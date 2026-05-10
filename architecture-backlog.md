@@ -2,7 +2,7 @@
 
 This document captures everything raised during architecture discussions that did not fully land in the architecture overview. The intent is to preserve context so future work (ADRs, design specifications, implementation tasks, revisits) has a single place to draw from rather than re-deriving from chat transcripts.
 
-Sections are organized by what to do with the content: deferred design decisions, alternatives considered and rejected with rationale, evolution paths to revisit if circumstances change, topics that need design before implementation, open questions to leave open until the right moment, architecture invariants worth formalizing, and ADR candidates.
+Sections are organized by what to do with the content: deferred design decisions, alternatives considered and rejected with rationale, evolution paths to revisit if circumstances change, topics that need design before implementation, open questions to leave open until the right moment, and architecture invariants worth formalizing. ADR candidates that lived here previously have been written up as ADRs in `adr/`.
 
 ## 1. Deferred design decisions
 
@@ -292,34 +292,3 @@ Invariants that are implicit in the architecture but should become explicit (the
 - Approvals flow through one mechanism (`Approval` CRD + Argo Workflows + Headlamp plugin). New approval types reuse the mechanism rather than building parallel ones.
 - Memory access modes are per-store: private, namespace-shared, or RBAC/OPA-controlled.
 - Each cluster is an independent install of the platform. Multi-cluster federation is not a v1.0 requirement.
-
-## 7. ADR candidates
-
-Decisions large enough that they deserve their own Architecture Decision Records, prioritized.
-
-1. ARK as the agent operator (chose ARK over kagent).
-2. OPA + Gatekeeper as the policy engine (chose over Kyverno).
-3. Envoy egress proxy as CNI-agnostic egress control (chose over Cilium L7).
-4. NATS JetStream as the broker backend (chose over Kafka).
-5. Letta as the memory backend.
-6. Python kopf operator for LiteLLM reconciliation (chose over Go Crossplane provider).
-7. LibreChat locked down as frontend-only (chose over Open WebUI, custom UI).
-8. Material for MkDocs as the documentation portal (chose over Backstage, Confluence).
-9. OpenSearch as the search/vector store (chose over Elasticsearch).
-10. CI/CD via GitHub Actions only for v1.0 (chose over multi-CI from day one).
-11. Three-layer testing with CLI orchestration.
-12. HolmesGPT as a first-class Platform Agent rather than an external tool.
-13. The capability CRD model and CapabilitySet layering (architectural primitive).
-14. Postgres as primary storage, OpenSearch as retrieval optimization only.
-15. Tempo + Langfuse correlated by trace_id.
-16. Multi-tenancy via Kubernetes namespaces with RBAC + OPA + network enforcement.
-17. Generalized approval system via `Approval` CRD + Argo Workflows + OPA elevation only.
-18. RBAC-as-floor / OPA-as-restrictor enforcement model platform-wide.
-19. Langchain Deep Agents as the single v1.0 agent SDK with multi-SDK harness shape preserved.
-20. Initial MCP services set: GitHub (system + user creds), Google Drive, Firecrawl, Context7.
-21. Dashboards as namespaced Crossplane-composed `GrafanaDashboard` XRs.
-22. Knowledge Base as a separate primitive (not built into HolmesGPT or any other agent).
-23. Knative broker is in the architecture but sources are environment-specific by design.
-24. Vendor doc acquisition is a separate companion project, not part of v1.0 architecture scope.
-25. Memory access modes (private / namespace-shared / RBAC-OPA-controlled) declared per memory store.
-26. Independent-cluster-install topology with no v1.0 federation.
