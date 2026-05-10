@@ -1835,6 +1835,10 @@ flowchart TB
   %% Headlamp graphical editors
   A9 --> A22
   A20 --> A22
+  %% Kargo promotion fabric — composes with Approval CRD (B19) and OPA (A7)
+  A7 --> A23
+  B19 --> A23
+  A23 --> B5
 
   %% Workstream B internal deps and dependencies on A
   A4 --> B8
