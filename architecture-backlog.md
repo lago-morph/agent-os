@@ -263,7 +263,7 @@ Currently independent installs. **Trigger**: a use case that requires cross-clus
 **Trigger**: a deployment environment requires Jenkins or GitLab CI.
 
 ### 3.15 Adding SDKs beyond LangGraph and Langchain Deep Agents
-v1.0 ships single-SDK with multi-SDK harness shape preserved. **Trigger**: a use case that fits another SDK better than LangGraph or Deep Agents.
+v1.0 ships LangGraph (supported low-level SDK) + Langchain Deep Agents (opinionated default layered on LangGraph) per ADR 0019, with the multi-SDK harness shape preserved. **Trigger**: a use case that fits another SDK better than LangGraph or Deep Agents.
 
 ### 3.16 Kargo Stage trajectory
 **Resolved for v1.0**: Kargo is in v1.0 deployed in single-cluster mode starting with one Stage (dev) per ADR 0040. **Trigger to add a staging Stage**: multiple agent teams converge on the platform, at which point a staging Stage is added between dev and the (still-future) prod Stage. **Trigger to add a prod Stage**: v1.0 feature-complete and ready for real workloads — at that point the prod Stage (prod cluster) is added into the Kargo promotion pipeline. Cross-ref ADR 0040.
@@ -276,8 +276,8 @@ These are not "alternatives" — they're concrete pieces of the architecture tha
 - Specific agent profiles to ship in the profile library (B17 scope).
 - Specific recommended agent compositions (B18 scope).
 - Specific OPA policy library content — concrete Rego bundles for v1.0 (B16 scope).
-- Specific Crossplane Compositions to build first — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, `GrafanaDashboard`, plus the substrate XRDs `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore` (per ADR 0041) (B4 scope).
-- Specific cross-cutting Headlamp plugins owned by B5 (capability inspector, approval queue UI, virtual key admin).
+- Specific Crossplane Compositions to build first — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, `GrafanaDashboard`, `AuditLog` (per ADR 0034), `TenantOnboarding` (per ADR 0037), `XAgentDatabase` (per ADR 0020 / 0041), plus the substrate XRDs `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore` (per ADR 0041) (B4 scope).
+- Specific cross-cutting Headlamp plugins owned by B5 (capability inspector, approval queue UI, virtual key admin, Kargo plugin per ADR 0040).
 - Specific tutorials and how-to guides to write first.
 - Memory namespace and sharing model details (3-mode access already specified).
 - Test manifest schema for the `agent-platform test` CLI.
@@ -304,7 +304,7 @@ These questions don't need answers yet but should be revisited at the right mome
 - Platform self-upgrade strategy — staged rollout, blue-green, canary; same as agent upgrades or different?
 - Whether B5 (cross-cutting Headlamp framework + cross-component plugins) ends up overlapping with per-component Headlamp plugins enough to merge or split.
 - Agent topology for the AI agents that will implement the platform — what kinds of agents, how they coordinate, what human-in-the-loop patterns apply. Held for a separate conversation after architecture is solid.
-- Unifying `OidcRoleMapping` CRD vs per-service config in v1.0 — **trigger to revisit**: when N service mappings get out of sync repeatedly. Cross-ref ADR 0040 and the future-enhancements entry that will be added.
+- Unifying `OidcRoleMapping` CRD vs per-service config in v1.0 — **trigger to revisit**: when N service mappings get out of sync repeatedly. Cross-ref ADR 0039 (editor scope), ADR 0040 (Kargo promotion), and `future-enhancements.md` § 11.
 - How should non-LibreChat chat surfaces integrate? (CLOSED — ADR 0036: Mattermost via Knative Eventing for v1.0; generic chat-platform driver pattern; Teams/Slack drop-ins deferred to future-enhancements.)
 
 ## 6. Architecture-level invariants worth documenting as ADRs

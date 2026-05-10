@@ -107,7 +107,7 @@ ADR 0035 accepts **rolling-restart-as-staged-restart** for LiteLLM. LiteLLM has 
 
 ## 9. GitOps progressive-delivery promotion (Kargo)
 
-**Resolved in v1.0 — see ADR 0040.** Kargo lands as the typed promotion pipeline for dev → staging → prod with verification gates. Tombstone retained for traceability against earlier deferral.
+**Resolved in v1.0 — see ADR 0040.** Kargo lands as the typed promotion pipeline with per-Stage verification suites and `Approval`-CRD-backed human gates. Phased trajectory: v1.0 starts with a single Stage; additional Stages (staging, prod) are added incrementally per ADR 0040. The dev → staging → prod end-state is the target, not the v1.0 initial deployment. Tombstone retained for traceability against earlier deferral.
 
 ## 10. Multi-cluster Kargo promotion across geographic regions / availability zones
 
