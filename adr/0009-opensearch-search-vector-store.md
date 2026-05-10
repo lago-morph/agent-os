@@ -5,7 +5,7 @@
 
 ## Context
 
-The platform needs a single retrieval-optimization tier for vector search, hybrid (lexical + vector) search, the `platform-knowledge-base` RAGStore, and searchable audit indexes (architecture-overview.md §6.3, §6.4, §6.5). The same store is also where Letta-maintained retrieval indexes land and where LiteLLM callbacks and Envoy egress fan out audit events for query and dashboards. The choice was narrowed to two options in architecture-backlog.md §2.15, and the architecture treats "anything in OpenSearch must be reproducible from a primary source (Postgres, object storage, or external system)" as an invariant (architecture-backlog.md §6).
+The platform needs a single retrieval-optimization tier for vector search, hybrid (lexical + vector) search, the `platform-knowledge-base` RAGStore, and searchable audit indexes (architecture-overview.md §6.3, §6.4, §6.5). The same store is also where Letta-maintained retrieval indexes land and where the platform audit adapter (ADR 0034) fans out audit events from LiteLLM callbacks, Envoy egress, and other components for query and dashboards. The choice was narrowed to two options in architecture-backlog.md §2.15, and the architecture treats "anything in OpenSearch must be reproducible from a primary source (Postgres, object storage, or external system)" as an invariant (architecture-backlog.md §6).
 
 ## Decision
 
@@ -68,9 +68,9 @@ Operators do not write audit events, KB indexes, or test-result documents direct
 
 ## References
 
-- architecture-overview.md § 6.3, § 6.4, § 6.5
-- architecture-backlog.md § 2.15, § 6
-- ADR 0011 (test execution and results) — non-unit results fan out here
-- ADR 0014 (Postgres primary, OpenSearch retrieval-only) — directly related
-- ADR 0033 (dual-mode initial targets) — kind + AWS-managed hosting model
-- ADR 0034 (platform audit pipeline) — Postgres + S3 system of record, OpenSearch fanout
+- [architecture-overview.md](../architecture-overview.md) [§ 6.3](../architecture-overview.md#63-memory-and-data-architecture), [§ 6.4](../architecture-overview.md#64-the-knowledge-base-as-a-separate-primitive), [§ 6.5](../architecture-overview.md#65-observability-architecture)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 2.15](../architecture-backlog.md#215-search-store-elasticsearch-vs-opensearch), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0011](./0011-three-layer-testing-cli-orchestration.md) (test execution and results) — non-unit results fan out here
+- [ADR 0014](./0014-postgres-primary-opensearch-retrieval.md) (Postgres primary, OpenSearch retrieval-only) — directly related
+- [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (dual-mode initial targets) — kind + AWS-managed hosting model
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (platform audit pipeline) — Postgres + S3 system of record, OpenSearch fanout

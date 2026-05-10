@@ -94,9 +94,9 @@ limits (rate, size, MIME); upload is not RBAC-gated to specific users.
 
 ## References
 
-- architecture-overview.md §5, §6.1, §6.9, §6.10, §6.11, §7.1, §7.2, §14.1
-- architecture-backlog.md § 2.10, 1.16, 3.12
-- ADR 0017 (approval flow — invoked by the scan-then-allow upload path)
-- ADR 0025 (Memory CRD access modes — destination for uploaded artifacts)
-- ADR 0038 (policy simulator — testing the upload OPA policy)
-- ADR 0039 (Headlamp policy editor — surfaces the upload-policy OPA bundle)
+- [architecture-overview.md](../architecture-overview.md) [§5](../architecture-overview.md#5-software-added-to-baseline), [§6.1](../architecture-overview.md#61-gateway-architecture), [§6.9](../architecture-overview.md#69-multi-tenancy-and-namespacing), [§6.10](../architecture-overview.md#610-platform-self-management-with-holmesgpt), [§6.11](../architecture-overview.md#611-identity-federation), [§7.1](../architecture-overview.md#71-interactive-chat), [§7.2](../architecture-overview.md#72-triggered-and-long-running), [§14.1](../architecture-overview.md#141-workstream-a--platform-installation-and-operations)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 2.10](../architecture-backlog.md#210-chat-ui-librechat-vs-open-webui-vs-custom), [1.16](../architecture-backlog.md#116-openai--a2a-translation-source), [3.12](../architecture-backlog.md#312-power-user-personal-agents-in-librechat)
+- [ADR 0017](./0017-generalized-approval-system.md) (approval flow — invoked by the scan-then-allow upload path)
+- [ADR 0025](./0025-memory-access-modes-per-store.md) (Memory CRD access modes — destination for uploaded artifacts)
+- [ADR 0038](./0038-policy-simulators.md) (policy simulator — testing the upload OPA policy)
+- [ADR 0039](./0039-headlamp-graphical-editors-for-platform-crds.md) (Headlamp policy editor — surfaces the upload-policy OPA bundle)

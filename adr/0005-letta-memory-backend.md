@@ -35,6 +35,6 @@ The platform adopts **Letta** as the memory backend (component **A10**, architec
 
 ## References
 
-- architecture-overview.md § 6.3
-- architecture-backlog.md § 2.9, 6
-- ADR 0025 (memory access modes per store) — directly related
+- [architecture-overview.md § 6.3](../architecture-overview.md#63-memory-and-data-architecture)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 2.9](../architecture-backlog.md#29-memory-backend-mem0-vs-letta-vs-zep--graphiti-vs-cognee-vs-langmem), [6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0025](./0025-memory-access-modes-per-store.md) (memory access modes per store) — directly related

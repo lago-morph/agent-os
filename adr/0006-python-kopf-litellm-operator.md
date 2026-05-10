@@ -30,7 +30,7 @@ The kopf operator is packaged as a **subchart of the LiteLLM Helm chart**, so a 
 
 ## References
 
-- architecture-overview.md §6.1, §6.6, §6.8, §6.12, §6.13, §9, §5 (component B13), §11
-- architecture-backlog.md § 2.5, § 6
-- ADR 0001 (ARK as the agent operator) — sibling reconciler in the controller landscape
-- ADR 0021 (`GrafanaDashboard` XRs use Crossplane Compositions) — Crossplane side of the kopf/Crossplane split
+- [architecture-overview.md](../architecture-overview.md) [§6.1](../architecture-overview.md#61-gateway-architecture), [§6.6](../architecture-overview.md#66-security-and-policy-architecture), [§6.8](../architecture-overview.md#68-capability-registries-and-approved-primitives), [§6.12](../architecture-overview.md#612-crd-inventory), [§6.13](../architecture-overview.md#613-versioning-policy), [§9](../architecture-overview.md#9-oss-limitations-and-required-custom-development), [§5](../architecture-overview.md#5-software-added-to-baseline) (component B13), [§11](../architecture-overview.md#11-grafana-dashboards)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 2.5](../architecture-backlog.md#25-litellm-provider-go-crossplane-provider-vs-python-kopf-operator), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0001](./0001-ark-as-agent-operator.md) (ARK as the agent operator) — sibling reconciler in the controller landscape
+- [ADR 0021](./0021-grafanadashboard-xrs.md) (`GrafanaDashboard` XRs use Crossplane Compositions) — Crossplane side of the kopf/Crossplane split

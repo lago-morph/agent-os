@@ -29,6 +29,6 @@ The platform adopts **NATS JetStream** as the Knative Eventing broker backend (c
 
 ## References
 
-- architecture-overview.md §6.7, §5, §14.1
-- architecture-backlog.md § 2.7, 2.8
-- ADR 0023 (environment-specific Knative sources), ADR 0031 (CloudEvent taxonomy), ADR 0036 (Mattermost integration via Knative Eventing)
+- [architecture-overview.md](../architecture-overview.md) [§6.7](../architecture-overview.md#67-eventing-architecture-knative--nats-jetstream), [§5](../architecture-overview.md#5-software-added-to-baseline), [§14.1](../architecture-overview.md#141-workstream-a--platform-installation-and-operations)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 2.7](../architecture-backlog.md#27-eventing-argo-events-vs-knative-eventing), [2.8](../architecture-backlog.md#28-knative-broker-backend-kafka-vs-nats-jetstream-vs-rabbitmq-vs-snssqs)
+- [ADR 0023](./0023-environment-specific-knative-sources.md) (environment-specific Knative sources), [ADR 0031](./0031-cloudevent-top-level-taxonomy.md) (CloudEvent taxonomy), [ADR 0036](./0036-mattermost-chat-integration.md) (Mattermost integration via Knative Eventing)

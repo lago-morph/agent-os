@@ -28,5 +28,5 @@ We use **Material for MkDocs** as the documentation portal. Markdown sources liv
 
 ## References
 
-- architecture-overview.md § 10, § 14.3
-- architecture-backlog.md § 2.6
+- [architecture-overview.md](../architecture-overview.md) [§ 10](../architecture-overview.md#10-documentation-plan), [§ 14.3](../architecture-overview.md#143-workstream-c--documentation-portal-and-content)
+- [architecture-backlog.md § 2.6](../architecture-backlog.md#26-documentation-portal-backstage-vs-material-for-mkdocs-vs-confluence)

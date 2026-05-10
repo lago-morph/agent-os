@@ -22,7 +22,7 @@ The platform ships one approval mechanism with four parts. (1) An `Approval` CRD
 - Commits the platform to "request a level, OPA may elevate, anyone with that level decides." M-of-N approvers, delegation, escalation timers, and complex routing are explicitly out of v1.0 scope (future-enhancements.md §4).
 - Revisit triggers for richer approval features (backlog §3.3): a concrete use case that cannot be expressed as OPA-elevation-only — e.g., multi-party sign-off, time-bounded escalation, or routing rules that depend on requester history. Added where the mechanism already lives (Argo behaviors, OPA rules, Headlamp UI), not by rebuilding.
 - Creates ongoing reuse pressure: any future approval surface (capability registration, budget exceptions, dynamic MCP registration, virtual key issuance overrides) must justify why it would not flow through this mechanism. The default is "use the `Approval` CRD."
-- Decisions emit a CloudEvent on the `platform.approval.*` taxonomy back to the requesting agent and an audit-index entry, so approval traceability is uniform regardless of action type.
+- Decisions emit a CloudEvent on the `platform.approval.*` taxonomy back to the requesting agent and an audit event through the platform audit adapter (ADR 0034) — Postgres + S3 are the system of record (Postgres only on kind), with OpenSearch as advisory fanout — so approval traceability is uniform regardless of action type.
 - Depends on Argo Workflows (ADR 0003-equivalent install — see §A3 in architecture-overview.md) and OPA (ADR 0002); couples the OPA policy library (B16) to a new policy surface (`approval.elevation`).
 - The HolmesGPT three-state permission model (ADR 0012) has an "upon-approval" state whose entire mechanic is creating an `Approval` CRD here — a third concrete consumer alongside Coach skill changes and HolmesGPT remediation, reinforcing the "use one mechanism" invariant.
 - Admins can preview the approval impact of an OPA policy change before submitting it via the Headlamp policy simulator (ADR 0038), which dry-runs `approval.elevation` rules against recent and synthetic `Approval` requests.
@@ -35,3 +35,4 @@ The platform ships one approval mechanism with four parts. (1) An `Approval` CRD
 - ADR 0018 (RBAC-floor / OPA-restrictor)
 - ADR 0012 (HolmesGPT three-state permission model — "upon-approval" consumer)
 - ADR 0038 (Headlamp OPA policy simulator)
+- ADR 0034 (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)
