@@ -19,6 +19,7 @@ Each cluster is an independent install of the platform. v1.0 commits to no multi
 - High availability and cross-region redundancy are explicitly out of v1.0 scope and tracked in future-enhancements §1; cross-cluster federation is listed there as the dependency that unlocks redundancy spanning clusters.
 - Trigger to revisit (backlog 3.13): a concrete use case that requires cross-cluster awareness or shared resources — e.g., agents in cluster A invoking agents or memory in cluster B, a shared knowledge base across regions, or HA that genuinely spans clusters. At that point this ADR is superseded and SPIFFE / federated identity (ADR 0028) is reopened.
 - Operational simplification for v1.0: a single set of CRDs, one Keycloak realm per platform install, one OPA bundle distribution, and one audit pipeline per cluster (Postgres + S3 system of record on AWS, Postgres-only on kind, with OpenSearch as advisory fanout — see ADR 0034). Tenancy boundaries remain namespace-scoped (ADR 0016) within a single cluster, not cross-cluster.
+- Cross-cluster *promotion* (not federation) is handled by **Kargo (ADR 0040)**: Kargo controllers in each cluster, or a centralized Kargo control plane reaching into each ArgoCD, orchestrate environment-to-environment promotion across the independent installs. This does not introduce a federation requirement — each cluster remains independent — but provides a uniform promotion contract on top of the independent-cluster topology.
 
 ## References
 
@@ -30,3 +31,4 @@ Each cluster is an independent install of the platform. v1.0 commits to no multi
 - [ADR 0028](./0028-identity-federation.md) (identity federation)
 - [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (AWS + GitHub initial targets)
 - [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)
+- [ADR 0040](./0040-kargo-promotion-fabric.md) (Kargo cross-cluster promotion)

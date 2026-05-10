@@ -31,9 +31,11 @@ Event *sources* are explicitly out of the architectural commitment: each install
 - A new install on a previously-unsupported environment (a different cloud, a different on-prem stack) is a source-set exercise, not an architecture change — provided that environment can run Knative + NATS JetStream and emit CloudEvents from whatever sources it does have.
 - GitOps stays clean: the broker, Triggers, adapters, and event-type schemas live in the platform manifests (one shape across installs), while the per-environment source manifests live in environment-specific overlays maintained by the install team.
 - The CloudEvent taxonomy (ADR 0031) is the load-bearing contract that makes this split work; tightening it (new namespaces, schema versioning) is a platform-wide concern, while adding a new source is a local one.
+- Relationship to ADR 0041 (substrate abstraction via Crossplane Compositions): this ADR's "sources are environment-specific by design" stance is one of the documented exceptions to the substrate-abstraction pattern. The shape difference between cloud-native event sources (SQS on AWS, Azure Event Grid on AKS, none on kind) is not abstractable in a way that preserves behavior; the boundary drawn here is therefore deliberate and noted as such in ADR 0041.
 
 ## References
 
 - [architecture-overview.md § 6.7](../architecture-overview.md#67-eventing-architecture-knative--nats-jetstream)
 - [architecture-backlog.md § 5](../architecture-backlog.md#5-open-questions-to-leave-open)
 - [ADR 0004](./0004-nats-jetstream-broker.md) (NATS JetStream broker), [ADR 0031](./0031-cloudevent-top-level-taxonomy.md) (CloudEvent taxonomy), [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial cloud target)
+- [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate abstraction via Crossplane Compositions — this ADR's source-set boundary is a documented exception to that pattern)

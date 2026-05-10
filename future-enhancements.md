@@ -107,17 +107,42 @@ ADR 0035 accepts **rolling-restart-as-staged-restart** for LiteLLM. LiteLLM has 
 
 ## 9. GitOps progressive-delivery promotion (Kargo)
 
+**Resolved in v1.0 — see ADR 0040.** Kargo lands as the typed promotion pipeline for dev → staging → prod with verification gates. Tombstone retained for traceability against earlier deferral.
+
+## 10. Multi-cluster Kargo promotion across geographic regions / availability zones
+
 ### v1.0 stance
 
-Dev → staging → prod promotion is via **PR + ArgoCD sync**, with the generalized approval system (ADR 0017) gating production changes. Pre-merge static checks (kubeval, conftest, ArgoCD dry-run) plus ephemeral kind smoke tests cover the lowest-risk patterns. The promotion shape is "merge to the right branch / overlay, ArgoCD reconciles, approval CRD gates where required."
+ADR 0026 commits to an independent-cluster topology, with a single region per environment. Kargo (ADR 0040) promotes within that single-region-per-environment shape: dev → staging → prod, each environment one cluster.
 
 ### Future enhancement
 
-- **Kargo for typed pipeline-shaped promotion with verification gates**, adopted when promotion volume and complexity justify the additional moving part. Kargo models promotion as a first-class pipeline with stages, verification, and rollback rather than a sequence of merges.
-- **Architecturally compatible with the Approval CRD**: the open design choice is whether Kargo *subsumes* the Approval CRD for promotion-shaped flows (Kargo's own gates suffice) or *wraps* it (Kargo stages call into the Approval CRD for human approval). Decision deferred until adoption is on the table.
-- Cross-references backlog § 3.x (Kargo evolution-path entry).
+- **Cross-region / cross-AZ Kargo promotion** for redundancy or geographic distribution: extend the Kargo pipeline to promote across regional cluster sets, with verification gates appropriate to the multi-region case (per-region health checks, staged regional rollout, region-aware rollback).
+- Cross-references backlog § 3.13 (multi-cluster federation trigger). The trigger to revisit is the same: a use case requiring cross-cluster awareness, redundancy, or shared resources.
 
-## 10. Other deferred items (cross-references)
+## 11. Unifying `OidcRoleMapping` CRD
+
+### v1.0 stance
+
+Per-service OIDC role-mapping configuration (Grafana, OpenSearch, ArgoCD, LiteLLM, LibreChat, Mattermost, Langfuse) lives in each service's native config in Git. Edits go through Headlamp graphical editors per ADR 0039 and are promoted via Kargo per ADR 0040. Each service speaks its own config schema; mappings are maintained N times.
+
+### Future enhancement
+
+- **Platform-level `OidcRoleMapping` CRD** that declares "this platform claim → that service role" once, with a controller that translates to each service's native config. Reduces N service-specific editors to one declarative surface.
+- **Trigger**: operational pain from drift across services — when N service mappings get out of sync more than once, the unification cost is justified. Until then, the per-service editor approach is the lower-overhead path.
+
+## 12. Additional substrate Compositions (AKS, GCP, on-prem variants)
+
+### v1.0 stance
+
+ADR 0041 ships kind + AWS Compositions. The XRD shape is substrate-agnostic; the Compositions are substrate-specific.
+
+### Future enhancement
+
+- **One Composition per XRD per additional substrate** (AKS, GCP / GKE, on-prem variants such as vSphere or bare-metal). The XRD shape itself is unchanged — adding a substrate is implementation work, not architecture work.
+- Architectural hooks already exist (XRD/Composition split per ADR 0041). Captured here for visibility so the work isn't mistaken for new architectural decisions when it comes up.
+
+## 13. Other deferred items (cross-references)
 
 These are tracked elsewhere but fit the "future enhancement" framing. Listed here for visibility:
 

@@ -123,7 +123,7 @@ Decision between local kind-based development and shared dev cluster development
 
 ### 1.15 Documentation portal vs Headlamp linking strategy
 
-Headlamp deep-links into other UIs (Langfuse, OpenSearch Dashboards, Argo Workflows, ArgoCD, LiteLLM admin). Specifics of linking — context preservation, authentication handoff, deep-link URL schemas — are design-time.
+Headlamp deep-links into other UIs (Langfuse, OpenSearch Dashboards, Argo Workflows, ArgoCD, LiteLLM admin, Kargo). Specifics of linking — context preservation, authentication handoff, deep-link URL schemas — are design-time.
 
 ### 1.16 OpenAI ↔ A2A translation source
 
@@ -265,8 +265,8 @@ Currently independent installs. **Trigger**: a use case that requires cross-clus
 ### 3.15 Adding SDKs beyond Langchain Deep Agents
 v1.0 ships single-SDK with multi-SDK harness shape preserved. **Trigger**: a use case that fits another SDK better than Langchain Deep Agents.
 
-### 3.16 GitOps progressive-delivery promotion (Kargo or equivalent)
-Current stance: PR + ArgoCD sync + the generalized approval system (ADR 0017) gates production changes. **Trigger to revisit**: enough environments and frequent enough config promotions that the manual approval flow starts to friction over staged rollouts. Architecturally compatible with the `Approval` CRD; the open design choice is whether Kargo subsumes or wraps the `Approval` CRD for promotion-shaped flows.
+### 3.16 Add the third Stage (prod cluster)
+**Resolved for v1.0**: Kargo is in v1.0 with two Stages (dev, staging) per ADR 0040. **Trigger to revisit**: v1.0 feature-complete and ready for real workloads — at that point add the third Stage (prod cluster) into the Kargo promotion pipeline. Cross-ref ADR 0040.
 
 ## 4. Topics that need further design before implementation
 
@@ -289,6 +289,8 @@ These are not "alternatives" — they're concrete pieces of the architecture tha
 - Per-event-type CloudEvent schemas under each top-level namespace (section 6.7).
 - Cluster-OIDC mapper concrete implementations for kind, EKS, AKS (now in scope per ADR 0028).
 - kind-cluster OIDC bootstrap utility (kubeadm patch + static JWKS host) as a concrete deliverable (ADR 0028, ADR 0033).
+- Per-substrate Composition implementations (kind side: CloudNativePG for `XPostgres`; OpenSearch operator for `XSearchIndex`; MinIO for `XObjectStore`; Bitnami MongoDB for `XMongoDocStore`). Cross-ref ADR 0041.
+- Candidate-Warehouse path-based shape (resolved: path-based, single mainline branch with `envs/<stage>/` directories per ADR 0040; remaining detail is per-stage verification step composition).
 
 ## 5. Open questions to leave open
 
@@ -302,6 +304,7 @@ These questions don't need answers yet but should be revisited at the right mome
 - Platform self-upgrade strategy — staged rollout, blue-green, canary; same as agent upgrades or different?
 - Whether B5 (cross-cutting Headlamp framework + cross-component plugins) ends up overlapping with per-component Headlamp plugins enough to merge or split.
 - Agent topology for the AI agents that will implement the platform — what kinds of agents, how they coordinate, what human-in-the-loop patterns apply. Held for a separate conversation after architecture is solid.
+- Unifying `OidcRoleMapping` CRD vs per-service config in v1.0 — **trigger to revisit**: when N service mappings get out of sync repeatedly. Cross-ref ADR 0040 and the future-enhancements entry that will be added.
 
 ## 6. Architecture-level invariants worth documenting as ADRs
 
@@ -324,3 +327,4 @@ Invariants that are implicit in the architecture but should become explicit (the
 - **Every API surface (CRDs, CloudEvents, SDKs, CLIs, HTTP APIs, agent A2A/MCP interfaces) carries an explicit version, owned by the component that exposes it** (section 6.13).
 - **Upstream-IdP mapper authoring** (translating Active Directory / Okta / etc. attributes into the platform claim schema): out of scope for this architecture; the platform commits to the schema, not the upstream-IdP mappers (section 6.9).
 - **Cluster-OIDC mapper authoring** (translating Kubernetes ServiceAccount tokens minted by the cluster OIDC issuer into platform JWTs for workload identity): IN SCOPE — the platform ships these for kind, EKS, and AKS per ADR 0028 / 0029.
+- **Connection-secret-shape and substrate-agnostic status-field discipline are part of the XRD contract** (ADR 0041).

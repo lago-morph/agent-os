@@ -332,6 +332,8 @@ The access mode is part of the `MemoryStore` CRD spec. Agent CRDs reference memo
 
 **OpenSearch deployment (ADR 0009, ADR 0033).** Same dual-mode pattern: **in-cluster on kind** for dev/integration, **AWS-managed OpenSearch via Crossplane MR on AWS**. OpenSearch is purely a retrieval-optimization layer (vectors, hybrid search, advisory audit fanout); see the rule of thumb above and the audit pipeline below.
 
+**Substrate abstraction via Crossplane Compositions (ADR 0041).** The dual-mode hosting pattern above (kind in-cluster vs. AWS managed services) is implemented uniformly through Crossplane XRDs with per-substrate Compositions rather than parallel hand-maintained manifests. The v1.0 substrate XRDs are `XPostgres`, `XSearchIndex`, `XObjectStore`, and `XMongoDocStore`; consumers reference the XRD claim and the platform selects the appropriate Composition for the target substrate. **Connection-secret schema is part of the XRD contract** — every Composition writes the same shape of connection secret (host, port, credentials key names, etc.) so consumers don't branch on substrate. **Status fields are substrate-agnostic** — the XR's status surface exposes a normalized health/readiness view rather than substrate-specific conditions. **Documented capability-parity caveat:** the kind path may produce reduced functionality by design (for example, no S3 archive in the kind audit pipeline — Postgres alone is the system of record on kind; see the audit pipeline below). Reduced-capability gaps are explicit in the Composition documentation, not silent.
+
 **Audit pipeline (ADR 0034).** Every component emits audit through the **platform audit adapter** — a Python library every component links against — to a single deployable **audit endpoint**. No component writes audit records directly to Postgres, S3, or OpenSearch.
 
 - **Postgres + S3 are the system of record.** The audit endpoint writes received events to a Postgres `audit_events` table. On AWS, a batch CronJob (~every 5 minutes) writes pending rows as immutable objects to S3, verifies the write, and only then deletes the corresponding Postgres rows. **On kind, S3 is not provisioned and Postgres alone is the system of record.**
@@ -546,7 +548,7 @@ Implementation requires a **structured dry-run mode at each layer** — every OP
 
 ### 6.7 Eventing architecture (Knative + NATS JetStream)
 
-We use Knative Eventing for the event mesh and NATS JetStream as the broker backend. Same broker in dev and prod. Sources differ per environment (AwsSqsSource on AWS, equivalents on Azure, webhook receivers in kind).
+We use Knative Eventing for the event mesh and NATS JetStream as the broker backend. Same broker in dev and prod. Sources differ per environment (AwsSqsSource on AWS, equivalents on Azure, webhook receivers in kind). These environment-specific Knative sources (ADR 0023) are documented exceptions to the substrate-abstraction pattern (ADR 0041) — the source kinds are not unified behind a Crossplane Composition because their event-shape and authentication models are substrate-native.
 
 ```mermaid
 flowchart LR
@@ -965,6 +967,10 @@ A summary of every CRD in the architecture, who reconciles it, and where it is d
 | `AuditLog` (Crossplane XRD) | Crossplane (B4) | namespaced | Composes the audit pipeline (ADR 0034) — Postgres `audit_events` backing store, S3 archive bucket + lifecycle (AWS only), OpenSearch indexer, batch CronJob (AWS only), and the audit-endpoint Deployment. | `postgresRef`, `s3BucketRef`, `indexerRef`, `batchScheduleSpec`, `endpointReplicas` | §6.3, §6.5 |
 | `TenantOnboarding` (Crossplane XRD) | Crossplane (B4) | namespaced | Provisions a tenant — creates the tenant namespace(s), templated default ServiceAccounts, and the claim-to-tenant binding in Keycloak (ADR 0037). CapabilitySets are intentionally not coupled. | `tenantId`, `namespaces[]`, `defaultServiceAccounts[]`, `keycloakBinding` | §6.9 |
 | `AgentDatabase` (Crossplane XRD) | Crossplane (B4) | namespaced | Provisions per-agent / per-tenant / per-user databases for the Postgres and MongoDB MCP services (ADR 0020) — creates the database, role, and grants. | `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef` | §6.1, §6.3 |
+| `XPostgres` (Crossplane XRD) | Crossplane (B4) | namespaced | Substrate-abstracted Postgres instance (ADR 0041). Per-substrate Compositions resolve to in-cluster Postgres on kind or AWS RDS on AWS. Writes a uniform connection secret per the XRD contract; status is substrate-agnostic. | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass` | §6.3 |
+| `XSearchIndex` (Crossplane XRD) | Crossplane (B4) | namespaced | Substrate-abstracted search/index backend (ADR 0041). Per-substrate Compositions resolve to in-cluster OpenSearch on kind or AWS-managed OpenSearch on AWS. Uniform connection secret; substrate-agnostic status. | `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass` | §6.3 |
+| `XObjectStore` (Crossplane XRD) | Crossplane (B4) | namespaced | Substrate-abstracted object storage (ADR 0041). Per-substrate Compositions resolve to an in-cluster MinIO-compatible store on kind or AWS S3 on AWS. Uniform connection secret; substrate-agnostic status. **Capability-parity caveat:** the kind path may expose reduced functionality (e.g., no S3 archive lifecycle) by design. | `bucketName`, `lifecycle`, `connectionSecretRef`, `substrateClass` | §6.3 |
+| `XMongoDocStore` (Crossplane XRD) | Crossplane (B4) | namespaced | Substrate-abstracted Mongo-compatible document store (ADR 0041). Per-substrate Compositions resolve to in-cluster MongoDB on kind or an AWS-managed equivalent on AWS. Uniform connection secret; substrate-agnostic status. | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass` | §6.3 |
 
 All CRDs are namespaced. There are no cluster-scoped platform CRDs in v1.0.
 
@@ -1210,6 +1216,8 @@ sequenceDiagram
 
 A skill, prompt, or capability change flows through Git → CI evals → ArgoCD reconcile. The custom Python kopf operator keeps LiteLLM in sync with capability CRDs.
 
+**PR + ArgoCD sync is the deploy path within a single environment.** Environment-to-environment progression is handled separately by **Kargo (ADR 0040)**: once the candidate commit is merged and reconciled into dev, Kargo advances it through subsequent Stages (staging, prod) with per-Stage verification suites and `Approval`-CRD-backed human gates where required. The diagram below shows the within-environment loop; see section 8 and component A23 for the Kargo promotion fabric on top of it.
+
 **Architecture:**
 
 ```mermaid
@@ -1365,6 +1373,8 @@ We use **option 2** (unified CLI tasks called from native pipelines): the same `
 - Posting results back as PR comments and commit statuses.
 
 **Container maintenance pipeline.** A scheduled CI workflow keeps the agent base image current: rebuild with latest base + OS + language deps, run security scans (Trivy or Grype, block on critical CVEs), run regression eval suite, tag new image, open PR to bump references in Agent CRDs. Triggered out-of-cycle for critical CVEs.
+
+**Pre-merge static checks complement Kargo's runtime promotion gates.** The reference pipeline runs `kubeval` against manifests, `conftest` against the OPA Rego library, `helm template` / `kustomize build` for render verification, and ArgoCD server-side dry-run before merge. These pre-merge checks catch syntax, schema, and policy problems early; they **complement Kargo's runtime promotion gates per ADR 0040** — Kargo handles environment-to-environment progression, verification suites per Stage, and the human-approval composition with the `Approval` CRD, all of which run *after* a candidate has merged into the Warehouse.
 
 **Security-first pipeline design.** The CI/CD pipeline is itself a privileged component — it has push access to the registry and merge-trigger access to GitOps reconciliation — and is designed with that in mind from the start. The reference GitHub Actions pipeline ships with: scoped tokens (no long-lived static credentials; OIDC federation to AWS where possible, GitHub Environments to gate production-affecting jobs), pinned action versions and SHA-pinned third-party actions, separate runners for build vs deploy where the deploy runner has elevated trust, and signed artifacts. Required scan steps (Trivy / Grype on images, dependency scanning on language packages, OPA bundle linting, schema validation on CRDs and CloudEvents) are part of the reference pipeline and gated as required checks. Hardening of the pipeline beyond v1.0 — admission-time enforcement of scan-artifact presence, continuous scanning of running images, image signing and attestation — is in the future-enhancements document.
 
@@ -1528,6 +1538,8 @@ Per-component dashboards are mostly vendor-provided with tweaks; they ship as pa
 
 The Crossplane Composition for `GrafanaDashboard` is part of Component B4. The Grafana provider for Crossplane (or the equivalent reconciliation path) is included in the same component.
 
+**Headlamp deep-link inventory.** Headlamp deep-links into the specialized operations UIs alongside its native resource views: **Langfuse** (LLM traces and prompt management), **OpenSearch Dashboards** (audit search, log exploration), **Argo Workflows** (workflow runs and approval consoles), **ArgoCD** (sync status, app health), **LiteLLM admin** (gateway configuration, virtual keys), and — per ADR 0040 — **Kargo** (one deep-link per Stage, surfacing the current promotion state, verification results, and manual promotion controls for that Stage).
+
 ### 11.1 Operator dashboards (cross-cutting / integrated)
 
 - Platform overview — single-screen health of every component, drill-down links.
@@ -1615,6 +1627,8 @@ Three layers of automated tests, in place from day one. Tests for each component
 
 Six workstreams. Workstreams A and B are the core engineering; C, D, and E continuously consume their outputs; F runs at the end to harden the platform for production.
 
+**Promotion and substrate model across workstreams.** Within a single environment, deployment is PR + ArgoCD sync (sections 7.4, 8). Between environments, **promotion is via Kargo per ADR 0040** — a candidate commit lands in the Warehouse, Kargo advances it through Stages (dev → staging → prod) with per-Stage verification and `Approval`-CRD-backed human gates where required. **Substrate differences (kind vs. AWS, and any future substrates) are absorbed by Crossplane Compositions per ADR 0041** rather than parallel hand-maintained manifests; the v1.0 substrate XRDs are `XPostgres`, `XSearchIndex`, `XObjectStore`, and `XMongoDocStore` (see §6.3, §6.12). **Per-environment Kustomize overlays handle sizing and replicas only** — substrate selection is the Composition's job, not the overlay's. This shapes Workstream A and B deliverables: each component ships a single set of manifests, with substrate variation behind XRDs and Composition selectors, and with Kargo's GitOps repo layout (path-based, single mainline) as the deployment target.
+
 ### 14.1 Workstream A — Platform installation and operations
 
 Each component here is a per-product install + configure + operate package. **Standard deliverables for every Workstream A component:**
@@ -1657,6 +1671,7 @@ Each component here is a per-product install + configure + operate package. **St
 | A20 | **Policy simulator service (ADR 0038)** — the dry-run composition service that calls each enforcement layer's structured dry-run mode and assembles the per-layer decision trace. Surfaces it via the Headlamp panel and exposes a HolmesGPT-callable skill equivalent. |
 | A21 | **Tenant onboarding reconciler (ADR 0037)** — the `TenantOnboarding` Crossplane XRD, its composition (namespaces + default ServiceAccounts + Keycloak claim-to-tenant binding), and the Headlamp graphical editor that drives it. CapabilitySets intentionally not coupled. |
 | A22 | **Headlamp graphical editors for platform CRDs (ADR 0039)** — schema-driven graphical editors for `Agent`, `CapabilitySet`, `MCPServer`, `A2APeer`, `Memory`, `EgressTarget`, `Skill`, `BudgetPolicy`, `LogLevel`, `TenantOnboarding`, `AgentDatabase`, `AuditLog`, OPA-bundle policy edits, and the others. Editors integrate with the policy simulator (A20) for preview-before-commit. |
+| A23 | **Kargo promotion fabric (ADR 0040)** — Helm values and install manifests for Kargo, GitOps wiring against the path-based environment overlays (`envs/dev/`, `envs/staging/`, `envs/prod/`), per-Stage verification configs (smoke suites bound to each environment), and Warehouse configuration for candidate commits. Composes with the `Approval` CRD (B19) for human gates and with OPA (A7) for promotion-action policy. Lands early under the same phased trajectory as HolmesGPT — single Stage initially, additional Stages added as additional environments come online. Standard component deliverables apply (per-product docs, runbook, alerts, Headlamp plugin via B5, OPA integration, audit emission, Knative trigger flow design, HolmesGPT toolset, tests, tutorials and how-tos). |
 
 ### 14.2 Workstream B — Custom platform development
 
@@ -1665,8 +1680,8 @@ Each component here is a per-product install + configure + operate package. **St
 | B1 | SSO/auth proxy layer — `oauth2-proxy` configured against Keycloak in front of LiteLLM, Langfuse, Headlamp, Argo, etc. |
 | B2 | LiteLLM custom callbacks (Python) — PII, audit, OPA bridge, guardrails. **Required**: audit and OPA bridge are mandatory and ship with LiteLLM (Component A1). If A1 lands before the integrating components are ready, the relevant callback implementation moves into the component that needs the integration (e.g., the OPA bridge callback ships with A7 OPA if A1 lands first). |
 | B3 | OPA policy library — initial Rego bundles + library setup + documentation for adding new policies. Each per-component OPA contribution lands in its own component; B3 sets up the framework and ships the initial admission policies. |
-| B4 | Crossplane v2 Compositions — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, **`GrafanaDashboard` (namespaced, RBAC/OPA-controlled)**, etc. |
-| B5 | **Cross-cutting Headlamp plugins** — plugins that span multiple components and don't naturally belong to any one of them: capability inspector (per-agent unified view across MCP / A2A / RAG / egress / skills / OPA refs), approval queue UI, virtual key admin UI. **The Headlamp framework itself (base install, branding, shared libraries) is owned by A9; per-component plugins are owned by their respective components.** |
+| B4 | Crossplane v2 Compositions — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, **`GrafanaDashboard` (namespaced, RBAC/OPA-controlled)**, and the **substrate-abstraction XRDs per ADR 0041** (`XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`) with per-substrate Compositions (kind, AWS), uniform connection-secret schemas, and substrate-agnostic status surfaces. |
+| B5 | **Cross-cutting Headlamp plugins** — plugins that span multiple components and don't naturally belong to any one of them: capability inspector (per-agent unified view across MCP / A2A / RAG / egress / skills / OPA refs), approval queue UI, virtual key admin UI, and the **Kargo plugin (ADR 0040)** — per-Stage status visualization (current commit, last verification result, Stage health), promotion triggering controls (manual promotion within OPA-allowed bounds, retry-failed-verification, abort), and deep-link out to the Kargo UI per the inventory in section 11. **The Headlamp framework itself (base install, branding, shared libraries) is owned by A9; per-component plugins are owned by their respective components.** |
 | B6 | Platform SDK (Python + TypeScript) — what Platform Agents use to call into the platform: `memory.*`, `rag.*`, OTel emission, A2A registration helpers. Distinct from the agent SDK in B7. |
 | B7 | **Initial agent SDK support — LangGraph + Langchain Deep Agents (ADR 0019).** **LangGraph** is the supported v1.0 SDK; **Langchain Deep Agents (built on LangGraph)** is the opinionated, batteries-included default used in tutorials, how-tos, the agent profile library, and recommended compositions. The multi-SDK harness shape is preserved so OpenAI Agents SDK / Strands / Anthropic Agent SDK / Mastra / ARK ADK can be enrolled as additive changes; the `Agent` CRD's `sdk` field accepts `langgraph` and `deep-agents` in v1.0. Adventurous users may build their own harness images that comply with the platform-SDK interaction surface (§6.2); third-party harness images are NOT officially supported. |
 | B8 | Knative event adapter services (Python — CloudEvent → AgentRun, CloudEvent → Workflow). Includes the two initial trigger flows (AlertManager → HolmesGPT, budget exceeded → email user). |
@@ -1759,6 +1774,7 @@ flowchart TB
     A20[A20 Policy simulator service]
     A21[A21 Tenant onboarding reconciler]
     A22[A22 Headlamp graphical editors]
+    A23[A23 Kargo promotion fabric]
   end
 
   subgraph B[Workstream B: Custom dev]

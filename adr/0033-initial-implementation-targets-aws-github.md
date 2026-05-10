@@ -19,6 +19,7 @@ For v1.0 the platform targets **AWS (EKS)** as the cloud and **GitHub** (source 
 - OpenSearch runs in-cluster on kind (StatefulSet) for dev and integration testing, and on **AWS-managed OpenSearch** in production.
 - Both modes are provisioned through the same Crossplane MR/XRD shape, so callers consume a connection (endpoint + credentials handle published into the namespace) without knowing where the backend is hosted.
 - This keeps the dev loop self-contained (no AWS account required) and the production path on managed services, without forking component code or test fixtures.
+- The dual-mode hosting above is implemented via the substrate-abstraction pattern formalized in [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate abstraction via Crossplane Compositions) — *not* via parallel manifest sets per substrate. [Kargo](./0040-kargo-promotion-fabric.md) promotes claim shapes that are uniform across substrates; per-environment differences live inside the matching Composition. AKS support, while architecturally committed, is implemented (when targeted) by adding a third Composition per relevant XRD rather than re-architecting.
 
 **kind cluster OIDC bootstrap is a v1.0 deliverable.** Developer and integration-test workloads need cluster-OIDC → Keycloak federation (ADR 0028) to exercise the same identity path as EKS. The bootstrap consists of:
 
@@ -51,3 +52,5 @@ Without this, the kind path cannot validate the federation pattern and IRSA-vs-k
 - [ADR 0028](./0028-identity-federation.md) (identity federation; kind cluster-OIDC issuer support)
 - [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — depends on Postgres + S3 backends established here)
 - [ADR 0036](./0036-mattermost-chat-integration.md) (Mattermost integration — part of v1.0 chat surface on this target)
+- [ADR 0040](./0040-kargo-promotion-fabric.md) (Kargo promotion — uniform claim shapes across substrates)
+- [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate abstraction via Crossplane Compositions — dual-mode implementation pattern)
