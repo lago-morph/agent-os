@@ -822,7 +822,7 @@ HolmesGPT's autonomy is policy-controlled. Initially: read-only diagnostics, pro
 - **upon-approval** — the action is held pending human approval through the generalized approval system (section 7.5); OPA may add conditions like "only during business hours" or "only for objects matching this label selector".
 - **denied** — the action is rejected and the rejection is audited.
 
-These policies are **centrally managed via OPA bundles**, edited through **Headlamp graphical editors for platform CRDs (ADR 0039)** rather than by hand-editing Rego in Git. The graphical editors integrate with the **policy simulator (ADR 0038)** so an admin can preview the per-layer effect of a proposed change before committing it.
+These policies are **centrally managed via OPA bundles**, edited through the **Headlamp policy editor surface (covered alongside the platform-CRD editors in ADR 0039)** rather than by hand-editing Rego in Git. OPA bundles are policy artifacts, not platform CRDs, but they share the same authoring discipline — schema-aware validation, diff-against-Git preview, and PR-then-ArgoCD apply. The editor integrates with the **policy simulator (ADR 0038)** so an admin can preview the per-layer effect of a proposed change before committing it.
 
 **Phased deployment trajectory (ADR 0012 update).** HolmesGPT lands **very early** — earlier than the bulk of the platform components. In its first deployment phase, it runs on a raw Kubernetes cluster with:
 
@@ -1229,7 +1229,8 @@ flowchart LR
   DEV[Developer]
   GIT[(Git)]
   CI[CI runner<br/>vendor-neutral CLI]
-  PF[promptfoo + chainsaw +<br/>playwright + pytest]
+  PF[Test layers (ADR 0011):<br/>chainsaw + playwright + pytest]
+  PFOO[promptfoo<br/>evaluation tool — separate]
   LFE[Langfuse experiments]
   OPAT[OPA bundle test]
   REG[(Container registry)]
@@ -1240,6 +1241,7 @@ flowchart LR
   DEV --> GIT
   GIT --> CI
   CI --> PF
+  CI --> PFOO
   CI --> LFE
   CI --> OPAT
   CI --> REG
@@ -1268,7 +1270,8 @@ sequenceDiagram
   DEV->>GIT: open PR
   GIT->>CI: trigger
   par eval and tests
-    CI->>TST: chainsaw + playwright + pytest + promptfoo
+    CI->>TST: chainsaw + playwright + pytest (three layers, ADR 0011)
+    CI->>TST: promptfoo (evaluation tool — separate from the three layers)
     CI->>LFE: experiment over dataset
     CI->>OPAT: rego unit tests
   end
@@ -1615,9 +1618,15 @@ Three layers of automated tests, in place from day one. Tests for each component
 - **Playwright** — both UI flows and HTTP API flows. "Log into LibreChat, pick agent, get response," and "POST to LiteLLM, expect this OPA decision, expect this audit event."
 - **PyTest** — where it's the natural fit (Python SDK unit tests, custom callback tests, kopf operator unit tests).
 
+**Promptfoo is an evaluation tool, not a fourth test layer (ADR 0011).** It runs alongside the three layers in CI for adversarial / red-team / quality evaluation, but it is **not part of the Chainsaw / Playwright / PyTest set** — the three layers above are the testing framework's structural contract.
+
 **Coordination via the `agent-platform test` CLI.** Same command from a developer laptop, from CI, or on schedule. The CLI reads a manifest declaring "what runs where" and invokes the right runners. Aggregates results.
 
-**`--debug` / `--trace` flags (ADR 0035).** The `agent-platform test` CLI accepts `--debug` and `--trace` flags that **activate the dynamic log-level / trace-granularity toggle for the duration of the run** and **disable it on completion** (whether the run passes, fails, or is interrupted). Components honoring the toggle (in-process via `LogLevel` CR; rolling-restart for non-reloadable services) raise verbosity for the test run only, so a developer chasing an intermittent failure can re-run with `--trace` and get full detail without leaving the platform in a high-verbosity state.
+**Audit emission (ADR 0034).** Every `agent-platform test` run emits audit events through the **platform audit adapter** to the audit endpoint, the same way every other audit-relevant action does. Test runs are first-class auditable activity — start, finish, pass/fail, and per-layer results all appear in the audit trail.
+
+**Soft dependencies on OpenSearch and the OTel pipeline.** OpenSearch (advisory test-result index) and the OTel collector (metrics / logs export) are **soft dependencies** for the CLI. When either backend is unreachable — common on a developer laptop without cluster access — the CLI **warns, continues, and exits non-zero only on actual test failure**. A laptop run without cluster access still produces local pass/fail output; remote indexing simply degrades gracefully.
+
+**`--debug` / `--trace` flags (ADR 0035).** The `agent-platform test` CLI accepts `--debug` and `--trace` flags that **activate the dynamic log-level / trace-granularity toggle for the duration of the run** and **disable it on completion** (whether the run passes, fails, or is interrupted). Components honoring the toggle (in-process via `LogLevel` CR; rolling-restart for non-reloadable services) raise verbosity for the test run only, so a developer chasing an intermittent failure can re-run with `--trace` and get full detail without leaving the platform in a high-verbosity state. **Blast radius is scoped to the components exercised by the run, not the whole platform** — only components the run actually touches have their levels raised. **Restoration is exhaustive**: the CLI restores prior levels on normal completion, on `Ctrl-C` / SIGTERM, and on crash paths (signal handlers + atexit hooks), not just on clean exit.
 
 **Reporting (ADR 0011 update).** **Non-unit test results** (integration, end-to-end, evaluation, red-team) **stream to OpenSearch** as an advisory index, and **metrics + logs publish via OpenTelemetry** through the same collector path the rest of the platform uses. This shares pipelines with production observability rather than running a parallel test-only stack. Trend dashboards over the OpenSearch index serve the role earlier slated for Mimir-only metrics; per-run detail still goes to CI output (PR comments, commit statuses). No Allure or ReportPortal initially — the bar to add either is felt pain in trend analysis or defect grouping. No test CRDs unless we hit a need declarative test execution can't meet.
 
@@ -1631,7 +1640,7 @@ Three layers of automated tests, in place from day one. Tests for each component
 
 Six workstreams. Workstreams A and B are the core engineering; C, D, and E continuously consume their outputs; F runs at the end to harden the platform for production.
 
-**Promotion and substrate model across workstreams.** Within a single environment, deployment is PR + ArgoCD sync (sections 7.4, 8). Between environments, **promotion is via Kargo per ADR 0040** — a candidate commit lands in the Warehouse, Kargo advances it through Stages (dev → staging → prod) with per-Stage verification and `Approval`-CRD-backed human gates where required. **Substrate differences (kind vs. AWS, and any future substrates) are absorbed by Crossplane Compositions per ADR 0041** rather than parallel hand-maintained manifests; the v1.0 substrate XRDs are `XPostgres`, `XSearchIndex`, `XObjectStore`, and `XMongoDocStore` (see §6.3, §6.12). **Per-environment Kustomize overlays handle sizing and replicas only** — substrate selection is the Composition's job, not the overlay's. This shapes Workstream A and B deliverables: each component ships a single set of manifests, with substrate variation behind XRDs and Composition selectors, and with Kargo's GitOps repo layout (path-based, single mainline) as the deployment target.
+**Promotion and substrate model across workstreams.** Within a single environment, deployment is PR + ArgoCD sync (sections 7.4, 8). Between environments, **promotion is via Kargo per ADR 0040** — a candidate commit lands in the Warehouse, Kargo advances it through Stages with per-Stage verification and `Approval`-CRD-backed human gates where required. **Phased Kargo trajectory:** v1.0 starts with a **single Stage**; additional Stages (e.g., staging, prod) come online only after they have been added per ADR 0040's phased rollout. Workstream planning treats the Stage list as evolving rather than the dev → staging → prod triple being present from day one. **Substrate differences (kind vs. AWS, and any future substrates) are absorbed by Crossplane Compositions per ADR 0041** rather than parallel hand-maintained manifests; the v1.0 substrate XRDs are `XPostgres`, `XSearchIndex`, `XObjectStore`, and `XMongoDocStore` (see §6.3, §6.12). **Per-environment Kustomize overlays handle sizing and replicas only** — substrate selection is the Composition's job, not the overlay's. This shapes Workstream A and B deliverables: each component ships a single set of manifests, with substrate variation behind XRDs and Composition selectors, and with Kargo's GitOps repo layout (path-based, single mainline) as the deployment target.
 
 ### 14.1 Workstream A — Platform installation and operations
 
@@ -1669,12 +1678,12 @@ Each component here is a per-product install + configure + operate package. **St
 | A14 | **HolmesGPT — lands very early (ADR 0012 phased trajectory).** First phase: deployed onto the raw Kubernetes cluster with read-only ServiceAccount + read-only AWS IAM, no secret-store access, useful for diagnostics during platform implementation itself. As subsequent components land, HolmesGPT's access is rewired through the platform layers (LiteLLM, audit adapter, OPA decision points) and other components contribute toolsets. Pulled forward in the dependency graph. |
 | A15 | Reloader, oauth2-proxy (small but real install/config work) |
 | A16 | Interactive Access Agent — general-purpose chat-facing Platform Agent that LibreChat connects to. Implemented early so LibreChat has a working endpoint from day one. |
-| A17 | **Initial MCP services integration (ADR 0020)** — GitHub (system-credential and user-credential modes), Google Drive (system- and user-credential modes), Context7, **OpenSearch** (system-mediated against the platform's own OpenSearch + agent/tenant/user-credentialed for external instances), **Postgres** and **MongoDB** (per-agent / per-tenant / per-user databases provisioned via the new `AgentDatabase` Crossplane XRD), and **generic web-search + web-scrape MCP servers** (in-cluster, OPA-gated at the access layer rather than internally). **Firecrawl is NOT in v1.0**; its role is taken by the generic web-search and web-scrape services. Each MCP service registered as an `MCPServer` CRD, secrets handled by ESO, access controlled by CapabilitySet inclusion + OPA. |
+| A17 | **Initial MCP services integration (ADR 0020)** — GitHub (system-credential and user-credential modes), Google Drive (system- and user-credential modes), Context7, **OpenSearch** (system-mediated against the platform's own OpenSearch + agent/tenant/user-credentialed for external instances), **Postgres** and **MongoDB** (per-agent / per-tenant / per-user databases provisioned via the `XAgentDatabase` Crossplane XRD), and **generic web-search + web-scrape MCP servers** (in-cluster, OPA-gated at the access layer rather than internally). **Firecrawl is NOT in v1.0**; its role is taken by the generic web-search and web-scrape services. Each MCP service registered as an `MCPServer` CRD, secrets handled by ESO, access controlled by CapabilitySet inclusion + OPA. |
 | A18 | **Audit endpoint + audit adapter library (ADR 0034)** — the single deployable audit endpoint Deployment, the Postgres `audit_events` schema and migrations, the OpenSearch indexer service, the S3 batch CronJob (AWS only), the `AuditLog` Crossplane composition, and the **Python audit adapter library** every component links against. |
 | A19 | **Mattermost adapter (ADR 0036)** — Mattermost Team Edition install, Keycloak GitLab-OAuth-spoof client + protocol mappers, the bidirectional Knative-Eventing bridge, and the OPA-driven Trigger filter library for channel routing. Generic chat-platform driver pattern so Teams / Slack are future drop-ins. |
-| A20 | **Policy simulator service (ADR 0038)** — the dry-run composition service that calls each enforcement layer's structured dry-run mode and assembles the per-layer decision trace. Surfaces it via the Headlamp panel and exposes a HolmesGPT-callable skill equivalent. |
-| A21 | **Tenant onboarding reconciler (ADR 0037)** — the `TenantOnboarding` Crossplane XRD, its composition (namespaces + default ServiceAccounts + Keycloak claim-to-tenant binding), and the Headlamp graphical editor that drives it. CapabilitySets intentionally not coupled. |
-| A22 | **Headlamp graphical editors for platform CRDs (ADR 0039)** — schema-driven graphical editors for `Agent`, `CapabilitySet`, `MCPServer`, `A2APeer`, `Memory`, `EgressTarget`, `Skill`, `BudgetPolicy`, `LogLevel`, `TenantOnboarding`, `AgentDatabase`, `AuditLog`, OPA-bundle policy edits, and the others. Editors integrate with the policy simulator (A20) for preview-before-commit. |
+| A20 | **Policy simulator service (ADR 0038)** — the dry-run composition service that calls each enforcement layer's structured dry-run mode and assembles the per-layer decision trace. **Participating layers explicitly include RBAC and the Gatekeeper / CLI gates** alongside OPA (LiteLLM callback, Envoy egress, approval-system elevation), per ADR 0038. Surfaces the per-layer trace via the Headlamp panel and exposes a HolmesGPT-callable skill equivalent. |
+| A21 | **Tenant onboarding reconciler (ADR 0037)** — the `TenantOnboarding` Crossplane XRD, its composition (namespaces + default ServiceAccounts + cluster-OIDC-side claim mapper), and the Headlamp graphical editor that drives it (A21 owns its own CRD's editor; A22 owns only the cross-cutting framework / shared widgets — see A22). CapabilitySets intentionally not coupled. |
+| A22 | **Headlamp graphical-editor framework for platform CRDs (ADR 0039)** — the **cross-cutting framework and shared editor widgets** (schema-driven form generation, validation hooks, policy-simulator integration, GitOps-diff preview) that per-component teams build their CRD editors on top of. Overlaps deliberately with A9 (Headlamp framework install) and B5 (cross-cutting plugins) — A22 is the editor-specific layer of that shared framework. **Per-component teams own their CRD's editor**; A22 ships the framework plus the **initial editor set per ADR 0039**: `MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `Agent` (and templates), `TenantOnboarding`, `AuditLog`, `LogLevel`, and `GrafanaDashboard`. **OPA-bundle policy edits** are also covered as a policy artifact alongside the platform CRDs (the simulator / diff-against-Git flow applies). **Excluded from the v1.0 set:** `BudgetPolicy` (deferred per ADR 0039); `Memory` and `XAgentDatabase` (not in ADR 0039's initial list). All editors integrate with the policy simulator (A20) for preview-before-commit. |
 | A23 | **Kargo promotion fabric (ADR 0040)** — Helm values and install manifests for Kargo, GitOps wiring against the path-based environment overlays (`envs/dev/`, `envs/staging/`, `envs/prod/`), per-Stage verification configs (smoke suites bound to each environment), and Warehouse configuration for candidate commits. Composes with the `Approval` CRD (B19) for human gates and with OPA (A7) for promotion-action policy. Lands early under the same phased trajectory as HolmesGPT — single Stage initially, additional Stages added as additional environments come online. Standard component deliverables apply (per-product docs, runbook, alerts, Headlamp plugin via B5, OPA integration, audit emission, Knative trigger flow design, HolmesGPT toolset, tests, tutorials and how-tos). |
 
 ### 14.2 Workstream B — Custom platform development
@@ -1693,7 +1702,7 @@ Each component here is a per-product install + configure + operate package. **St
 | B10 | Coach Component (self-retrospection). **Implemented after the components it depends on land**: Langfuse, ARK, LiteLLM, observability stack. Doesn't necessarily need OPA; design-time decision. |
 | B11 | Memory backend adapter. |
 | B12 | CloudEvent schema registry — JSON schemas + tooling. |
-| B13 | **Custom Python kopf operator for LiteLLM** — reconciles `MCPServer`, `A2APeer`, `VirtualKey`, `CapabilitySet`, `RAGStore`, `BudgetPolicy` to LiteLLM admin API. **Packaged as a subchart of the LiteLLM Helm chart (ADR 0006)** — single ArgoCD release, lifecycle bound to LiteLLM, no version-skew between the gateway and the operator that drives it. |
+| B13 | **Custom Python kopf operator for LiteLLM** — reconciles `MCPServer`, `A2APeer`, `VirtualKey`, `CapabilitySet`, `RAGStore`, `EgressTarget`, `Skill`, `BudgetPolicy` to LiteLLM admin API. **Packaged as a subchart of the LiteLLM Helm chart (ADR 0006)** — single ArgoCD release, lifecycle bound to LiteLLM, no version-skew between the gateway and the operator that drives it. |
 | B14 | **`agent-platform` test framework** — test orchestration CLI, harness for stress probes, test result metrics emission, dashboard provisioning. |
 | B15 | **CI/CD reference pipeline — GitHub Actions only for v1.0.** Jenkins and GitLab CI are explicitly out of scope for v1.0; they may come later. |
 | B16 | **Initial OPA policy library content** — concrete Rego bundles covering admission for all v1.0 CRDs, runtime decisions for LiteLLM (tool authorization, budget enforcement, dynamic registration approval), egress policy at the Envoy proxy, RBAC-floor / OPA-restrictor enforcement helpers, and Headlamp action gating. Distinct from B3 (framework) — this is the first wave of policies the platform ships with. |
