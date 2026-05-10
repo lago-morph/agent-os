@@ -32,8 +32,15 @@ The cluster has these pieces already running. The platform is built on top of th
 | cert-manager | TLS certificate lifecycle | Issues and rotates certs for ingress, mTLS, internal services. |
 | Git server | Source of truth | Holds all platform manifests, skill artifacts, OPA bundles, capability CRs, agent specs. |
 | Container registry | Image storage | Holds platform images, agent base images, custom controller images. |
+| Ingress controller | L7 ingress | Serves external traffic to platform UIs and the LiteLLM gateway. |
+| ExternalDNS | DNS record management | Maintains DNS records for cluster ingress hostnames. |
+| Cloud or in-cluster load balancer | L4 fronting the ingress controller | Cloud-managed on EKS / AKS, MetalLB or equivalent in kind. |
+| Cluster OIDC issuer | Service-account token federation | Required for AWS IRSA, Azure Workload Identity, and federating Kubernetes service-account identity to Keycloak. See section 6.11. |
+| CSI storage driver | Persistent volume provisioning | Whatever the cloud provider's default offers; consumed by Postgres, OpenSearch, NATS JetStream, and the PV-access subsystem (B20). |
 
-The cluster itself runs on EKS, AKS, or kind for development. **We do not depend on a specific CNI** — egress controls happen at an Envoy-based egress proxy rather than via CNI L7 policy. **Each cluster is an independent install of the platform.** Multi-cluster federation is not a v1.0 requirement; the EKS / AKS / kind list describes where the platform can run, not a topology that knits clusters together.
+Detailed baseline configuration — exact ingress controller, CSI driver versions, DNS strategy — is documented in the **`k8-platform` companion repository**. This architecture assumes a conformant install of that baseline; deviations from it are a baseline-repo concern, not an architecture-of-this-platform concern.
+
+The cluster itself runs on EKS, AKS, or kind for development. **We do not depend on a specific CNI** — egress controls happen at an Envoy-based egress proxy rather than via CNI L7 policy. **Each cluster is an independent install of the platform.** Multi-cluster federation is not a v1.0 requirement; the EKS / AKS / kind list describes where the platform can run, not a topology that knits clusters together. **Initial v1.0 implementation targets AWS (EKS) and GitHub for source control and CI**; Azure (AKS) is supported by the architecture but not exercised in v1.0.
 
 ## 4. High-level architecture
 
@@ -143,12 +150,12 @@ Each component is classified by **activity type**: install, configuration, or cu
 | **`oauth2-proxy`** | Authenticating reverse proxy for tools whose OSS versions lack SSO (LiteLLM admin UI, etc.). | Install (Helm, multiple instances) + per-tool config against Keycloak. |
 | **Reloader (stakater/reloader)** | Triggers rolling restart of dependent workloads when ConfigMaps or Secrets they consume change. | Install (Helm). |
 | **Crossplane v2 Compositions** | XRDs and Compositions for cloud-shaped resources (`AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, etc.). | **Custom development — Composition YAML, possibly with Python composition functions.** |
-| **Platform SDK (Python + TypeScript)** | Library agents use for memory, skills, tools, RAG, OTel emission. | **Custom development.** |
+| **Platform SDK (Python + TypeScript)** | Library Platform Agents use for memory, skills, tools, RAG, OTel emission. | **Custom development.** |
 | **Agent base container image** | Multi-SDK harness (LangGraph, OpenAI Agents SDK, Strands, Anthropic Agent SDK, Mastra, ARK ADK) wrapping the platform SDK. | **Custom development.** |
-| **Coach agent** | Scheduled Platform Agent that consumes traces and audit data and proposes improvements via PR or suggestion card. | **Custom development — built using the platform itself.** |
+| **Coach Component** | Scheduled Platform Agent that consumes traces and audit data and proposes improvements via PR or suggestion card. | **Custom development — built using the platform itself.** |
 | **CI/CD integration kit** | Vendor-neutral CLI and container images called from native CI pipelines. | **Custom development.** |
 | **Knative event adapter services** | Two thin services: CloudEvent → AgentRun CR, CloudEvent → Argo Workflow. Filtering happens at Knative Trigger level (declarative); adapters are pure field-mapping. | **Custom development (Python).** |
-| **Documentation portal** | Material for MkDocs: tutorials, how-tos, reference, explanation, per-product docs, runbooks, knowledge base. Also indexed as a `RAGStore` for use by agents. | **Custom development — content + simple static site.** |
+| **Documentation portal** | Material for MkDocs: tutorials, how-tos, reference, explanation, per-product docs, runbooks, knowledge base. Also indexed as a `RAGStore` for use by Platform Agents. | **Custom development — content + simple static site.** |
 
 > **Callout: configuration that is really custom development.**
 >
@@ -364,7 +371,28 @@ flowchart LR
 
 **Tempo and Langfuse correlate by `trace_id`** — every span emitted by the agent SDK and the gateway carries the same trace_id whether it's LLM-flavored or not, so a developer in Grafana can click into Langfuse for prompt-level detail and back. Mimir holds long-term metrics; Prometheus stays as the scrape layer.
 
+**Scope note.** The architecture commits to the observability infrastructure (collection, storage, correlation, per-component dashboards, alert rules for failure conditions) and to broad audit emission. **Operations-metrics work — SLI / SLO definitions, error budgets, reliability summaries, automated alert→remediation loops via HolmesGPT — is deferred to future enhancements** (see `future-enhancements.md`). The collection paths for those metrics exist; the policy and dashboards on top of them are the deferred portion.
+
 ### 6.6 Security and policy architecture
+
+#### Threat model — v1.0 stance
+
+The architecture's primary modeled threat for v1.0 is **users or Platform Agents exceeding their authorized access, with a focus on unintentional excess.** Misconfigured capabilities, prompt-injection-driven actions outside intended scope, careless OPA policies, accidental over-broad RBAC grants, and similar mistakes are the dominant concern. The defense-in-depth model — capability scoping at admission, OPA runtime restriction at the gateway, FQDN allowlist at the egress proxy, gVisor / Kata kernel isolation in the sandbox, complete audit emission, RBAC-as-floor / OPA-as-restrictor — is designed primarily against this class of risk.
+
+A **dedicated adversarial threat model** — treating malicious actors as the primary modeling subject rather than mistakes — is a required **design specification deliverable that ships before the first wave of component implementation lands** so its requirements feed forward into every component. It is owned by Workstream B as design (see component **B22** in section 14.2), not as code.
+
+The dedicated threat model design must address at minimum:
+
+- **Adversary classes**: malicious agent author, compromised agent, compromised tenant, compromised admin, compromised LLM or MCP provider, supply-chain compromise (skill artifacts, container images, CRDs), prompt injection from incoming text influencing agent decisions.
+- **Asset inventory**: tenant data, secrets, audit integrity, compute, capability registry integrity, identity tokens, the platform's own self-management agents (HolmesGPT, Coach).
+- **Trust boundaries**: tenant ↔ tenant, agent ↔ gateway, gateway ↔ provider, sandbox ↔ host kernel, control plane ↔ data plane, internal A2A ↔ external A2A.
+- **Specific attack patterns**: capability escape (agent acquires capability not in its set), audit tampering, OPA bypass, sandbox escape, A2A-based lateral movement, exfiltration via approved tools, secret extraction via prompt injection, denial-of-service via budget or capability exhaustion.
+- **Per-attack mapping**: which controls apply, what residual risk remains, what observability detects exploitation.
+- **Output**: a set of security standards, acceptance criteria, mandatory test cases, and mandatory dashboard signals that every component must meet. The output updates this section, the per-component deliverable lists in Workstream A, and the OPA policy library targets in B16.
+
+The ongoing defense-in-depth model below is the architecture-level commitment; the dedicated threat model refines and extends it.
+
+#### Defense in depth
 
 ```mermaid
 flowchart TB
@@ -426,27 +454,30 @@ Calling these out explicitly so they get implemented as each component lands.
 
 **Audit emission points:**
 
-- LiteLLM callbacks — every request and response, including MCP calls and A2A handoffs.
+- LiteLLM callbacks — every request and response, including MCP calls and A2A handoffs. (A17 MCP services ride this path; no separate emission point.)
 - Kubernetes admission via Gatekeeper — every CR admit/deny.
 - Envoy egress proxy — every outbound HTTP connection.
 - Knative broker — event arrival and dispatch outcome.
-- ARK operator — Agent / Team / Sandbox lifecycle events.
+- ARK operator — Agent / Team / Sandbox / AgentRun lifecycle events.
 - agent-sandbox controller — Sandbox creation, destruction, hibernation.
 - ESO — secret access (built in).
 - ArgoCD — sync events.
 - LibreChat — conversation events.
-- Headlamp plugin actions — admin operations through our plugins.
-- Coach agent — auto-PR creation, suggestion card emission.
+- Headlamp plugin actions — admin operations through our plugins, including virtual-key issuance and budget edits.
+- Approval workflows — request created, OPA elevation decision, approver decision, escalation triggered, timeout fired, CloudEvent delivery to requesting agent.
+- Coach Component — auto-PR creation, suggestion card emission.
 - HolmesGPT — queries run, recommendations made, actions taken.
+- LiteLLM kopf operator — capability registry changes (MCPServer, A2APeer, RAGStore, EgressTarget, Skill, CapabilitySet, VirtualKey, BudgetPolicy reconcile events).
 
 **OPA decision points:**
 
-- Kubernetes admission via Gatekeeper — Agent CRD, Sandbox, Memory, MCPServer, A2APeer, RAGStore, CapabilitySet, VirtualKey, BudgetPolicy.
+- Kubernetes admission via Gatekeeper — Agent, AgentRun, Sandbox, SandboxTemplate, Memory, MemoryStore, MCPServer, A2APeer, RAGStore, EgressTarget, Skill, CapabilitySet, VirtualKey, BudgetPolicy, Approval, and the Crossplane XRs (AgentEnvironment, SyntheticMCPServer, GrafanaDashboard).
 - LiteLLM callbacks — runtime tool/model authorization, rate limiting, content checks, **budget enforcement**.
 - LiteLLM dynamic registration — whether a Platform Agent is allowed to register an A2A or MCP interface in its namespace.
 - LibreChat — which Platform Agents a user can pick (via Keycloak claims).
 - Envoy egress proxy — which destinations are allowed for which agent class.
-- Headlamp plugin actions — which admin can approve which suggestion cards, **issue virtual keys**, edit budgets, or perform other privileged operations.
+- Headlamp plugin actions — which admin can approve which suggestion cards, **issue virtual keys**, edit budgets, perform other privileged operations.
+- Approval system — required-level elevation evaluation, escalation policy.
 - agent-platform CLI — CI pipeline gates: can this PR promote to which environment?
 - HolmesGPT — what tools it can invoke, what it can do autonomously vs require human approval.
 
@@ -501,7 +532,24 @@ flowchart LR
 
 **Filtering happens at the Knative Trigger** (declarative, GitOps-able, audited and policy-checked through Knative). The adapters are pure field-mapping services with no decision logic — one creates an `AgentRun` CR, the other submits an Argo Workflow. This keeps every event flowing through Knative's audit and policy layer.
 
-**CloudEvent standardization across the platform.** All platform events — agent lifecycle, audit events, gateway events, evaluation events — emit as CloudEvents. We maintain a JSON schema registry in Git for our event types. External systems can subscribe declaratively.
+**CloudEvent standardization across the platform.** All platform events — agent lifecycle, audit events, gateway events, evaluation events — emit as CloudEvents. We maintain a JSON schema registry in Git for our event types (component B12). External systems can subscribe declaratively.
+
+The architecture commits to the following top-level event-type namespaces. Specific event names within each namespace are design-time per component, but every event a platform component emits must fall under one of these.
+
+| Namespace | What it covers |
+|---|---|
+| `platform.lifecycle.*` | Agent, AgentRun, Sandbox, Workflow, MemoryStore lifecycle (created, started, paused, resumed, completed, failed, deleted). |
+| `platform.audit.*` | Audit-emission events from any component (gateway request/response, admission decisions, egress connections, secret access). Mirrors what flows to OpenSearch. |
+| `platform.gateway.*` | LiteLLM-specific events that aren't pure audit: routing decisions, provider failover, MCP health changes, A2A handoffs. |
+| `platform.policy.*` | OPA decisions, policy violations, dynamic registration accept/deny. |
+| `platform.capability.*` | Changes to the capability registry: MCPServer / A2APeer / RAGStore / EgressTarget / Skill / CapabilitySet add/update/delete. |
+| `platform.evaluation.*` | Evaluation run started / completed, A/B test results, red-team findings. |
+| `platform.approval.*` | Approval requested, OPA-elevated, decided (approved or rejected), escalated, timed out. |
+| `platform.observability.*` | Threshold crossings, alert routing (e.g., budget-exceeded notifications, SLA-style alerts). |
+| `platform.tenant.*` | Tenant onboarding, namespace association changes, cross-tenant publish events. |
+| `platform.security.*` | Security-relevant events distinct from audit: sandbox-escape signal, repeated authn failures, policy-bypass attempts. |
+
+The schema for each event type lives in B12's registry. Schema versioning is per the platform versioning policy (section 6.13).
 
 **Initial trigger flows for v1.0.** Two concrete flows ship with v1.0 to exercise the eventing path end to end and demonstrate the pattern; more flows are designed inside each component as it lands.
 
@@ -557,42 +605,70 @@ flowchart TB
   HL -.->|reads| LL
 ```
 
-**CapabilitySet layering** uses a Helm-style values-overlay model: sets applied in order, later overriding earlier, with per-Agent overrides taking precedence. Detailed semantics (recursive includes, merge vs replace per field, validation rules) are design-time decisions, not architecture-time. The key architectural property is that capabilities are declarative, layerable, and visible per-agent through Headlamp.
+**CapabilitySet layering** uses a Helm-style values-overlay model with the following committed semantics:
+
+- CapabilitySets referenced by an Agent are processed **one at a time, in declared order**.
+- For each set, for each top-level field: **if the field is not yet present in the resolved state, add it; if it is present, replace it.** This is field-level Helm overlay — a later set's value for a field fully replaces an earlier set's value for that same field. Lists are not concatenated by default; to extend a list from a parent set, the overlay restates the full list it wants.
+- After all referenced sets are resolved, the **per-Agent overrides apply last**, with the same add-if-not-there / replace-if-there semantics.
+
+Detailed semantics that remain design-time: recursive includes (whether a CapabilitySet may reference other CapabilitySets), validation rules for missing or deleted references, namespace boundaries on cross-references, and whether per-Agent overrides may grant capabilities not present in any referenced set. The architectural commitment is the layering model above; syntax and mechanics around it are design.
 
 A small pseudocode sketch of how layering would resolve, just to illustrate the model:
 
 ```yaml
 # baseline-readonly capability set
-mcp_servers: [confluence-readonly, jira-readonly]
-llm_providers: [anthropic-claude, openai-gpt5]
+mcp_servers:    [confluence-readonly, jira-readonly]
+llm_providers:  [anthropic-claude, openai-gpt5]
 egress_targets: [internal-api]
 opa_policy_refs: [base-restrictions]
 
-# customer-support overlay
-mcp_servers: [+zendesk]              # additive: union with parent
-llm_providers: [openai-gpt5]         # replace: this list, not parent's
-egress_targets: [+customer-portal]   # additive
-opa_policy_refs: [+rate-limit-strict]
+# customer-support overlay — full lists, replaces baseline values
+mcp_servers:    [confluence-readonly, jira-readonly, zendesk]
+egress_targets: [internal-api, customer-portal]
+opa_policy_refs: [base-restrictions, rate-limit-strict]
+# llm_providers not specified → stays from baseline
 
 # Agent X
 capability_sets: [baseline-readonly, customer-support]
 overrides:
-  egress_targets: [+observability-api]   # add one more on top
+  egress_targets: [internal-api, customer-portal, observability-api]
 
 # Final resolved capability for Agent X
-mcp_servers: [confluence-readonly, jira-readonly, zendesk]
-llm_providers: [openai-gpt5]
+mcp_servers:    [confluence-readonly, jira-readonly, zendesk]
+llm_providers:  [anthropic-claude, openai-gpt5]
 egress_targets: [internal-api, customer-portal, observability-api]
 opa_policy_refs: [base-restrictions, rate-limit-strict]
 ```
 
-The exact merge marker syntax (`+` for additive vs replace for overwrite, or alternatives), validation, and conflict resolution are design-time. The point is that capabilities compose declaratively from a library of profiles, not by editing each Agent CRD from scratch.
+The point is that capabilities compose declaratively from a library of profiles, with predictable replace-then-override resolution, and a tooling surface (Headlamp) that shows the resolved view.
 
 **Headlamp plugin** for capabilities renders the unified per-agent view: for `Agent X`, here are all MCP servers, A2A peers, RAG stores, egress targets, skills, and OPA policies that apply, regardless of which CapabilitySet contributed them. Reads come from Kubernetes (CRDs) and LiteLLM (current applied state).
 
 ### 6.9 Multi-tenancy and namespacing
 
 Tenancy is built around Kubernetes namespaces. A tenant maps to one or more namespaces; the namespace boundary is the tenancy boundary. This applies to Platform Agents, the CRDs they reference, the Sandboxes they run in, and the audit and observability data they emit.
+
+**Tenancy is established through Keycloak claims.** A user's tenant membership, accessible namespaces, and platform roles are all carried as JWT claims minted by Keycloak. Keycloak in turn uses **mappers** to translate identity attributes from the upstream identity provider (AD groups, Okta groups, etc.) into the platform's claim schema. Building those mappers is **out of scope** for this architecture — that work is the responsibility of whoever administers the platform install, since their choice of upstream IdP determines the source attributes. The architecture commits only to the **claim schema Keycloak must emit**, summarized below.
+
+#### Required Keycloak JWT claims
+
+| Claim | Type | Required | Purpose |
+|---|---|---|---|
+| `sub` | string | yes | Subject identity (user or service-account principal). |
+| `iss` | string | yes | Issuer; must be the platform's Keycloak realm. |
+| `aud` | string or array | yes | Audience; one of the platform service identifiers (gateway, headlamp, etc.). |
+| `exp`, `iat`, `nbf` | int | yes | Standard JWT lifetime claims. |
+| `email` | string | for users | User email; absent for service-account principals. |
+| `preferred_username` | string | yes | Display name used in UIs and audit. |
+| `platform_tenants` | array&lt;string&gt; | yes | Tenants the principal belongs to. Empty array means "no tenant context" (cross-tenant platform admins are still scoped via roles, not absence of this claim). |
+| `platform_namespaces` | array&lt;string&gt; | yes | Kubernetes namespaces the principal may operate in. Authoritative for OPA decisions on resource scope. |
+| `platform_roles` | array&lt;string&gt; | yes | Platform-level roles: `platform-admin`, `operator`, `developer`, `viewer`, `auditor`, etc. Specific role catalog is design-time; this claim's presence and shape is architecture-level. |
+| `tenant_roles` | object&lt;tenant, array&lt;role&gt;&gt; | for tenant-scoped principals | Per-tenant role mappings (e.g., `{tenant-a: [admin], tenant-b: [developer]}`). Empty for purely platform-level principals. |
+| `capability_set_refs` | array&lt;string&gt; | for service-account principals (Platform Agents) | CapabilitySets the principal is permitted to bind to. Used by OPA to gate dynamic registration and virtual-key issuance. |
+
+These claims are consumed by LiteLLM (auth + virtual-key claim binding), OPA (every policy decision that depends on identity), Headlamp (UI scoping), and LibreChat (endpoint visibility). RBAC remains the authoritative permission floor; OPA may further restrict per-decision based on these claims.
+
+#### Visibility model
 
 Within a namespace, Platform Agents that expose an A2A or MCP interface to other agents register **dynamically** with LiteLLM at startup — the agent advertises itself through the gateway's registration API, gated by OPA policy that decides whether this agent is allowed to expose this interface. Once registered, other Platform Agents can discover and call it according to whatever policy says they may.
 
@@ -658,6 +734,125 @@ flowchart LR
 ```
 
 HolmesGPT's autonomy is policy-controlled. Initially: read-only diagnostics, propose changes via auto-PR or suggestion card. Later, narrow remediations execute autonomously when OPA allows. The audit trail is the same as any other agent.
+
+### 6.11 Identity federation
+
+The platform has three identity domains that need to be tied together: Kubernetes service accounts (running pods, including Platform Agents), cloud-provider identity (for IRSA / Workload Identity-style access to cloud secret stores and other cloud resources), and Keycloak-issued JWTs (the platform's authoritative identity for OPA decisions, virtual key claims, and UI access).
+
+```mermaid
+flowchart LR
+  subgraph K8S[Kubernetes cluster]
+    SA[ServiceAccount<br/>per Platform Agent]
+    OIDC[Cluster OIDC issuer]
+    SA --> OIDC
+  end
+
+  subgraph CLOUD[Cloud provider]
+    direction TB
+    AWS[AWS IAM<br/>via IRSA]
+    SM[AWS Secrets Manager]
+    AWS --> SM
+    AZ[Azure AD Workload Identity]
+    KV[Azure Key Vault]
+    AZ --> KV
+  end
+
+  subgraph KC[Keycloak]
+    IDP[Cluster OIDC<br/>as IdP]
+    MAP[Mappers<br/>installer-provided]
+    JWT[Platform JWT<br/>with claims]
+    IDP --> MAP --> JWT
+  end
+
+  ESO[ESO]
+  GW[LiteLLM]
+  OPA[OPA]
+  LC[LibreChat]
+
+  OIDC --> AWS
+  OIDC --> AZ
+  OIDC --> IDP
+  ESO --> SM
+  ESO --> KV
+  JWT --> GW
+  JWT --> OPA
+  JWT --> LC
+```
+
+**The chain of trust** for a Platform Agent making a privileged call:
+
+1. The agent's pod runs as a Kubernetes ServiceAccount with a projected token signed by the cluster's OIDC issuer.
+2. **Cloud-side**: ESO (or any in-cluster process needing cloud access) uses that SA token to assume a cloud identity — **AWS IRSA** (SA annotated with `eks.amazonaws.com/role-arn`, AWS STS recognizes the cluster as an OIDC provider, returns scoped AWS credentials) or **Azure Workload Identity** (SA annotated with `azure.workload.identity/client-id`, Azure AD recognizes the cluster as an OIDC issuer, returns scoped Azure credentials). Both Azure and AWS implement this OIDC-based federation pattern; functionally equivalent for the architecture's purposes.
+3. **Platform-side**: the SA token is exchanged (via standard OIDC token exchange) for a Keycloak-issued platform JWT. Keycloak federates the cluster OIDC issuer as an Identity Provider and applies the installer-configured mappers to enrich the resulting platform JWT with the claim schema in section 6.9 (`platform_tenants`, `platform_namespaces`, `platform_roles`, `capability_set_refs`, etc.).
+4. The platform JWT is what LiteLLM, OPA, Headlamp, and LibreChat actually consume.
+
+**For human users**, the chain skips step 2 — the user logs in to Keycloak through the UI, Keycloak brokers the upstream IdP (AD, Okta, etc.), mappers populate the same claim schema, and the resulting JWT is presented to platform components.
+
+**Trust bootstrap.**
+
+- **AWS (v1.0 initial implementation)**: ESO uses an IRSA-bound ServiceAccount to fetch Keycloak admin credentials, JWT signing keys, initial database passwords, and other bootstrap secrets from **AWS Secrets Manager**. The IRSA trust is established once during cluster provisioning by the `k8-platform` baseline.
+- **Azure (architecture-supported, not exercised in v1.0)**: equivalent pattern with **Azure Workload Identity** + **Azure Key Vault**. Specifics are TBD until v1.0 lands and Azure becomes a real target.
+- **kind / dev**: the cluster runs without cloud federation; ESO is configured against a local secret backend or the secrets are provided directly. Bootstrap is local.
+
+**What the architecture commits to:**
+
+- All privileged platform identity flows ultimately resolve to a Keycloak-issued JWT carrying the section 6.9 claim schema. No platform component trusts upstream identity directly.
+- Cluster OIDC is the SA federation root; IRSA / Workload Identity is the cloud-resource adapter; Keycloak is the platform identity adapter.
+- Mapper authoring (translating upstream IdP attributes into platform claims) is **out of scope**; architects of a specific install own it.
+- Initial v1.0 implementation is AWS + GitHub. Azure parity is a configuration concern, not an architectural one.
+
+### 6.12 CRD inventory
+
+A summary of every CRD in the architecture, who reconciles it, and where it is discussed in detail. High-level attributes are listed here; the full schema lives with each CRD's reference documentation (section 10.3).
+
+| CRD | Reconciler | Scope | Summary | Key attributes | Discussed in |
+|---|---|---|---|---|---|
+| `Agent` | ARK | namespaced | A Platform Agent declaration. | `capabilitySetRefs[]`, `overrides`, `sdk`, `image`, `sandboxTemplateRef`, `memoryRefs[]`, `modelRef`, `triggers`, `exposes` (A2A/MCP) | §6.2, §6.8 |
+| `AgentRun` | ARK | namespaced | A single execution of an Agent, created by Knative event adapters or workflow steps. | `agentRef`, `inputs`, `traceId`, `triggeredBy`, `state` | §6.7, §7.2 |
+| `Team` | ARK | namespaced | A coordinated multi-agent grouping. | `members[]`, `coordinationStrategy` | §5 (component A5) |
+| `Tool` | ARK | namespaced | An ARK-native tool definition. | (defers to ARK) | §5 (component A5) |
+| `Memory` | ARK | namespaced | An agent-scoped memory binding. | `memoryStoreRef`, `accessMode` | §6.3 |
+| `Evaluation` | ARK | namespaced | An agent evaluation specification. | `agentRef`, `datasetRef`, `evaluators[]` | §5 (component A5), §7.4 |
+| `Query` | ARK | namespaced | An ARK-native query primitive. | (defers to ARK) | §5 (component A5) |
+| `Sandbox` | agent-sandbox | namespaced | A sandbox instance running agent pods. | `templateRef`, `runtime` (gVisor/Kata), `state` | §6.2 |
+| `SandboxTemplate` | agent-sandbox | namespaced | A reusable sandbox class definition. | `runtime`, `warmPoolSize`, `hibernationEnabled`, `resourceLimits` | §6.2 |
+| `MCPServer` | kopf (B13) | namespaced | An approved MCP server registered with the gateway. | `endpoint`, `authMode` (system/user-cred), `credentialsRef`, `tags`, `scopes`, `visibility` | §6.1, §6.8 |
+| `A2APeer` | kopf (B13) | namespaced | An approved A2A peer (internal or external). | `endpoint`, `direction` (internal/external), `auth`, `tags` | §6.1, §6.8 |
+| `RAGStore` | kopf (B13) | namespaced | A RAG-capable store (vector + hybrid). | `backend`, `indexes[]`, `contentSourceRefs[]`, `ingestionPipelineRef` | §6.4, §6.8 |
+| `EgressTarget` | kopf (B13) | namespaced | An approved outbound HTTP destination. | `fqdn`, `port`, `scheme`, `allowedMethods` | §6.1, §6.8 |
+| `Skill` | kopf (B13) | namespaced | A skill artifact reference (managed via LiteLLM's skill gateway). | `gitRef`, `versionPin`, `schemaRef` | §6.2, §6.8 |
+| `CapabilitySet` | kopf (B13) | namespaced | A bundled, layerable set of capabilities. | `mcpServers[]`, `a2aPeers[]`, `ragStores[]`, `egressTargets[]`, `skills[]`, `llmProviders[]`, `opaPolicyRefs[]` | §6.8 |
+| `VirtualKey` | kopf (B13) | namespaced | A LiteLLM virtual key bound to a CapabilitySet and identity. | `ownerIdentity`, `capabilitySetRef`, `budgetRef`, `environment`, `allowedModels[]`, `ttl` | §6.6 |
+| `BudgetPolicy` | kopf (B13) | namespaced | A budget specification consumed by OPA + LiteLLM. | `scope` (key/agent/team/tenant), `period`, `limits`, `thresholdActions[]` | §6.6 |
+| `Approval` | Argo Workflow + B19 | namespaced | A request for human approval of an agent-proposed action. | `requestingAgent`, `actionType`, `actionAttributes`, `defaultLevel`, `evidenceRefs[]`, `decision`, `decidedBy`, `decidedAt` | §7.5 |
+| `MemoryStore` (Crossplane XR) | Crossplane (B4) | namespaced | A composed memory backend resource. | `accessMode` (private/namespace-shared/RBAC-OPA), `backendType` | §6.3 |
+| `AgentEnvironment` (Crossplane XR) | Crossplane (B4) | namespaced | A composed environment for a class of agents. | `region`, `quotas`, `defaultCapabilitySetRef` | §5 (component B4) |
+| `SyntheticMCPServer` (Crossplane XR) | Crossplane (B4) | namespaced | An MCP server synthesized from an OpenAPI spec. | `openApiSpecRef`, `authConfigRef`, `mcpServerRef` (back-link) | §5 (component A12) |
+| `GrafanaDashboard` (Crossplane XR) | Crossplane (B4) | namespaced | A namespaced dashboard. | `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled) | §11 |
+
+All CRDs are namespaced. There are no cluster-scoped platform CRDs in v1.0.
+
+### 6.13 Versioning policy
+
+The platform exposes several distinct API surfaces that all need explicit versioning. The architecture commits to a versioning model for each; specific bump/deprecation timing is per-component design.
+
+| Surface | Versioning approach | Owner |
+|---|---|---|
+| **CRDs** | Kubernetes API versioning (`v1alpha1`, `v1beta1`, `v1`); breaking changes go through a new `vN` group with conversion webhooks; `vN-1` deprecated for at least one minor platform release before removal. | The component that owns the CRD's reconciler — kopf operator (B13) for capability/key/budget CRDs, ARK install (A5) for ARK CRDs, agent-sandbox install (A6) for sandbox CRDs, Crossplane compositions (B4) for XRs, B19 for Approval. |
+| **CloudEvent schemas** | Schemas in B12's registry carry `specversion` (CloudEvents-native) plus a per-event-type `schemaVersion` field. Backward-compatible additions bump minor; breaking changes mint a new event type rather than breaking subscribers. | B12 owns the registry; each component owns its event types. |
+| **Platform SDK (Python + TypeScript)** | Semantic versioning. Major bumps signal SDK API breaks; minor bumps are additive; patch is bugfix. SDK ships with a version-pinned compatibility matrix against gateway / ARK / Letta versions. | B6. |
+| **`agent-platform` CLI** | Semantic versioning. Subcommand surface is the versioned API; flag-level changes follow deprecation-warning conventions. | B9. |
+| **A2A and MCP interfaces exposed by Platform Agents** | Each agent declares a version on its exposed interface (e.g., `myAgent.v1`); peers pin a major version. Breaking changes ship as a new major and run side-by-side until peers migrate. | The component shipping the agent (each agent in B17 / B18 owns its exposed interface). |
+| **HTTP APIs exposed by custom services** (kopf operator admin, Knative adapters, audit pipeline, etc.) | URL-path versioning (`/v1/...`); deprecated versions remain reachable for at least one platform release after replacement. | Each owning component. |
+
+**Component responsibility.** Versioning is **not a centrally-coordinated activity**. Each component owns its own surfaces and is responsible for:
+
+- Declaring the current version of every API it exposes.
+- Documenting compatibility with adjacent versions (which Platform SDK works with which gateway, etc.) in its per-product documentation (section 10.5).
+- Emitting deprecation warnings (logs, metrics, audit events) when callers use deprecated versions.
+- Providing migration guidance in the per-product docs.
+
+The architecture does not prescribe a synchronized "platform release" version that bumps everything in lockstep; components evolve independently within the compatibility matrix.
 
 ## 7. Use cases
 
@@ -1031,6 +1226,8 @@ We use **option 2** (unified CLI tasks called from native pipelines): the same `
 
 **Container maintenance pipeline.** A scheduled CI workflow keeps the agent base image current: rebuild with latest base + OS + language deps, run security scans (Trivy or Grype, block on critical CVEs), run regression eval suite, tag new image, open PR to bump references in Agent CRDs. Triggered out-of-cycle for critical CVEs.
 
+**Security-first pipeline design.** The CI/CD pipeline is itself a privileged component — it has push access to the registry and merge-trigger access to GitOps reconciliation — and is designed with that in mind from the start. The reference GitHub Actions pipeline ships with: scoped tokens (no long-lived static credentials; OIDC federation to AWS where possible, GitHub Environments to gate production-affecting jobs), pinned action versions and SHA-pinned third-party actions, separate runners for build vs deploy where the deploy runner has elevated trust, and signed artifacts. Required scan steps (Trivy / Grype on images, dependency scanning on language packages, OPA bundle linting, schema validation on CRDs and CloudEvents) are part of the reference pipeline and gated as required checks. Hardening of the pipeline beyond v1.0 — admission-time enforcement of scan-artifact presence, continuous scanning of running images, image signing and attestation — is in the future-enhancements document.
+
 ## 9. OSS limitations and required custom development
 
 Most components are OSS and fit well, but several have features behind a commercial license. The most consequential is **single sign-on**: many OSS tools either lack SSO or only support OAuth-with-built-in-user-store, neither of which works against Keycloak fronting AD or Okta.
@@ -1191,9 +1388,9 @@ The Crossplane Composition for `GrafanaDashboard` is part of Component B4. The G
 - Cost — per team, per agent, per model, with budget vs. actual and burn rate.
 - Audit and security — anomaly indicators, policy violation rate, secret rotation lag, egress denials.
 - Capacity — sandbox warm-pool utilization, cold start rate, memory backend headroom, broker backlog, queue depth.
-- SLO dashboards — latency, availability, error budget burn for each user-facing capability.
-- Reliability summary — daily snapshot.
 - Test framework health — pass/fail trends across Chainsaw, Playwright, PyTest layers (section 13).
+
+(SLO dashboards, error-budget tracking, and operations-metrics summary dashboards are deferred to future enhancements; see `future-enhancements.md`.)
 
 ### 11.2 Developer dashboards
 
@@ -1219,7 +1416,7 @@ Documentation is necessary but not sufficient. Operators and developers each nee
 2. Cluster baseline review.
 3. Installing and configuring each component — module per component group.
 4. Configuration patterns — how SSO, secrets, capabilities, and policy bundles flow.
-5. Monitoring and alerting — interpreting operator dashboards, SLOs, on-call.
+5. Monitoring and alerting — interpreting operator dashboards, alert rules, on-call. (SLO-based monitoring is a future enhancement.)
 6. Common failure modes and runbooks.
 7. Backup and restore drills.
 8. Upgrade procedures.
@@ -1275,7 +1472,7 @@ Each component here is a per-product install + configure + operate package. **St
 - Per-product architecture-specific documentation (10.5).
 - Per-product operator runbook (10.7).
 - Backup / restore procedure where relevant.
-- SLO definitions and alert rules.
+- Alert rules for component-level failure conditions. (Comprehensive operations metrics — SLOs, error budgets, reliability summaries — are deferred to future enhancements.)
 - Per-component Grafana dashboards (delivered as Crossplane Compositions — see section 11).
 - **Headlamp plugin (where useful) — the component owns writing the plugin, testing it, and ensuring it integrates correctly with the Headlamp framework. This applies even when a usable open-source plugin already exists for the component: ensuring it works in our environment is in scope for the per-component component, not the Headlamp framework component.**
 - **OPA policy integration** — what admission and runtime policies apply to this component, written as Rego, contributed to the OPA policy library.
@@ -1295,7 +1492,7 @@ Each component here is a per-product install + configure + operate package. **St
 | A6 | agent-sandbox + Envoy egress proxy |
 | A7 | OPA / Gatekeeper |
 | A8 | LibreChat (locked-down config; includes OpenAI ↔ A2A adapter if LiteLLM doesn't ship the translation in OSS) |
-| A9 | **Headlamp base** — install, branding for our environment, common libraries that make plugin development easier. **Per-component plugins are NOT in scope here**; they're delivered by their respective Workstream A or B components. |
+| A9 | **Headlamp install + framework** — install, branding for our environment, and the **cross-cutting framework code (common libraries, shared widgets, auth handoff)** that makes plugin development easier. **Per-component plugins are NOT in scope here**; they are delivered by their respective Workstream A or B components. |
 | A10 | Letta memory backend |
 | A11 | OpenSearch |
 | A12 | OpenAPI→MCP converter |
@@ -1313,7 +1510,7 @@ Each component here is a per-product install + configure + operate package. **St
 | B2 | LiteLLM custom callbacks (Python) — PII, audit, OPA bridge, guardrails. **Required**: audit and OPA bridge are mandatory and ship with LiteLLM (Component A1). If A1 lands before the integrating components are ready, the relevant callback implementation moves into the component that needs the integration (e.g., the OPA bridge callback ships with A7 OPA if A1 lands first). |
 | B3 | OPA policy library — initial Rego bundles + library setup + documentation for adding new policies. Each per-component OPA contribution lands in its own component; B3 sets up the framework and ships the initial admission policies. |
 | B4 | Crossplane v2 Compositions — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, **`GrafanaDashboard` (namespaced, RBAC/OPA-controlled)**, etc. |
-| B5 | **Cross-cutting Headlamp framework** — base setup, branding, common libraries that make per-component plugins easier. **Per-component plugins are owned by their respective components, not B5.** Cross-component plugins (capability inspector that spans multiple CRDs, approval queue UI, virtual key admin) live here when they don't naturally belong to one component. |
+| B5 | **Cross-cutting Headlamp plugins** — plugins that span multiple components and don't naturally belong to any one of them: capability inspector (per-agent unified view across MCP / A2A / RAG / egress / skills / OPA refs), approval queue UI, virtual key admin UI. **The Headlamp framework itself (base install, branding, shared libraries) is owned by A9; per-component plugins are owned by their respective components.** |
 | B6 | Platform SDK (Python + TypeScript) — what Platform Agents use to call into the platform: `memory.*`, `rag.*`, OTel emission, A2A registration helpers. Distinct from the agent SDK in B7. |
 | B7 | **Initial agent SDK support — Langchain Deep Agents.** Single SDK in v1.0; the multi-SDK harness shape is preserved (so adding LangGraph, OpenAI Agents SDK, etc. later is straightforward), but only Langchain Deep Agents ships in v1.0. |
 | B8 | Knative event adapter services (Python — CloudEvent → AgentRun, CloudEvent → Workflow). Includes the two initial trigger flows (AlertManager → HolmesGPT, budget exceeded → email user). |
@@ -1330,6 +1527,7 @@ Each component here is a per-product install + configure + operate package. **St
 | B19 | **Generalized approval system** — `Approval` CRD, OPA elevation logic, Argo Workflow integration, Headlamp approval queue plugin, CloudEvent emission of decisions. Initial use cases: Coach skill changes, HolmesGPT remediation. |
 | B20 | **Persistent volume access for Platform Agents** — system for declarative mapping of pre-defined Kubernetes PVs (reference data sets, shared corpora) into Platform Agents, with namespace + RBAC + OPA-driven access control. |
 | B21 | **Development environment for agents** — documentation, tooling, and conventions for developers to build new Platform Agents. Decision between local kind environment vs shared dev cluster is design-time and per-developer, not platform-wide; this component ships the support for both paths. |
+| B22 | **Security threat model design specification** — adversarial threat model, attack-pattern catalog, security standards, mandatory test cases, mandatory dashboard signals, OPA policy targets. **Design specification, not code.** Ships before the first wave of component implementation; its output feeds forward into A and B component deliverables. See section 6.6 for scope. |
 
 ### 14.3 Workstream C — Documentation portal and content
 
@@ -1391,7 +1589,7 @@ flowchart TB
     A6[A6 agent-sandbox + Envoy]
     A7[A7 OPA]
     A8[A8 LibreChat]
-    A9[A9 Headlamp base]
+    A9[A9 Headlamp install + framework]
     A10[A10 Letta]
     A11[A11 OpenSearch]
     A12[A12 OpenAPI→MCP]
@@ -1408,7 +1606,7 @@ flowchart TB
     B2[B2 LiteLLM callbacks]
     B3[B3 OPA framework]
     B4[B4 Crossplane comps + Grafana XR]
-    B5[B5 Headlamp framework]
+    B5[B5 Cross-cutting Headlamp plugins]
     B6[B6 Platform SDK]
     B7[B7 Initial agent SDK]
     B8[B8 Knative adapters]
@@ -1425,6 +1623,7 @@ flowchart TB
     B19[B19 Generalized approval system]
     B20[B20 PV access for Platform Agents]
     B21[B21 Dev environment for agents]
+    B22[B22 Security threat model design]
   end
 
   C[Workstream C: Docs + content]
@@ -1432,6 +1631,7 @@ flowchart TB
   E[Workstream E: Training]
   F[Workstream F: Production readiness]
 
+  %% Workstream A internal deps
   A6 --> A5
   A11 --> A10
   A13 --> A14
@@ -1439,14 +1639,23 @@ flowchart TB
   A1 --> A16
   A14 --> A16
   A1 --> A17
+  A7 --> A17
+  B13 --> A17
+
+  %% Workstream B internal deps and dependencies on A
   A4 --> B8
   A1 --> B1
   A2 --> B1
   A8 --> B1
   A9 --> B1
   A1 --> B2
+  A7 --> B2
   A7 --> B3
   B3 --> B16
+  A1 --> B16
+  A6 --> B16
+  A5 --> B16
+  B13 --> B16
   A1 --> B6
   A2 --> B6
   B6 --> B7
@@ -1464,17 +1673,32 @@ flowchart TB
   B8 --> B12
   A1 --> B13
   B13 --> B17
+  A5 --> B17
+  A1 --> B17
   B17 --> B18
+  A5 --> B18
+  A1 --> B18
+  B7 --> B18
   A3 --> B19
   A7 --> B19
   A9 --> B19
+  B5 --> B19
+  B12 --> B19
   A6 --> B20
   A7 --> B20
+  A5 --> B20
   B7 --> B21
   B6 --> B21
+  B9 --> B21
+  B9 --> B14
+  B9 --> B15
+  B14 --> B15
   B14 --> A
   B14 --> B
+  B22 --> A
+  B22 --> B
 
+  %% Cross-workstream
   A --> C
   B --> C
   A --> D
@@ -1483,9 +1707,12 @@ flowchart TB
   D --> E
   A --> F
   B --> F
+  C --> F
 ```
 
-**Foundation components** (no internal deps within their workstream) sit mostly in Workstream A and are parallelizable from day one. A11 (OpenSearch), A13 (Tempo + Mimir), and A14 (HolmesGPT) go in early so other components can contribute knowledge to HolmesGPT and emit traces from the start. **Workstream B components** depend on their respective Workstream A components and on the SDK chain (B6 → B7, B6 → B10, B17 → B18, etc.). **Workstreams C, D, and E** consume continuously from A and B. **Workstream F** runs after the platform is functionally complete to harden it for production.
+**Foundation components** (no internal deps within their workstream) sit mostly in Workstream A and are parallelizable from day one. **B22 (security threat model design)** is also foundational — it's a design specification that ships before the first wave of A and B implementation lands, and feeds standards forward into every component. A11 (OpenSearch), A13 (Tempo + Mimir), and A14 (HolmesGPT) go in early so other components can contribute knowledge to HolmesGPT and emit traces from the start. **Workstream B components** depend on their respective Workstream A components and on the SDK chain (B6 → B7, B6 → B10, B17 → B18, etc.). **Workstreams C, D, and E** consume continuously from A and B. **Workstream F** runs after the platform is functionally complete to harden it for production; F6 in particular consumes finalized cross-cutting runbooks from C.
+
+The graph is a DAG; no cycles. The two fan-out edges from B14 (test framework) and B22 (security design) into A and B express "consumed by every component" rather than "must precede every component" — they are continuously available inputs.
 
 Implementation will be done by AI agents. The agent topology — what kinds of agents, how they coordinate, what human-in-the-loop patterns apply — is a separate conversation, taken up after this architecture is solid.
 
@@ -1496,9 +1723,11 @@ Terms with specific meaning in this architecture. When generic words like "agent
 | Term | Meaning |
 |---|---|
 | **Platform Agent** | An agent run and controlled by this platform: declared as an Agent CRD, reconciled by ARK, runs in a Sandbox, has a CapabilitySet, calls out only through LiteLLM and the Envoy egress proxy. Always use this term when referring to an agent in our system; reserve "agent" without qualification for clearly external or generic contexts. |
-| **CapabilitySet** | A Kubernetes CRD bundling references to MCP servers, A2A peers, RAG stores, egress targets, skills, OPA policy snippets, and LLM providers. Layerable in a Helm-style values overlay model. Referenced by Platform Agents to grant capabilities. |
+| **A2A** | Agent-to-Agent protocol — the inter-agent calling convention brokered by LiteLLM, both for Platform Agents calling each other and for calling approved external A2A peers. The platform speaks A2A as its native inter-agent transport; OpenAI-compatible HTTP is translated to A2A at the gateway for frontends like LibreChat. |
+| **MCP** | Model Context Protocol — the tool-calling protocol Platform Agents use to invoke external services (GitHub, Google Drive, etc.) through the gateway. Approved MCP servers are registered as `MCPServer` CRDs. |
+| **CapabilitySet** | A Kubernetes CRD bundling references to MCP servers, A2A peers, RAG stores, egress targets, skills, OPA policy snippets, and LLM providers. Layerable in a Helm-style values overlay model with add-if-not-there / replace-if-there field semantics. Referenced by Platform Agents to grant capabilities. |
 | **Approved capability** | An MCP server, A2A peer, RAG store, or egress target that has been registered as a CRD in our system. Approval implies governance: tracked in observability, gated by OPA, available for inclusion in CapabilitySets, visible in Headlamp. Unapproved capabilities are not reachable from a Platform Agent. |
-| **Knowledge Base** | The `platform-knowledge-base` RAGStore — a single approved RAG store containing platform documentation, runbooks, and pinned vendor docs. Available to any Platform Agent that includes it in its CapabilitySet, including HolmesGPT and the interactive access agent. Not built into HolmesGPT or any other agent. |
+| **Knowledge Base** | The `platform-knowledge-base` RAGStore — a single approved RAG store containing platform documentation, runbooks, and pinned vendor docs. Available to any Platform Agent that includes it in its CapabilitySet, including HolmesGPT and the Interactive Access Agent. Not built into HolmesGPT or any other agent. |
 | **HolmesGPT** | The platform self-management agent. A Platform Agent like any other, with broad read access to platform state and policy-gated write access for remediation. Implemented early; grows with the platform. |
 | **Coach Agent** | The platform self-improvement agent. A Platform Agent that runs on schedule, observes production traces and audit data, proposes prompt and skill changes via PR or suggestion card. Implemented after HolmesGPT and after the components it depends on. |
 | **Interactive Access Agent** | A general-purpose Platform Agent that LibreChat connects to as the default endpoint for users who want to chat with platform infrastructure (knowledge base, conversational diagnostics, general help). Implemented early so we use our own infrastructure to access LLMs from LibreChat. |
@@ -1506,4 +1735,7 @@ Terms with specific meaning in this architecture. When generic words like "agent
 | **Workstream** | A coherent grouping of components with shared purpose: A (install + operate vendor components), B (custom platform development), C (documentation), D (dashboards), E (training), F (production readiness). |
 | **CRD** | Custom Resource Definition (Kubernetes term, included for completeness). All capability definitions, agent specs, sandboxes, memory configurations, and so on are CRDs reconciled from Git. |
 | **Approved namespace** | A Kubernetes namespace where Platform Agents are allowed to run. Tenant boundary, capability scope boundary, RBAC boundary. |
-| **Tenant** | A logical isolation boundary, implemented as one or more Kubernetes namespaces. See section 6.9 for the multi-tenancy model. |
+| **Tenant** | A logical isolation boundary, implemented as one or more Kubernetes namespaces, established via Keycloak claims. See section 6.9 for the multi-tenancy model. |
+| **Platform JWT** | A Keycloak-issued JSON Web Token carrying the platform's claim schema (section 6.9): `platform_tenants`, `platform_namespaces`, `platform_roles`, `tenant_roles`, `capability_set_refs`. Consumed by LiteLLM, OPA, Headlamp, and LibreChat. |
+| **IRSA / Workload Identity** | OIDC-based federation of Kubernetes service accounts to cloud-provider identity (AWS IAM via IRSA, Azure AD via Workload Identity). The platform uses both for cloud-resource access (e.g., Secrets Manager, Key Vault) and as the inbound side of Keycloak's Identity Provider federation. See section 6.11. |
+| **k8-platform** | The companion repository documenting the assumed Kubernetes baseline (CNI, ingress, DNS, OIDC issuer, CSI). The architecture assumes a conformant install. |

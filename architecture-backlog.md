@@ -10,21 +10,21 @@ These are decisions explicitly punted to design-time. Each will need its own des
 
 ### 1.1 CapabilitySet layering semantics
 
-The architecture states CapabilitySets layer in a Helm-style values overlay model: sets applied in order, later overriding earlier, with per-Agent overrides taking final precedence. A small pseudocode example is in section 6.8 of the overview. Detailed semantics deferred:
+The architecture now commits to add-if-not-there / replace-if-there field-level overlay, processed in declared order, with per-Agent overrides applied last (see overview section 6.8). Detailed semantics still deferred:
 
 - Whether a CapabilitySet can include other CapabilitySets, and whether inclusion is recursive or one-level deep.
-- For each field type (lists of MCP servers, lists of tools, RAG store references, OPA policy snippets, egress targets, secret references, LLM providers), the merge semantic — additive (concatenation), replace (last wins), or per-element (override individual entries by name). The example uses `+` as an additive marker; finalize the actual syntax.
-- Validation rules: enforce that referenced CapabilitySets exist at admission time. What happens if a referenced set is deleted.
+- Concrete validation rules: enforce that referenced CapabilitySets exist at admission time. What happens if a referenced set is deleted.
 - Whether namespace boundaries apply to CapabilitySet references — can an Agent in namespace A reference a CapabilitySet in namespace B (with cross-namespace policy approval).
 - Whether per-Agent overrides can grant capabilities not present in any referenced set, or whether Agent capabilities must be a subset of what the referenced sets provide.
 
 ### 1.2 Multi-tenancy details
 
-The architecture model is established (tenancy = namespace, RBAC + OPA + network enforcement, dynamic agent registration, three visibility modes). Details deferred to design:
+The architecture model is established (tenancy = namespace, RBAC + OPA + network enforcement, dynamic agent registration, three visibility modes, **tenant carried as Keycloak claims with required JWT schema specified in section 6.9**). Details deferred to design:
 
 - Tenant onboarding flow: who creates a tenant, what gets provisioned automatically.
 - Tenant-scoped resource quotas (max agents, max sandboxes, max virtual keys, cost budget, rate limit) — defaults and how they're customized.
 - Cross-tenant collaboration patterns when explicitly published.
+- Concrete `platform_roles` catalog (the architecture commits to the claim's presence and shape; the role names are design-time).
 
 ### 1.3 Self-service virtual key request flow
 
@@ -126,6 +126,23 @@ Headlamp deep-links into other UIs (Langfuse, OpenSearch Dashboards, Argo Workfl
 ### 1.16 OpenAI ↔ A2A translation source
 
 Architecture says "expected to be handled by LiteLLM directly; if not in OSS, build a small adapter as part of LibreChat install." Confirmation needed during implementation, and adapter shape if required.
+
+### 1.17 Identity federation details
+
+Architecture commits to the federation chain (cluster OIDC → IRSA / Workload Identity for cloud, cluster OIDC → Keycloak federation for platform JWT) in section 6.11. Details deferred:
+
+- Specific token-exchange flow between cluster OIDC and Keycloak (RFC 8693 token exchange shape, subject-token vs actor-token, audience handling).
+- Caching and refresh strategy for platform JWTs in long-running Platform Agents.
+- Azure Workload Identity bootstrap specifics — TBD until v1.0 lands and Azure becomes a real target.
+- Service-account → CapabilitySet binding mechanism (annotation, label, separate CRD).
+
+### 1.18 Versioning specifics per surface
+
+Architecture commits to the versioning policy in section 6.13 (CRDs via Kubernetes API versioning; CloudEvents via per-event schemaVersion; semver for SDK and CLI; URL-path versioning for HTTP APIs). Per-surface specifics deferred:
+
+- Concrete deprecation windows (the architecture says "at least one minor platform release"; the calendar definition of "platform release" is design-time).
+- Compatibility matrix maintenance — where it lives, how it's verified in CI.
+- Conversion webhook patterns for CRD breaking changes.
 
 ## 2. Alternatives considered and rejected
 
@@ -250,17 +267,21 @@ v1.0 ships single-SDK with multi-SDK harness shape preserved. **Trigger**: a use
 
 These are not "alternatives" — they're concrete pieces of the architecture that need design specifications before code.
 
+- **Adversarial threat model (B22)** — the highest-priority design specification, called out in section 6.6 of the overview. Its output sets security standards for every component.
 - Specific agent profiles to ship in the profile library (B17 scope).
 - Specific recommended agent compositions (B18 scope).
 - Specific OPA policy library content — concrete Rego bundles for v1.0 (B16 scope).
 - Specific Crossplane Compositions to build first — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, `GrafanaDashboard` (B4 scope).
-- Specific cross-cutting Headlamp plugins owned by B5 (vs per-component plugins owned by their components).
+- Specific cross-cutting Headlamp plugins owned by B5 (capability inspector, approval queue UI, virtual key admin).
 - Specific tutorials and how-to guides to write first.
 - Memory namespace and sharing model details (3-mode access already specified).
 - Test manifest schema for the `agent-platform test` CLI.
-- GitHub Actions reference pipeline implementation.
+- GitHub Actions reference pipeline implementation (security-first per overview section 8).
 - Glossary maintenance — keeping terminology consistent as the platform evolves.
 - Knative Trigger flow design for each component (the "what events does this emit and consume" part of standard component deliverables).
+- Concrete `platform_roles` catalog — names and semantics of each platform role used in Keycloak claims.
+- Cluster OIDC → Keycloak federation token-exchange flow (section 1.17).
+- Per-event-type CloudEvent schemas under each top-level namespace (section 6.7).
 
 ## 5. Open questions to leave open
 
@@ -286,12 +307,15 @@ Invariants that are implicit in the architecture but should become explicit (the
 - Every audit-relevant action emits a structured event to the audit index, regardless of which component performed it.
 - Every Platform Agent invocation traverses LiteLLM. The Envoy egress proxy handles non-LiteLLM HTTP. There are no other paths to external services.
 - Every component contributes a HolmesGPT toolset, an OPA policy contribution, audit emission, observability, Knative trigger flow design, tests, and tutorial / how-to documentation.
-- SSO is exclusively Keycloak. No tool maintains its own user store.
+- SSO is exclusively Keycloak. No tool maintains its own user store. **All privileged platform identity ultimately resolves to a Keycloak-issued JWT carrying the section 6.9 claim schema.**
 - **RBAC is the floor; OPA may raise the floor on a per-decision basis.** OPA never grants permissions RBAC didn't already give.
 - All dashboards are namespaced and access-controlled (Crossplane-composed `GrafanaDashboard` XRs).
 - Approvals flow through one mechanism (`Approval` CRD + Argo Workflows + Headlamp plugin). New approval types reuse the mechanism rather than building parallel ones.
 - Memory access modes are per-store: private, namespace-shared, or RBAC/OPA-controlled.
 - Each cluster is an independent install of the platform. Multi-cluster federation is not a v1.0 requirement.
+- **All platform CloudEvents fall under one of the committed top-level namespaces** (section 6.7).
+- **Every API surface (CRDs, CloudEvents, SDKs, CLIs, HTTP APIs, agent A2A/MCP interfaces) carries an explicit version, owned by the component that exposes it** (section 6.13).
+- **Mapper authoring (translating upstream IdP attributes into platform claims) is out of scope for this architecture**; the platform commits to the claim schema, not the mappers (section 6.9).
 
 ## 7. ADR candidates
 
@@ -323,3 +347,10 @@ Decisions large enough that they deserve their own Architecture Decision Records
 24. Vendor doc acquisition is a separate companion project, not part of v1.0 architecture scope.
 25. Memory access modes (private / namespace-shared / RBAC-OPA-controlled) declared per memory store.
 26. Independent-cluster-install topology with no v1.0 federation.
+27. Threat-model scope: unintentional access excess as the v1.0 primary, dedicated adversarial threat model (B22) as a required pre-implementation design specification.
+28. Identity federation: cluster OIDC → IRSA (AWS) or Workload Identity (Azure) for cloud resources; cluster OIDC → Keycloak federation for platform JWT.
+29. Required Keycloak JWT claim schema for the platform.
+30. CRD and API versioning policy with per-component ownership.
+31. CloudEvent top-level type taxonomy (`platform.lifecycle.*`, `platform.audit.*`, etc.).
+32. CapabilitySet overlay semantics: add-if-not-there / replace-if-there field-level resolution, processed in declared order, with per-Agent overrides last.
+33. Initial implementation targets: AWS (EKS) and GitHub. Azure supported architecturally but not exercised in v1.0.
