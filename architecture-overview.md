@@ -185,7 +185,7 @@ flowchart LR
   PII[Presidio PII scrub]
   OPA[OPA runtime<br/>decisions]
   LF[Langfuse]
-  AUD[(Audit index<br/>OpenSearch)]
+  AUD[Audit adapter →<br/>audit endpoint]
   PROV[LLM providers]
   MCPS[MCP servers]
   AGENTS[A2A peers<br/>internal + external]
@@ -209,7 +209,7 @@ flowchart LR
   A2A --> AGENTS
 ```
 
-The **callbacks pipeline** is LiteLLM's hook chain — Python callbacks fire at `pre-call`, `post-call`, `success`, `failure`. Each is a class we register. Custom callbacks add PII scrubbing (Presidio), OPA runtime decisions, audit emission to OpenSearch, and Langfuse instrumentation. The pipeline is configured in the LiteLLM ConfigMap; reload-on-change via Reloader.
+The **callbacks pipeline** is LiteLLM's hook chain — Python callbacks fire at `pre-call`, `post-call`, `success`, `failure`. Each is a class we register. Custom callbacks add PII scrubbing (Presidio), OPA runtime decisions, **audit emission via the platform audit adapter to the audit endpoint (ADR 0034)** — not direct writes to OpenSearch — and Langfuse instrumentation. The pipeline is configured in the LiteLLM ConfigMap; reload-on-change via Reloader.
 
 The **A2A endpoint** accepts internal calls (one Platform Agent calling another) and outbound calls to external A2A peers we have approved. **External organizations do not register A2A peers with us.** When we want to call an external A2A endpoint, an admin defines an `A2APeer` CRD through the Headlamp plugin, which the kopf operator reconciles into LiteLLM's registry. We do not allow outside parties to onboard themselves into our gateway. Same registry, same auth, same audit for all directions.
 
@@ -535,6 +535,15 @@ Calling these out explicitly so they get implemented as each component lands.
 - agent-platform CLI — CI pipeline gates: can this PR promote to which environment?
 - HolmesGPT — what tools it can invoke, what it can do autonomously vs require human approval.
 
+#### Policy simulator (ADR 0038)
+
+The platform ships a **policy simulator** that answers "what would happen for this request at each enforcement layer?" without actually performing the action. Two surfaces:
+
+- **Headlamp panel** — admins paste or compose a request (subject + action + target) and see, layer by layer, what each enforcement point (Gatekeeper admission, LiteLLM OPA callback, Envoy egress OPA, approval-system elevation, etc.) would decide and why. The panel is the primary editing companion for OPA bundles.
+- **HolmesGPT skill (equivalent)** — the same simulator exposed as a skill HolmesGPT can invoke when diagnosing why a request was (or would be) denied, or when proposing a policy change.
+
+Implementation requires a **structured dry-run mode at each layer** — every OPA decision point exposes a dry-run input and emits the same decision shape as the live path, with `simulated: true`. Components that implement runtime authorization (LiteLLM callbacks, Envoy egress, the approval system, Headlamp action gates) all honor the dry-run flag without side effects (no audit emission, no state change). The simulator composes per-layer dry-runs into a single response.
+
 ### 6.7 Eventing architecture (Knative + NATS JetStream)
 
 We use Knative Eventing for the event mesh and NATS JetStream as the broker backend. Same broker in dev and prod. Sources differ per environment (AwsSqsSource on AWS, equivalents on Azure, webhook receivers in kind).
@@ -611,6 +620,8 @@ The schema for each event type lives in B12's registry. Schema versioning is per
 - **Budget exceeded → email user.** A LiteLLM callback emits a CloudEvent when a virtual key exceeds its budget. A Trigger filters for budget events and dispatches to a notification adapter that emails the affected user. This exercises the "platform component emits CloudEvent → Trigger → side-effect" path without requiring a Platform Agent in the middle.
 
 **Each subsequent component is expected to design its own trigger flows** as part of standard component deliverables (alongside Headlamp plugin, OPA integration, audit emission, observability, tests). Flow design = identifying what events the component emits, what events it consumes, and what Triggers route between them. This is how the eventing fabric grows organically without big-bang design.
+
+**Mattermost integration (ADR 0036).** Mattermost is integrated as a **bidirectional** chat surface via Knative Eventing — messages and events flow both ways through the same broker and Trigger machinery used elsewhere. **Mattermost Team Edition (free)** is the deployed tier; it is authenticated via **Keycloak using GitLab-OAuth-spoof protocol mappers** because Team Edition lacks native OIDC/SAML (see section 9). **OPA-driven Trigger filtering** decides which platform events route to which Mattermost channel, the same way OPA filters apply to other Trigger sinks. The integration follows a **generic chat-platform driver pattern**, so Microsoft Teams and Slack drop-ins are straightforward future-enhancements; only Mattermost ships in v1.0.
 
 ### 6.8 Capability registries and approved primitives
 
@@ -698,6 +709,8 @@ The point is that capabilities compose declaratively from a library of profiles,
 
 **Headlamp plugin** for capabilities renders the unified per-agent view: for `Agent X`, here are all MCP servers, A2A peers, RAG stores, egress targets, skills, and OPA policies that apply, regardless of which CapabilitySet contributed them. Reads come from Kubernetes (CRDs) and LiteLLM (current applied state).
 
+**Capability-change notification model (ADR 0013 update).** When the kopf operator reconciles a capability CRD change (MCPServer / A2APeer / RAGStore / EgressTarget / Skill / CapabilitySet add / update / delete), it emits a **`platform.capability.changed` CloudEvent** onto the broker. The platform SDK consumes this event and surfaces it to the running Platform Agent through a **callback or next-turn notification** so the agent can react to capability changes between turns rather than mid-turn. A **poll fallback via the SDK API** is provided for harnesses that prefer pull semantics. The notification is **best-effort**: it is a UX convenience, not a security control. **Enforcement remains authoritative at LiteLLM (gateway), OPA (policy), and Envoy (egress)** — an agent that missed a notification cannot exceed its current capabilities because the perimeter checks at request time.
+
 ### 6.9 Multi-tenancy and namespacing
 
 Tenancy is built around Kubernetes namespaces. A tenant maps to one or more namespaces; the namespace boundary is the tenancy boundary. This applies to Platform Agents, the CRDs they reference, the Sandboxes they run in, and the audit and observability data they emit.
@@ -741,6 +754,16 @@ This is enforced at three layers, defense-in-depth:
 Cross-tenant resource sharing (a `CapabilitySet` defined in one namespace and referenced from another) is allowed only when explicitly published with an OPA-checked policy. Default is namespace-private.
 
 The same model applies to dynamic agent registration: an agent can request registration as A2A or MCP exposing in any namespace it has admission rights for, and OPA decides whether the registration is allowed and what visibility it gets. Admin override happens through Headlamp plugin (force-register or force-deregister).
+
+#### Tenant onboarding flow (ADR 0037)
+
+A new **`TenantOnboarding` Crossplane XRD** drives tenant provisioning. The XRD is reconciled via a combined **Headlamp + GitOps** flow — admins author or amend a `TenantOnboarding` claim through the Headlamp graphical editor for the XRD (ADR 0039), the change lands in Git, and ArgoCD reconciles. On reconcile, the composition creates:
+
+- The **tenant namespace** (or namespaces, if the tenant maps to more than one).
+- **Templated default ServiceAccounts** for the tenant (developer SA, operator SA, agent-default SA, etc.) wired up to the cluster OIDC issuer for downstream Keycloak federation.
+- The **claim-to-tenant binding** — the Keycloak side of the mapping from a principal's upstream claims to the `platform_tenants` claim entry that grants this tenant.
+
+**CapabilitySets are decoupled from the onboarding XRD by design.** A new tenant has no CapabilitySets until one is created for it. The Headlamp plugin **recommends seeding at least one CapabilitySet** at onboarding time (and offers a starter from the agent profile library) but does **not couple the two in code** — a tenant can exist without a CapabilitySet, and a CapabilitySet can be replaced or removed without re-onboarding. This keeps tenancy and capability lifecycles independent.
 
 ### 6.10 Platform self-management with HolmesGPT
 
@@ -789,9 +812,73 @@ flowchart LR
 
 HolmesGPT's autonomy is policy-controlled. Initially: read-only diagnostics, propose changes via auto-PR or suggestion card. Later, narrow remediations execute autonomously when OPA allows. The audit trail is the same as any other agent.
 
+**Three-state OPA permission model (ADR 0012 update).** Permissions for HolmesGPT actions (and, more generally, for any platform action that a Platform Agent or admin proposes) resolve to one of three states with fine-grained conditions attached:
+
+- **allowed** — the action proceeds without further approval.
+- **upon-approval** — the action is held pending human approval through the generalized approval system (section 7.5); OPA may add conditions like "only during business hours" or "only for objects matching this label selector".
+- **denied** — the action is rejected and the rejection is audited.
+
+These policies are **centrally managed via OPA bundles**, edited through **Headlamp graphical editors for platform CRDs (ADR 0039)** rather than by hand-editing Rego in Git. The graphical editors integrate with the **policy simulator (ADR 0038)** so an admin can preview the per-layer effect of a proposed change before committing it.
+
+**Phased deployment trajectory (ADR 0012 update).** HolmesGPT lands **very early** — earlier than the bulk of the platform components. In its first deployment phase, it runs on a raw Kubernetes cluster with:
+
+- A **read-only ServiceAccount** (read across all namespaces, write nothing).
+- A **read-only AWS IAM role** (read tags, describe resources, read CloudWatch — no Secrets Manager access, no write actions).
+- **No secret-store access** of any kind in this initial phase.
+
+This lets HolmesGPT be useful for diagnostics during the platform implementation itself. As subsequent platform components land, **HolmesGPT's access is rewired through the platform layers** — its LLM calls move behind LiteLLM, its audit emission moves to the audit adapter / endpoint, its tool authorization moves under OPA decision points, and its toolsets grow to cover the new components. **Read-only stays the default**; write actions expand **incrementally**, gated by the three-state OPA model above, as trust in each remediation pattern is established.
+
 ### 6.11 Identity federation
 
-The platform has three identity domains that need to be tied together: Kubernetes service accounts (running pods, including Platform Agents), cloud-provider identity (for IRSA / Workload Identity-style access to cloud secret stores and other cloud resources), and Keycloak-issued JWTs (the platform's authoritative identity for OPA decisions, virtual key claims, and UI access).
+The platform has three distinct identity flows that need to be tied together. They are described **separately** because they involve different actors, different issuers, and different trust roots; conflating them is the most common source of confusion in this area.
+
+Cross-references: ADR 0028 (identity federation topology), ADR 0029 (Keycloak claim schema), ADR 0033 (initial-implementation targets — AWS + GitHub + kind).
+
+#### Flow 1 — Human user identity
+
+End users (developers, operators, admins, tenant users) authenticate through their **browser**. The flow:
+
+1. Browser hits a platform UI (LibreChat, Headlamp, Mattermost, Langfuse, Argo, etc.).
+2. The UI redirects to **Keycloak** for SSO. Keycloak brokers the **upstream IdP** (the customer's AD, Okta, Google Workspace, etc.).
+3. Keycloak applies **mappers** to translate upstream identity attributes (group membership, attributes) into the platform's claim schema (ADR 0029): `platform_tenants`, `platform_namespaces`, `platform_roles`, `tenant_roles`, etc.
+4. The resulting **platform JWT** is what every UI and platform service consumes.
+
+**Authoring of upstream-IdP mappers remains OUT of scope** for this architecture — the customer running the platform owns this, because the source attributes depend on which IdP they use. The architecture only commits to the **target claim schema** Keycloak must emit (section 6.9).
+
+#### Flow 2 — Workload / machine identity
+
+Platform components and Platform Agents run as Kubernetes pods that need an identity for both **cloud-resource access** (IRSA-style) and **platform calls** (LiteLLM, OPA, Headlamp APIs). The flow:
+
+1. The pod runs as a **Kubernetes ServiceAccount** with a projected token signed by the **cluster's OIDC issuer**.
+2. **Cloud side**: the ServiceAccount token is exchanged for cloud credentials — AWS IRSA (annotation `eks.amazonaws.com/role-arn` → STS AssumeRoleWithWebIdentity → scoped AWS creds) or Azure Workload Identity (annotation `azure.workload.identity/client-id` → Azure AD federated token). Both use the cluster OIDC issuer as the trust anchor.
+3. **Platform side**: the same ServiceAccount token is exchanged (via standard OIDC token exchange) for a **Keycloak-issued platform JWT**. Keycloak federates the cluster OIDC issuer as an Identity Provider and applies **cluster-OIDC-side mappers** to enrich the JWT with the platform claim schema (`platform_tenants`, `platform_namespaces`, `capability_set_refs`, etc.).
+4. The platform JWT is what LiteLLM, OPA, Headlamp, and other platform services consume for workload calls.
+
+**Authoring of cluster-OIDC-side mappers IS IN SCOPE** for this architecture (this is a change from earlier scoping). The cluster OIDC issuer is a platform-controlled artifact; the mappers from cluster-OIDC subject claims to platform claims are part of what the platform ships and tests.
+
+**Cluster OIDC issuer availability per environment:**
+
+- **EKS** — provides a managed cluster OIDC issuer out of the box (this is what IRSA uses). Nothing extra to configure.
+- **AKS** — provides a cluster OIDC issuer but it is **opt-in**: the cluster must be created (or updated) with `--enable-oidc-issuer --enable-workload-identity`. The architecture commits to enabling these flags.
+- **kind** — has **no external OIDC issuer out of the box**. To make dev / integration testing functionally complete, the platform ships a **kind-cluster bootstrap utility** that:
+  - applies a `kubeadm` patch to enable a stable issuer URL on the API server,
+  - hosts the **JWKS document statically** at a discoverable URL inside the cluster,
+  - configures Keycloak to federate that issuer the same way it would federate EKS or AKS.
+
+  Without this utility, kind cannot exercise Flow 2 end to end; with it, kind reaches feature parity with the cloud environments for workload identity.
+
+#### Flow 3 — Developer cluster access (kubectl)
+
+Developers and operators using `kubectl` against a platform cluster need to authenticate as themselves, not as a long-lived static credential. The flow:
+
+1. The cluster's API server is configured with `--oidc-issuer-url=<keycloak-realm>`, `--oidc-client-id=<kubectl-client>`, and the matching username / groups claim flags.
+2. The developer runs `kubectl` with an OIDC plugin (kubelogin / `kubectl oidc-login` or equivalent) that drives a browser-based Keycloak login.
+3. Keycloak issues a JWT with the same platform claim schema; the API server treats the developer as authenticated by Keycloak.
+4. Kubernetes RBAC (and platform OPA admission policy) then decides what the developer can do.
+
+This pattern is **supported on EKS, AKS, and kind** via the same `--oidc-*` flags on the API server (kind via the kubeadm patch shipped with the bootstrap utility above).
+
+#### Diagram
 
 ```mermaid
 flowchart LR
@@ -833,27 +920,18 @@ flowchart LR
   JWT --> LC
 ```
 
-**The chain of trust** for a Platform Agent making a privileged call:
-
-1. The agent's pod runs as a Kubernetes ServiceAccount with a projected token signed by the cluster's OIDC issuer.
-2. **Cloud-side**: ESO (or any in-cluster process needing cloud access) uses that SA token to assume a cloud identity — **AWS IRSA** (SA annotated with `eks.amazonaws.com/role-arn`, AWS STS recognizes the cluster as an OIDC provider, returns scoped AWS credentials) or **Azure Workload Identity** (SA annotated with `azure.workload.identity/client-id`, Azure AD recognizes the cluster as an OIDC issuer, returns scoped Azure credentials). Both Azure and AWS implement this OIDC-based federation pattern; functionally equivalent for the architecture's purposes.
-3. **Platform-side**: the SA token is exchanged (via standard OIDC token exchange) for a Keycloak-issued platform JWT. Keycloak federates the cluster OIDC issuer as an Identity Provider and applies the installer-configured mappers to enrich the resulting platform JWT with the claim schema in section 6.9 (`platform_tenants`, `platform_namespaces`, `platform_roles`, `capability_set_refs`, etc.).
-4. The platform JWT is what LiteLLM, OPA, Headlamp, and LibreChat actually consume.
-
-**For human users**, the chain skips step 2 — the user logs in to Keycloak through the UI, Keycloak brokers the upstream IdP (AD, Okta, etc.), mappers populate the same claim schema, and the resulting JWT is presented to platform components.
-
 **Trust bootstrap.**
 
-- **AWS (v1.0 initial implementation)**: ESO uses an IRSA-bound ServiceAccount to fetch Keycloak admin credentials, JWT signing keys, initial database passwords, and other bootstrap secrets from **AWS Secrets Manager**. The IRSA trust is established once during cluster provisioning by the `k8-platform` baseline.
+- **AWS (v1.0 initial implementation, ADR 0033)**: ESO uses an IRSA-bound ServiceAccount to fetch Keycloak admin credentials, JWT signing keys, initial database passwords, and other bootstrap secrets from **AWS Secrets Manager**. The IRSA trust is established once during cluster provisioning by the `k8-platform` baseline.
 - **Azure (architecture-supported, not exercised in v1.0)**: equivalent pattern with **Azure Workload Identity** + **Azure Key Vault**. Specifics are TBD until v1.0 lands and Azure becomes a real target.
-- **kind / dev**: the cluster runs without cloud federation; ESO is configured against a local secret backend or the secrets are provided directly. Bootstrap is local.
+- **kind / dev**: the kind-cluster bootstrap utility above stands up the OIDC issuer and JWKS; ESO is configured against a local secret backend or the secrets are provided directly. Bootstrap is fully local.
 
 **What the architecture commits to:**
 
-- All privileged platform identity flows ultimately resolve to a Keycloak-issued JWT carrying the section 6.9 claim schema. No platform component trusts upstream identity directly.
-- Cluster OIDC is the SA federation root; IRSA / Workload Identity is the cloud-resource adapter; Keycloak is the platform identity adapter.
-- Mapper authoring (translating upstream IdP attributes into platform claims) is **out of scope**; architects of a specific install own it.
-- Initial v1.0 implementation is AWS + GitHub. Azure parity is a configuration concern, not an architectural one.
+- All privileged platform identity flows ultimately resolve to a Keycloak-issued JWT carrying the section 6.9 claim schema (ADR 0029). No platform component trusts upstream identity directly.
+- Cluster OIDC is the workload-identity federation root; IRSA / Workload Identity is the cloud-resource adapter; Keycloak is the platform identity adapter.
+- **Upstream-IdP mappers (Flow 1)** are out of scope — the install owner owns them. **Cluster-OIDC mappers (Flow 2)** are in scope and ship with the platform.
+- Initial v1.0 implementation is AWS + GitHub + kind (ADR 0033). Azure parity is a configuration concern, not an architectural one.
 
 ### 6.12 CRD inventory
 
@@ -883,6 +961,10 @@ A summary of every CRD in the architecture, who reconciles it, and where it is d
 | `AgentEnvironment` (Crossplane XR) | Crossplane (B4) | namespaced | A composed environment for a class of agents. | `region`, `quotas`, `defaultCapabilitySetRef` | §5 (component B4) |
 | `SyntheticMCPServer` (Crossplane XR) | Crossplane (B4) | namespaced | An MCP server synthesized from an OpenAPI spec. | `openApiSpecRef`, `authConfigRef`, `mcpServerRef` (back-link) | §5 (component A12) |
 | `GrafanaDashboard` (Crossplane XR) | Crossplane (B4) | namespaced | A namespaced dashboard. | `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled) | §11 |
+| `LogLevel` | per-component (in-process or rolling-restart) | namespaced | Declarative log-level / trace-granularity toggle target (ADR 0035). | `componentSelector`, `level`, `traceGranularity`, `scope` (component/tenant/eventClass), `expiresAt` | §6.5, §13 |
+| `AuditLog` (Crossplane XRD) | Crossplane (B4) | namespaced | Composes the audit pipeline (ADR 0034) — Postgres `audit_events` backing store, S3 archive bucket + lifecycle (AWS only), OpenSearch indexer, batch CronJob (AWS only), and the audit-endpoint Deployment. | `postgresRef`, `s3BucketRef`, `indexerRef`, `batchScheduleSpec`, `endpointReplicas` | §6.3, §6.5 |
+| `TenantOnboarding` (Crossplane XRD) | Crossplane (B4) | namespaced | Provisions a tenant — creates the tenant namespace(s), templated default ServiceAccounts, and the claim-to-tenant binding in Keycloak (ADR 0037). CapabilitySets are intentionally not coupled. | `tenantId`, `namespaces[]`, `defaultServiceAccounts[]`, `keycloakBinding` | §6.9 |
+| `AgentDatabase` (Crossplane XRD) | Crossplane (B4) | namespaced | Provisions per-agent / per-tenant / per-user databases for the Postgres and MongoDB MCP services (ADR 0020) — creates the database, role, and grants. | `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef` | §6.1, §6.3 |
 
 All CRDs are namespaced. There are no cluster-scoped platform CRDs in v1.0.
 
@@ -914,13 +996,17 @@ Each use case has two diagrams: an architecture view showing which components pa
 
 ### 7.1 Interactive chat
 
-End user chats with a Platform Agent through LibreChat. LibreChat is locked down (no native agents, no plugins, no per-conversation MCP, no file uploads) and serves only as the chat frontend. Platform Agents appear in LibreChat's endpoint picker as if they were models, surfaced through LiteLLM. Skills, tools, MCP, and RAG are configured on the agent server-side and are not visible to or controllable by the user.
+End user chats with a Platform Agent through LibreChat. LibreChat is locked down (no native agents, no plugins, no per-conversation MCP) and serves only as the chat frontend. Platform Agents appear in LibreChat's endpoint picker as if they were models, surfaced through LiteLLM. Skills, tools, MCP, and RAG are configured on the agent server-side and are not visible to or controllable by the user.
+
+**File upload (ADR 0007 update).** File upload from LibreChat **is permitted**. Uploads route to the **`Memory` CRD** for the active conversation rather than to LibreChat's local filesystem; the Platform Agent reads them through the standard memory access path. **OPA gates file types** with a three-state model: **allowed** (e.g., text, structured data formats the agent expects), **forbidden** (e.g., executables, archives outside an explicit allowlist), and **scan-then-allow** (e.g., images, PDFs, logs — accepted after a content-scan callback completes). This is especially useful for **HolmesGPT diagnostics** where admins drop logs, screenshots, or configuration dumps into the chat and ask HolmesGPT to analyze them.
 
 The default endpoint a typical user sees is the **Interactive Access Agent** — a general-purpose Platform Agent that includes the Knowledge Base in its CapabilitySet and offers conversational access to platform information. Other Platform Agents may be exposed as additional endpoints depending on tenancy and RBAC.
 
 **OpenAI ↔ A2A translation.** This translation between LibreChat's OpenAI-compatible HTTP and our A2A-spoken Platform Agents is expected to be handled by LiteLLM directly. If LiteLLM doesn't provide this translation in OSS by the time we install it, we add a small adapter service (Python) between LibreChat and LiteLLM as part of the LibreChat install/configure component. Either way, LibreChat itself is unmodified.
 
 **Streaming.** Responses stream end-to-end: LLM provider → LiteLLM → Platform Agent → LiteLLM → LibreChat → user, with stream chunks preserved at every layer. The same path applies in reverse for streaming inputs.
+
+**Mattermost as an alternative chat surface (ADR 0036).** Users may also reach Platform Agents through **Mattermost** — messages flow over Knative Eventing as CloudEvents through the same LiteLLM call path, with OPA-driven Trigger filters deciding which channels see which events. See section 6.7 for the integration model. The user-facing capability is the same as LibreChat (chat with Platform Agents, receive streamed responses); the difference is the surface and the bidirectional channel-routing model.
 
 **Architecture:**
 
@@ -1296,7 +1382,7 @@ We fill these gaps with recurring patterns, all custom development:
 | Tool | OSS limitation | Fill-in we build |
 |---|---|---|
 | LiteLLM | SSO/SAML enterprise-only | `oauth2-proxy` in front of admin UI against Keycloak. Two or three admin classes via Keycloak group claims — we don't need fine-grained RBAC. |
-| LiteLLM | Fine-grained audit and RBAC enterprise-only | Custom Python callbacks emit structured audit events to OpenSearch. OPA admission for sensitive virtual key admin operations. We don't need fine-grained RBAC — two or three admin classes via Keycloak group claims suffice. |
+| LiteLLM | Fine-grained audit and RBAC enterprise-only | Custom Python callbacks emit structured audit events through the **platform audit adapter** to the **audit endpoint** (ADR 0034) — Postgres + S3 are the system of record; OpenSearch is advisory fanout. OPA admission for sensitive virtual key admin operations. We don't need fine-grained RBAC — two or three admin classes via Keycloak group claims suffice. |
 | LiteLLM | Org-level guardrails enterprise | Custom Python callbacks for PII, content policy, OPA-driven rate limits. |
 | LiteLLM | Advanced budget features (alert routing, automated suspension on threshold) may be enterprise; basic per-key budgets are OSS | Architecture commits to OPA as policy layer + LiteLLM as spend tracker. Anything missing from OSS gets added via callback. Headlamp is the editing surface; OPA enforces. |
 | LiteLLM | No native Crossplane provider | Hand-written Python kopf operator reconciles CRDs to LiteLLM admin API. |
@@ -1311,6 +1397,7 @@ We fill these gaps with recurring patterns, all custom development:
 | Crossplane v2 | Console (Upbound) is commercial | Headlamp plugin for XR inspection. |
 | Letta | Multi-tenant features may need custom configuration | Wrap behind ARK's `Memory` CRD; namespace-scoped instances. |
 | OpenAPI→MCP converters | None production-grade out of the box | Custom hardening on top of an OSS converter. |
+| Mattermost Team Edition | No native OIDC / SAML in the OSS / free tier (ADR 0036) | Configure Keycloak as a **GitLab-OAuth-spoof client** — Keycloak presents the GitLab OAuth surface that Team Edition supports natively, with protocol mappers translating the platform claim schema into the GitLab-shaped attributes Mattermost expects. No fork, no upgrade. |
 
 OpenSearch is intentionally out of this table — its OSS Security plugin includes OIDC and SAML, no proxy needed. Service accounts elsewhere in the architecture access it by API.
 
@@ -1324,9 +1411,13 @@ The portal is built with **Material for MkDocs** — Markdown in the same repo a
 
 **Documentation timing.** Tutorials and how-to guides are developed **in parallel with the component they document** — tutorial covering Component X ships with Component X. Reference documentation that spans multiple components is scheduled as part of the **last component in the relevant flow** (e.g., the end-to-end "build and deploy your first agent" tutorial finalizes when the agent SDK component, the platform SDK component, the CI/CD reference pipeline, and the deployment path are all in place). **Partial documentation is encouraged, but not required, from earlier components in such a flow** — to reduce the burden on the final component. Wider consistency reviews happen when a cluster of related components finishes.
 
+**Documentation-before-implementation process commitment.** For every component, **documentation is constructed BEFORE implementation** and serves as the **source of test cases for acceptance**. Writing the documentation first forces the design to be concrete — what the user sees, what the API shape is, what the failure modes are — and pulls disagreements forward where they're cheap. The specification / design output for each component includes **concrete test expectations** that are reviewed and signed off **before implementation begins**; acceptance is then a matter of demonstrating that the implementation meets the documented behavior, not of negotiating what the behavior should have been. **For components that depend on un-implemented components**, documentation includes **mock-out instructions** so the dependent component can be developed and tested against the mock; when the real dependency lands, the mock is replaced and the same tests are re-run.
+
 ### 10.1 Tutorials (learning-oriented)
 
 For someone who has never used the platform. Hand-holding, end-to-end, working result.
+
+**Tutorials use Langchain Deep Agents (ADR 0019)** as the agent SDK throughout. Deep Agents is the opinionated, batteries-included default that lets a tutorial get to a working agent in the fewest steps. Tutorials do not introduce raw LangGraph; readers who want the lower-level surface follow the reference (section 10.3) or the dedicated how-to guide.
 
 - Build your first Platform Agent — declarative ARK Agent CRD, deploy via ArgoCD, invoke via LibreChat or A2A.
 - Build your first agent with the Python SDK (BYO container).
@@ -1357,6 +1448,8 @@ For someone who has never used the platform. Hand-holding, end-to-end, working r
 - How to add a toolset to HolmesGPT for a new component.
 
 ### 10.3 Reference (information-oriented)
+
+Reference documentation **covers both LangGraph and Langchain Deep Agents (ADR 0019)** — LangGraph as the supported v1.0 SDK surface and Deep Agents as the opinionated layer on top. Readers using the tutorials see Deep Agents; readers needing the underlying graph primitives find them here.
 
 - ARK CRD reference.
 - Sandbox CRD reference.
@@ -1508,11 +1601,15 @@ Three layers of automated tests, in place from day one. Tests for each component
 
 **Coordination via the `agent-platform test` CLI.** Same command from a developer laptop, from CI, or on schedule. The CLI reads a manifest declaring "what runs where" and invokes the right runners. Aggregates results.
 
-**Reporting.** Test result metrics emit to Mimir for trend dashboards. Per-run detail goes to CI output (PR comments, commit statuses). No Allure or ReportPortal initially — the bar to add either is felt pain in trend analysis or defect grouping. No test CRDs unless we hit a need declarative test execution can't meet.
+**`--debug` / `--trace` flags (ADR 0035).** The `agent-platform test` CLI accepts `--debug` and `--trace` flags that **activate the dynamic log-level / trace-granularity toggle for the duration of the run** and **disable it on completion** (whether the run passes, fails, or is interrupted). Components honoring the toggle (in-process via `LogLevel` CR; rolling-restart for non-reloadable services) raise verbosity for the test run only, so a developer chasing an intermittent failure can re-run with `--trace` and get full detail without leaving the platform in a high-verbosity state.
+
+**Reporting (ADR 0011 update).** **Non-unit test results** (integration, end-to-end, evaluation, red-team) **stream to OpenSearch** as an advisory index, and **metrics + logs publish via OpenTelemetry** through the same collector path the rest of the platform uses. This shares pipelines with production observability rather than running a parallel test-only stack. Trend dashboards over the OpenSearch index serve the role earlier slated for Mimir-only metrics; per-run detail still goes to CI output (PR comments, commit statuses). No Allure or ReportPortal initially — the bar to add either is felt pain in trend analysis or defect grouping. No test CRDs unless we hit a need declarative test execution can't meet.
 
 **Stress probes.** Low-volume concurrent invocation harnesses (Chainsaw or Playwright running N parallel agent invocations) watch existing observability for saturation. Goal: catch gross race conditions or resource exhaustion at modest concurrency, not benchmark performance. No locust/k6.
 
 **Each component contributes its tests.** Workstream A and B component deliverable lists explicitly include Chainsaw + Playwright + PyTest where each applies.
+
+**Periodic platform-health test runs deferred.** A pattern of XRDs (working names `HealthCheck` / `ScheduledTest`) that schedule recurring platform-health test runs as cluster resources is **deferred to future-enhancements**. v1.0 ships only on-demand and CI-triggered runs; periodic in-cluster scheduling is added later when the value is felt.
 
 ## 14. Components and dependencies
 
@@ -1551,10 +1648,15 @@ Each component here is a per-product install + configure + operate package. **St
 | A11 | OpenSearch |
 | A12 | OpenAPI→MCP converter |
 | A13 | Tempo + Mimir |
-| A14 | HolmesGPT (early — others contribute toolsets) |
+| A14 | **HolmesGPT — lands very early (ADR 0012 phased trajectory).** First phase: deployed onto the raw Kubernetes cluster with read-only ServiceAccount + read-only AWS IAM, no secret-store access, useful for diagnostics during platform implementation itself. As subsequent components land, HolmesGPT's access is rewired through the platform layers (LiteLLM, audit adapter, OPA decision points) and other components contribute toolsets. Pulled forward in the dependency graph. |
 | A15 | Reloader, oauth2-proxy (small but real install/config work) |
 | A16 | Interactive Access Agent — general-purpose chat-facing Platform Agent that LibreChat connects to. Implemented early so LibreChat has a working endpoint from day one. |
-| A17 | **Initial MCP services integration** — GitHub (with system-credential and user-credential modes), Google Drive, Firecrawl (with platform-managed secrets and per-agent budget enforcement), Context7. Each MCP service registered as an `MCPServer` CRD, secrets handled by ESO, access controlled by CapabilitySet inclusion + OPA. The GitHub user-credential mode is for interactive scenarios where the user authenticates GitHub themselves; LiteLLM brokers the OAuth flow. |
+| A17 | **Initial MCP services integration (ADR 0020)** — GitHub (system-credential and user-credential modes), Google Drive (system- and user-credential modes), Context7, **OpenSearch** (system-mediated against the platform's own OpenSearch + agent/tenant/user-credentialed for external instances), **Postgres** and **MongoDB** (per-agent / per-tenant / per-user databases provisioned via the new `AgentDatabase` Crossplane XRD), and **generic web-search + web-scrape MCP servers** (in-cluster, OPA-gated at the access layer rather than internally). **Firecrawl is NOT in v1.0**; its role is taken by the generic web-search and web-scrape services. Each MCP service registered as an `MCPServer` CRD, secrets handled by ESO, access controlled by CapabilitySet inclusion + OPA. |
+| A18 | **Audit endpoint + audit adapter library (ADR 0034)** — the single deployable audit endpoint Deployment, the Postgres `audit_events` schema and migrations, the OpenSearch indexer service, the S3 batch CronJob (AWS only), the `AuditLog` Crossplane composition, and the **Python audit adapter library** every component links against. |
+| A19 | **Mattermost adapter (ADR 0036)** — Mattermost Team Edition install, Keycloak GitLab-OAuth-spoof client + protocol mappers, the bidirectional Knative-Eventing bridge, and the OPA-driven Trigger filter library for channel routing. Generic chat-platform driver pattern so Teams / Slack are future drop-ins. |
+| A20 | **Policy simulator service (ADR 0038)** — the dry-run composition service that calls each enforcement layer's structured dry-run mode and assembles the per-layer decision trace. Surfaces it via the Headlamp panel and exposes a HolmesGPT-callable skill equivalent. |
+| A21 | **Tenant onboarding reconciler (ADR 0037)** — the `TenantOnboarding` Crossplane XRD, its composition (namespaces + default ServiceAccounts + Keycloak claim-to-tenant binding), and the Headlamp graphical editor that drives it. CapabilitySets intentionally not coupled. |
+| A22 | **Headlamp graphical editors for platform CRDs (ADR 0039)** — schema-driven graphical editors for `Agent`, `CapabilitySet`, `MCPServer`, `A2APeer`, `Memory`, `EgressTarget`, `Skill`, `BudgetPolicy`, `LogLevel`, `TenantOnboarding`, `AgentDatabase`, `AuditLog`, OPA-bundle policy edits, and the others. Editors integrate with the policy simulator (A20) for preview-before-commit. |
 
 ### 14.2 Workstream B — Custom platform development
 
@@ -1566,13 +1668,13 @@ Each component here is a per-product install + configure + operate package. **St
 | B4 | Crossplane v2 Compositions — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, **`GrafanaDashboard` (namespaced, RBAC/OPA-controlled)**, etc. |
 | B5 | **Cross-cutting Headlamp plugins** — plugins that span multiple components and don't naturally belong to any one of them: capability inspector (per-agent unified view across MCP / A2A / RAG / egress / skills / OPA refs), approval queue UI, virtual key admin UI. **The Headlamp framework itself (base install, branding, shared libraries) is owned by A9; per-component plugins are owned by their respective components.** |
 | B6 | Platform SDK (Python + TypeScript) — what Platform Agents use to call into the platform: `memory.*`, `rag.*`, OTel emission, A2A registration helpers. Distinct from the agent SDK in B7. |
-| B7 | **Initial agent SDK support — Langchain Deep Agents.** Single SDK in v1.0; the multi-SDK harness shape is preserved (so adding LangGraph, OpenAI Agents SDK, etc. later is straightforward), but only Langchain Deep Agents ships in v1.0. |
+| B7 | **Initial agent SDK support — LangGraph + Langchain Deep Agents (ADR 0019).** **LangGraph** is the supported v1.0 SDK; **Langchain Deep Agents (built on LangGraph)** is the opinionated, batteries-included default used in tutorials, how-tos, the agent profile library, and recommended compositions. The multi-SDK harness shape is preserved so OpenAI Agents SDK / Strands / Anthropic Agent SDK / Mastra / ARK ADK can be enrolled as additive changes; the `Agent` CRD's `sdk` field accepts `langgraph` and `deep-agents` in v1.0. Adventurous users may build their own harness images that comply with the platform-SDK interaction surface (§6.2); third-party harness images are NOT officially supported. |
 | B8 | Knative event adapter services (Python — CloudEvent → AgentRun, CloudEvent → Workflow). Includes the two initial trigger flows (AlertManager → HolmesGPT, budget exceeded → email user). |
 | B9 | **`agent-platform` CLI** — the platform CLI used by developers, operators, and CI. |
 | B10 | Coach Component (self-retrospection). **Implemented after the components it depends on land**: Langfuse, ARK, LiteLLM, observability stack. Doesn't necessarily need OPA; design-time decision. |
 | B11 | Memory backend adapter. |
 | B12 | CloudEvent schema registry — JSON schemas + tooling. |
-| B13 | **Custom Python kopf operator for LiteLLM** — reconciles `MCPServer`, `A2APeer`, `VirtualKey`, `CapabilitySet`, `RAGStore`, `BudgetPolicy` to LiteLLM admin API. |
+| B13 | **Custom Python kopf operator for LiteLLM** — reconciles `MCPServer`, `A2APeer`, `VirtualKey`, `CapabilitySet`, `RAGStore`, `BudgetPolicy` to LiteLLM admin API. **Packaged as a subchart of the LiteLLM Helm chart (ADR 0006)** — single ArgoCD release, lifecycle bound to LiteLLM, no version-skew between the gateway and the operator that drives it. |
 | B14 | **`agent-platform` test framework** — test orchestration CLI, harness for stress probes, test result metrics emission, dashboard provisioning. |
 | B15 | **CI/CD reference pipeline — GitHub Actions only for v1.0.** Jenkins and GitLab CI are explicitly out of scope for v1.0; they may come later. |
 | B16 | **Initial OPA policy library content** — concrete Rego bundles covering admission for all v1.0 CRDs, runtime decisions for LiteLLM (tool authorization, budget enforcement, dynamic registration approval), egress policy at the Envoy proxy, RBAC-floor / OPA-restrictor enforcement helpers, and Headlamp action gating. Distinct from B3 (framework) — this is the first wave of policies the platform ships with. |
@@ -1635,6 +1737,7 @@ These components run **at the end** of the v1.0 implementation — they harden, 
 flowchart TB
   subgraph A[Workstream A: Install + operate]
     direction TB
+    A14[A14 HolmesGPT — early phase 1]
     A1[A1 LiteLLM]
     A2[A2 Langfuse]
     A3[A3 Argo Workflows]
@@ -1648,10 +1751,14 @@ flowchart TB
     A11[A11 OpenSearch]
     A12[A12 OpenAPI→MCP]
     A13[A13 Tempo + Mimir]
-    A14[A14 HolmesGPT]
     A15[A15 Reloader + oauth2-proxy]
     A16[A16 Interactive Access Agent]
     A17[A17 Initial MCP services]
+    A18[A18 Audit endpoint + adapter]
+    A19[A19 Mattermost adapter]
+    A20[A20 Policy simulator service]
+    A21[A21 Tenant onboarding reconciler]
+    A22[A22 Headlamp graphical editors]
   end
 
   subgraph B[Workstream B: Custom dev]
@@ -1688,13 +1795,30 @@ flowchart TB
   %% Workstream A internal deps
   A6 --> A5
   A11 --> A10
-  A13 --> A14
-  A2 --> A14
+  %% A14 HolmesGPT is phase-1 with minimal deps — others contribute toolsets later
+  A13 -.->|toolset contribution| A14
+  A2 -.->|toolset contribution| A14
   A1 --> A16
   A14 --> A16
   A1 --> A17
   A7 --> A17
   B13 --> A17
+  %% Audit endpoint + adapter
+  A11 --> A18
+  A7 --> A18
+  %% Mattermost adapter
+  A4 --> A19
+  A1 --> A19
+  %% Policy simulator depends on layers it dry-runs
+  A7 --> A20
+  A1 --> A20
+  A6 --> A20
+  %% Tenant onboarding
+  A9 --> A21
+  A22 --> A21
+  %% Headlamp graphical editors
+  A9 --> A22
+  A20 --> A22
 
   %% Workstream B internal deps and dependencies on A
   A4 --> B8
@@ -1764,7 +1888,7 @@ flowchart TB
   C --> F
 ```
 
-**Foundation components** (no internal deps within their workstream) sit mostly in Workstream A and are parallelizable from day one. **B22 (security threat model design)** is also foundational — it's a design specification that ships before the first wave of A and B implementation lands, and feeds standards forward into every component. A11 (OpenSearch), A13 (Tempo + Mimir), and A14 (HolmesGPT) go in early so other components can contribute knowledge to HolmesGPT and emit traces from the start. **Workstream B components** depend on their respective Workstream A components and on the SDK chain (B6 → B7, B6 → B10, B17 → B18, etc.). **Workstreams C, D, and E** consume continuously from A and B. **Workstream F** runs after the platform is functionally complete to harden it for production; F6 in particular consumes finalized cross-cutting runbooks from C.
+**Foundation components** (no internal deps within their workstream) sit mostly in Workstream A and are parallelizable from day one. **B22 (security threat model design)** is also foundational — it's a design specification that ships before the first wave of A and B implementation lands, and feeds standards forward into every component. **A14 (HolmesGPT) lands very early per ADR 0012's phased trajectory** — first phase on the raw cluster with read-only access, then incrementally rewired through the platform layers (LiteLLM, audit adapter, OPA decision points) as those land. A11 (OpenSearch) and A13 (Tempo + Mimir) also go in early so other components can contribute knowledge and emit traces from the start. **Workstream B components** depend on their respective Workstream A components and on the SDK chain (B6 → B7, B6 → B10, B17 → B18, etc.). **Workstreams C, D, and E** consume continuously from A and B. **Workstream F** runs after the platform is functionally complete to harden it for production; F6 in particular consumes finalized cross-cutting runbooks from C.
 
 The graph is a DAG; no cycles. The two fan-out edges from B14 (test framework) and B22 (security design) into A and B express "consumed by every component" rather than "must precede every component" — they are continuously available inputs.
 
