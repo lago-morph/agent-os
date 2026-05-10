@@ -46,12 +46,12 @@ Other CRDs (`AgentRun`, `Sandbox`, `Approval`, `VirtualKey`, `BudgetPolicy`, etc
 
 ## References
 
-- Architecture overview §6.12 (CRD inventory), §10, §14.4, Workstream B5
-- ADR 0013 — Capability CRD and CapabilitySet layering
-- ADR 0017 — Generalized approval system
-- ADR 0021 — `GrafanaDashboard` XRs
-- ADR 0032 — CapabilitySet overlay semantics
-- ADR 0034 — Audit pipeline (`AuditLog` XRD)
-- ADR 0035 — Dynamic log and trace toggle (`LogLevel`)
-- ADR 0037 — Tenant onboarding (`TenantOnboarding`)
-- ADR 0038 — Policy simulators
+- [Architecture overview](../architecture-overview.md) [§6.12](../architecture-overview.md#612-crd-inventory) (CRD inventory), [§10](../architecture-overview.md#10-documentation-plan), [§14.4](../architecture-overview.md#144-workstream-d--dashboards), Workstream B5
+- [ADR 0013](./0013-capability-crd-and-capabilityset-layering.md) — Capability CRD and CapabilitySet layering
+- [ADR 0017](./0017-generalized-approval-system.md) — Generalized approval system
+- [ADR 0021](./0021-grafanadashboard-xrs.md) — `GrafanaDashboard` XRs
+- [ADR 0032](./0032-capabilityset-overlay-semantics.md) — CapabilitySet overlay semantics
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) — Audit pipeline (`AuditLog` XRD)
+- [ADR 0035](./0035-dynamic-log-and-trace-toggle.md) — Dynamic log and trace toggle (`LogLevel`)
+- [ADR 0037](./0037-tenant-onboarding-xrd.md) — Tenant onboarding (`TenantOnboarding`)
+- [ADR 0038](./0038-policy-simulators.md) — Policy simulators

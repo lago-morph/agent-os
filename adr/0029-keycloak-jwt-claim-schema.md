@@ -42,10 +42,10 @@ The platform commits to the JWT claim schema specified in architecture-overview.
 
 (Cross-references reflect the post-ADR-0028-revision split between in-scope cluster-OIDC mappers and out-of-scope upstream-IdP mappers; see Consequences for the architecture-backlog.md § 6 wording flagged for follow-up narrowing.)
 
-- architecture-overview.md § 6.9 (Required Keycloak JWT claims)
-- architecture-backlog.md § 4, 6
-- ADR 0028 (identity federation chain; defines cluster-OIDC → Keycloak mappers as in-scope and is the source of the upstream-vs-cluster mapper split this ADR adopts)
-- ADR 0037 (tenant onboarding; consumes `platform_tenants` / `platform_namespaces` / `tenant_roles` from this schema as the binding moment for new tenants)
-- ADR 0016 (namespace-based multi-tenancy; ADR 0029 is the identity-layer expression of the tenancy model ADR 0016 defines at the namespace layer)
-- ADR 0018 (RBAC permission floor; OPA may further restrict but cannot grant beyond)
-- ADR 0030 (CRD/API versioning discipline; covers the schema and the platform-shipped cluster-OIDC mapper bundles in lockstep)
+- [architecture-overview.md § 6.9](../architecture-overview.md#69-multi-tenancy-and-namespacing) (Required Keycloak JWT claims)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 4](../architecture-backlog.md#4-topics-that-need-further-design-before-implementation), [6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0028](./0028-identity-federation.md) (identity federation chain; defines cluster-OIDC → Keycloak mappers as in-scope and is the source of the upstream-vs-cluster mapper split this ADR adopts)
+- [ADR 0037](./0037-tenant-onboarding-xrd.md) (tenant onboarding; consumes `platform_tenants` / `platform_namespaces` / `tenant_roles` from this schema as the binding moment for new tenants)
+- [ADR 0016](./0016-multi-tenancy-via-namespaces.md) (namespace-based multi-tenancy; ADR 0029 is the identity-layer expression of the tenancy model ADR 0016 defines at the namespace layer)
+- [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC permission floor; OPA may further restrict but cannot grant beyond)
+- [ADR 0030](./0030-crd-and-api-versioning-policy.md) (CRD/API versioning discipline; covers the schema and the platform-shipped cluster-OIDC mapper bundles in lockstep)

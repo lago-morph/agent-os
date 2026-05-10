@@ -81,10 +81,10 @@ stay decoupled in both directions.
 
 ## References
 
-- architecture-overview.md § 6.9, § 6.11
-- architecture-backlog.md § 1.2, § 4
-- ADR 0013 (Capability CRD model and CapabilitySet layering)
-- ADR 0016 (Multi-tenancy via Kubernetes namespaces)
-- ADR 0028 (Identity federation chain)
-- ADR 0029 (Required Keycloak JWT claim schema)
-- ADR 0039 (Headlamp graphical editors for platform CRDs)
+- [architecture-overview.md](../architecture-overview.md) [§ 6.9](../architecture-overview.md#69-multi-tenancy-and-namespacing), [§ 6.11](../architecture-overview.md#611-identity-federation)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.2](../architecture-backlog.md#12-multi-tenancy-details), [§ 4](../architecture-backlog.md#4-topics-that-need-further-design-before-implementation)
+- [ADR 0013](./0013-capability-crd-and-capabilityset-layering.md) (Capability CRD model and CapabilitySet layering)
+- [ADR 0016](./0016-multi-tenancy-via-namespaces.md) (Multi-tenancy via Kubernetes namespaces)
+- [ADR 0028](./0028-identity-federation.md) (Identity federation chain)
+- [ADR 0029](./0029-keycloak-jwt-claim-schema.md) (Required Keycloak JWT claim schema)
+- [ADR 0039](./0039-headlamp-graphical-editors-for-platform-crds.md) (Headlamp graphical editors for platform CRDs)

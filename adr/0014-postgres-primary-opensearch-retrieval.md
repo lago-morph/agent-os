@@ -26,9 +26,9 @@ The platform treats **Postgres (and, where appropriate, object storage or an ext
 
 ## References
 
-- architecture-overview.md § 6.3, § 6.5
-- architecture-backlog.md § 6
-- ADR 0009 (OpenSearch)
-- ADR 0011 (three-layer testing — test results streamed to OpenSearch as advisory index)
-- ADR 0033 (initial implementation targets — dual-mode hosting: kind locally, AWS RDS via Crossplane on AWS)
-- ADR 0034 (audit pipeline — Postgres + S3 system of record, OpenSearch advisory only)
+- [architecture-overview.md](../architecture-overview.md) [§ 6.3](../architecture-overview.md#63-memory-and-data-architecture), [§ 6.5](../architecture-overview.md#65-observability-architecture)
+- [architecture-backlog.md § 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0009](./0009-opensearch-search-vector-store.md) (OpenSearch)
+- [ADR 0011](./0011-three-layer-testing-cli-orchestration.md) (three-layer testing — test results streamed to OpenSearch as advisory index)
+- [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial implementation targets — dual-mode hosting: kind locally, AWS RDS via Crossplane on AWS)
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — Postgres + S3 system of record, OpenSearch advisory only)

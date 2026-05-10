@@ -52,6 +52,6 @@ no platform-wide override that changes a store's mode after declaration.
 
 ## References
 
-- architecture-overview.md § 6.3
-- architecture-backlog.md § 4, 6
-- ADR 0005 (Letta), ADR 0016 (multi-tenancy), ADR 0018 (RBAC-floor / OPA-restrictor)
+- [architecture-overview.md § 6.3](../architecture-overview.md#63-memory-and-data-architecture)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 4](../architecture-backlog.md#4-topics-that-need-further-design-before-implementation), [6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0005](./0005-letta-memory-backend.md) (Letta), [ADR 0016](./0016-multi-tenancy-via-namespaces.md) (multi-tenancy), [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor)

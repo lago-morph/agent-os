@@ -71,8 +71,8 @@ toolset.
 
 ## References
 
-- architecture-overview.md § 6.5
-- architecture-backlog.md § 2.4
-- ADR 0011 (three-layer testing — non-unit runs publish via OTel)
-- ADR 0012 (HolmesGPT)
-- ADR 0035 (dynamic log/trace toggle — gates trace granularity)
+- [architecture-overview.md § 6.5](../architecture-overview.md#65-observability-architecture)
+- [architecture-backlog.md § 2.4](../architecture-backlog.md#24-tracing-strategy-tempo--langfuse-correlated-vs-langfuse-only)
+- [ADR 0011](./0011-three-layer-testing-cli-orchestration.md) (three-layer testing — non-unit runs publish via OTel)
+- [ADR 0012](./0012-holmesgpt-first-class-agent.md) (HolmesGPT)
+- [ADR 0035](./0035-dynamic-log-and-trace-toggle.md) (dynamic log/trace toggle — gates trace granularity)

@@ -23,6 +23,6 @@ All dashboards — per-component, integrated, developer-facing, and any dashboar
 
 ## References
 
-- architecture-overview.md § 11, § 14.4
-- architecture-backlog.md § 4 (B4 Compositions), § 6
-- ADR 0006 (kopf vs Crossplane split), ADR 0016 (namespace tenancy), ADR 0018 (RBAC-floor / OPA-restrictor)
+- [architecture-overview.md](../architecture-overview.md) [§ 11](../architecture-overview.md#11-grafana-dashboards), [§ 14.4](../architecture-overview.md#144-workstream-d--dashboards)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 4](../architecture-backlog.md#4-topics-that-need-further-design-before-implementation) (B4 Compositions), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0006](./0006-python-kopf-litellm-operator.md) (kopf vs Crossplane split), [ADR 0016](./0016-multi-tenancy-via-namespaces.md) (namespace tenancy), [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor)

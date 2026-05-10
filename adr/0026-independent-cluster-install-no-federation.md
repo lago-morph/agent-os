@@ -22,11 +22,11 @@ Each cluster is an independent install of the platform. v1.0 commits to no multi
 
 ## References
 
-- architecture-overview.md §3 (baseline assumptions, "Each cluster is an independent install of the platform"), §6.9 (multi-tenancy and namespacing), §6.11 (identity federation)
-- architecture-backlog.md §2.19 (Kubernetes ServiceAccounts vs SPIFFE), §3.5 (SPIFFE trigger), §3.13 (multi-cluster federation trigger), §6 (invariant)
-- future-enhancements.md §1 (redundancy and degraded operations)
-- ADR 0016 (multi-tenancy via namespaces)
-- ADR 0023 (environment-specific Knative sources)
-- ADR 0028 (identity federation)
-- ADR 0033 (AWS + GitHub initial targets)
-- ADR 0034 (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)
+- [architecture-overview.md](../architecture-overview.md) [§3](../architecture-overview.md#3-baseline-assumptions) (baseline assumptions, "Each cluster is an independent install of the platform"), [§6.9](../architecture-overview.md#69-multi-tenancy-and-namespacing) (multi-tenancy and namespacing), [§6.11](../architecture-overview.md#611-identity-federation) (identity federation)
+- [architecture-backlog.md](../architecture-backlog.md) [§2.19](../architecture-backlog.md#219-identity-spiffe-vs-kubernetes-serviceaccounts) (Kubernetes ServiceAccounts vs SPIFFE), [§3.5](../architecture-backlog.md#35-spiffe-identity) (SPIFFE trigger), [§3.13](../architecture-backlog.md#313-multi-cluster-federation) (multi-cluster federation trigger), [§6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs) (invariant)
+- [future-enhancements.md §1](../future-enhancements.md#1-redundancy-and-degraded-operations) (redundancy and degraded operations)
+- [ADR 0016](./0016-multi-tenancy-via-namespaces.md) (multi-tenancy via namespaces)
+- [ADR 0023](./0023-environment-specific-knative-sources.md) (environment-specific Knative sources)
+- [ADR 0028](./0028-identity-federation.md) (identity federation)
+- [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (AWS + GitHub initial targets)
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)

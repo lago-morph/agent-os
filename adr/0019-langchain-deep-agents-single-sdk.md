@@ -54,8 +54,8 @@ v1.0 ships **LangGraph as the supported agent SDK**, with **Langchain Deep Agent
 
 ## References
 
-- architecture-overview.md § 6.2, § 5.3, § 8, § 9.5, § 10, § 11
-- architecture-backlog.md § 2.16, § 3.15, § 7 item 19
-- ADR 0001 (ARK as agent operator) — ARK reconciles `Agent` CRDs into pods regardless of which SDK runs inside; SDK choice is a harness-level decision and does not constrain the operator layer
-- ADR 0013 (Capability CRD and CapabilitySet layering) — capability change notifications are surfaced through the platform SDK callback in both supported SDKs
-- ADR 0032 (CapabilitySet overlay) — overlay composition is SDK-independent and applies identically to LangGraph and Deep Agents agents
+- [architecture-overview.md](../architecture-overview.md) [§ 6.2](../architecture-overview.md#62-agent-runtime-architecture), § 5.3, [§ 8](../architecture-overview.md#8-cicd-integration-requirements), § 9.5, [§ 10](../architecture-overview.md#10-documentation-plan), [§ 11](../architecture-overview.md#11-grafana-dashboards)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 2.16](../architecture-backlog.md#216-initial-agent-sdk-choice), [§ 3.15](../architecture-backlog.md#315-adding-sdks-beyond-langchain-deep-agents), § 7 item 19
+- [ADR 0001](./0001-ark-as-agent-operator.md) (ARK as agent operator) — ARK reconciles `Agent` CRDs into pods regardless of which SDK runs inside; SDK choice is a harness-level decision and does not constrain the operator layer
+- [ADR 0013](./0013-capability-crd-and-capabilityset-layering.md) (Capability CRD and CapabilitySet layering) — capability change notifications are surfaced through the platform SDK callback in both supported SDKs
+- [ADR 0032](./0032-capabilityset-overlay-semantics.md) (CapabilitySet overlay) — overlay composition is SDK-independent and applies identically to LangGraph and Deep Agents agents

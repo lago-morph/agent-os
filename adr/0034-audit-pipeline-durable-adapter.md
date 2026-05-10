@@ -46,12 +46,12 @@ The retention durations, redaction rules, and lifecycle specifics remain deferre
 
 ## References
 
-- architecture-overview.md § 6.5 (observability and audit), § 6.3 (memory and data architecture, audit retention paragraph)
-- architecture-backlog.md § 1.13 (audit retention policy deferred to Workstream F), § 6 (reproducibility invariant; all custom code is Python)
-- ADR 0003 (Envoy egress proxy — egress path for S3 and managed OpenSearch)
-- ADR 0009 (OpenSearch as search/vector store; advisory role here)
-- ADR 0011 (three-layer testing — test results stream via the same OpenSearch + OTel paths)
-- ADR 0014 (Postgres as primary; OpenSearch as retrieval optimization only)
-- ADR 0021 (Crossplane-composed XR pattern, applied here as the `AuditLog` XRD)
-- ADR 0033 (initial implementation targets AWS + kind; dual-mode hosting rule)
-- ADR 0035 (dynamic log-level toggle on the audit endpoint)
+- [architecture-overview.md](../architecture-overview.md) [§ 6.5](../architecture-overview.md#65-observability-architecture) (observability and audit), [§ 6.3](../architecture-overview.md#63-memory-and-data-architecture) (memory and data architecture, audit retention paragraph)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.13](../architecture-backlog.md#113-audit-retention-policy-deferred-to-workstream-f) (audit retention policy deferred to Workstream F), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs) (reproducibility invariant; all custom code is Python)
+- [ADR 0003](./0003-envoy-egress-proxy.md) (Envoy egress proxy — egress path for S3 and managed OpenSearch)
+- [ADR 0009](./0009-opensearch-search-vector-store.md) (OpenSearch as search/vector store; advisory role here)
+- [ADR 0011](./0011-three-layer-testing-cli-orchestration.md) (three-layer testing — test results stream via the same OpenSearch + OTel paths)
+- [ADR 0014](./0014-postgres-primary-opensearch-retrieval.md) (Postgres as primary; OpenSearch as retrieval optimization only)
+- [ADR 0021](./0021-grafanadashboard-xrs.md) (Crossplane-composed XR pattern, applied here as the `AuditLog` XRD)
+- [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial implementation targets AWS + kind; dual-mode hosting rule)
+- [ADR 0035](./0035-dynamic-log-and-trace-toggle.md) (dynamic log-level toggle on the audit endpoint)

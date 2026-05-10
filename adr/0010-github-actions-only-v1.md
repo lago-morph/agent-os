@@ -28,6 +28,6 @@ v1.0 supports **GitHub Actions only** as the reference CI/CD system. Jenkins, Gi
 
 ## References
 
-- architecture-overview.md § 8
-- architecture-backlog.md § 2.17, § 3.14, § 7 item 10
-- ADR 0011 (CLI-based test orchestration), ADR 0033 (AWS + GitHub initial targets)
+- [architecture-overview.md § 8](../architecture-overview.md#8-cicd-integration-requirements)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 2.17](../architecture-backlog.md#217-ci-system-support-github-actions-only-for-v10-vs-multi-ci), [§ 3.14](../architecture-backlog.md#314-multi-ci-support-beyond-github-actions), § 7 item 10
+- [ADR 0011](./0011-three-layer-testing-cli-orchestration.md) (CLI-based test orchestration), [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (AWS + GitHub initial targets)

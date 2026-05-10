@@ -68,6 +68,6 @@ set per Agent.
 
 ## References
 
-- architecture-overview.md § 6.8
-- architecture-backlog.md § 1.1, 6
-- ADR 0013 (Capability CRD model), ADR 0018 (RBAC-floor / OPA-restrictor)
+- [architecture-overview.md § 6.8](../architecture-overview.md#68-capability-registries-and-approved-primitives)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.1](../architecture-backlog.md#11-capabilityset-layering-semantics), [6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0013](./0013-capability-crd-and-capabilityset-layering.md) (Capability CRD model), [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor)

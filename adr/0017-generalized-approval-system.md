@@ -29,10 +29,10 @@ The platform ships one approval mechanism with four parts. (1) An `Approval` CRD
 
 ## References
 
-- architecture-overview.md § 7.5
-- architecture-backlog.md § 1.5, 2.18, 2.22, 3.3, 6
-- future-enhancements.md § 4 (M-of-N approvers)
-- ADR 0018 (RBAC-floor / OPA-restrictor)
-- ADR 0012 (HolmesGPT three-state permission model — "upon-approval" consumer)
-- ADR 0038 (Headlamp OPA policy simulator)
-- ADR 0034 (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)
+- [architecture-overview.md § 7.5](../architecture-overview.md#75-approvals--generalized)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.5](../architecture-backlog.md#15-approval-crd-details), [2.18](../architecture-backlog.md#218-generalized-approval-system-defer-vs-do-now), [2.22](../architecture-backlog.md#222-approval-mechanism-rebuild-on-need-vs-generalize-once), [3.3](../architecture-backlog.md#33-more-approval-flow-features), [6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [future-enhancements.md § 4](../future-enhancements.md#4-other-deferred-items-cross-references) (M-of-N approvers)
+- [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor)
+- [ADR 0012](./0012-holmesgpt-first-class-agent.md) (HolmesGPT three-state permission model — "upon-approval" consumer)
+- [ADR 0038](./0038-policy-simulators.md) (Headlamp OPA policy simulator)
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)

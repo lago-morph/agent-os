@@ -84,11 +84,11 @@ resolution semantics are deferred to ADR 0032 and design specs.
 
 ## References
 
-- architecture-overview.md § 6.8
-- architecture-backlog.md § 1.1, 6
-- ADR 0019 (platform SDK is the agent-facing surface for capability
+- [architecture-overview.md § 6.8](../architecture-overview.md#68-capability-registries-and-approved-primitives)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.1](../architecture-backlog.md#11-capabilityset-layering-semantics), [6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0019](./0019-langchain-deep-agents-single-sdk.md) (platform SDK is the agent-facing surface for capability
   notifications)
-- ADR 0031 (CloudEvent taxonomy carrying `platform.capability.changed`)
-- ADR 0032 (CapabilitySet overlay semantics)
-- ADR 0018 (RBAC-floor / OPA-restrictor)
-- ADR 0039 (Headlamp surfaces the resolved capability set live)
+- [ADR 0031](./0031-cloudevent-top-level-taxonomy.md) (CloudEvent taxonomy carrying `platform.capability.changed`)
+- [ADR 0032](./0032-capabilityset-overlay-semantics.md) (CapabilitySet overlay semantics)
+- [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor)
+- [ADR 0039](./0039-headlamp-graphical-editors-for-platform-crds.md) (Headlamp surfaces the resolved capability set live)

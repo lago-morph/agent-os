@@ -56,6 +56,6 @@ level) and outright deny; it does not include any form of escalation.
 
 ## References
 
-- architecture-overview.md § 6.6
-- architecture-backlog.md § 6
-- ADR 0002 (OPA + Gatekeeper), ADR 0017 (Approval system), ADR 0016 (multi-tenancy)
+- [architecture-overview.md § 6.6](../architecture-overview.md#66-security-and-policy-architecture)
+- [architecture-backlog.md § 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0002](./0002-opa-gatekeeper-policy-engine.md) (OPA + Gatekeeper), [ADR 0017](./0017-generalized-approval-system.md) (Approval system), [ADR 0016](./0016-multi-tenancy-via-namespaces.md) (multi-tenancy)

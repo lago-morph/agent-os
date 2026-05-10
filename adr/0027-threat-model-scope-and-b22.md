@@ -30,11 +30,11 @@ For v1.0 the platform optimizes its built-in controls against **unintentional ac
 
 ## References
 
-- architecture-overview.md § 6.6 (security and policy architecture, threat model — v1.0 stance)
-- architecture-overview.md § 14.2 (Workstream B, component B22)
-- architecture-backlog.md § 4 (topics that need further design before implementation)
-- architecture-backlog.md § 7 item 27 (this ADR's backlog entry)
-- future-enhancements.md § 2 (continuous container security)
-- ADR 0002 (OPA + Gatekeeper)
-- ADR 0003 (Envoy egress proxy)
-- ADR 0018 (RBAC-floor / OPA-restrictor)
+- [architecture-overview.md § 6.6](../architecture-overview.md#66-security-and-policy-architecture) (security and policy architecture, threat model — v1.0 stance)
+- [architecture-overview.md § 14.2](../architecture-overview.md#142-workstream-b--custom-platform-development) (Workstream B, component B22)
+- [architecture-backlog.md § 4](../architecture-backlog.md#4-topics-that-need-further-design-before-implementation) (topics that need further design before implementation)
+- [architecture-backlog.md](../architecture-backlog.md) § 7 item 27 (this ADR's backlog entry)
+- [future-enhancements.md § 2](../future-enhancements.md#2-continuous-container-security) (continuous container security)
+- [ADR 0002](./0002-opa-gatekeeper-policy-engine.md) (OPA + Gatekeeper)
+- [ADR 0003](./0003-envoy-egress-proxy.md) (Envoy egress proxy)
+- [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor)

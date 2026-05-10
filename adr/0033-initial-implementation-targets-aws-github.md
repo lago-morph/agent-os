@@ -42,12 +42,12 @@ Without this, the kind path cannot validate the federation pattern and IRSA-vs-k
 
 ## References
 
-- architecture-overview.md § 3 (baseline assumptions), § 6.11 (identity federation)
-- architecture-backlog.md § 1.17 (identity federation details, Azure bootstrap deferred), § 3.14 (multi-CI support beyond GitHub Actions)
-- ADR 0003 (Envoy egress proxy — cloud/CNI portability)
-- ADR 0009 (OpenSearch dual-mode: in-cluster on kind, managed on AWS)
-- ADR 0010 (GitHub Actions only for v1.0)
-- ADR 0014 (Postgres dual-mode: in-cluster on kind, RDS on AWS)
-- ADR 0028 (identity federation; kind cluster-OIDC issuer support)
-- ADR 0034 (audit pipeline — depends on Postgres + S3 backends established here)
-- ADR 0036 (Mattermost integration — part of v1.0 chat surface on this target)
+- [architecture-overview.md](../architecture-overview.md) [§ 3](../architecture-overview.md#3-baseline-assumptions) (baseline assumptions), [§ 6.11](../architecture-overview.md#611-identity-federation) (identity federation)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.17](../architecture-backlog.md#117-identity-federation-details) (identity federation details, Azure bootstrap deferred), [§ 3.14](../architecture-backlog.md#314-multi-ci-support-beyond-github-actions) (multi-CI support beyond GitHub Actions)
+- [ADR 0003](./0003-envoy-egress-proxy.md) (Envoy egress proxy — cloud/CNI portability)
+- [ADR 0009](./0009-opensearch-search-vector-store.md) (OpenSearch dual-mode: in-cluster on kind, managed on AWS)
+- [ADR 0010](./0010-github-actions-only-v1.md) (GitHub Actions only for v1.0)
+- [ADR 0014](./0014-postgres-primary-opensearch-retrieval.md) (Postgres dual-mode: in-cluster on kind, RDS on AWS)
+- [ADR 0028](./0028-identity-federation.md) (identity federation; kind cluster-OIDC issuer support)
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — depends on Postgres + S3 backends established here)
+- [ADR 0036](./0036-mattermost-chat-integration.md) (Mattermost integration — part of v1.0 chat surface on this target)

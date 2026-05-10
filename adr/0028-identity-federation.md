@@ -119,10 +119,10 @@ component trusts upstream identity directly.
 
 ## References
 
-- architecture-overview.md § 6.11
-- architecture-backlog.md § 1.17, § 6
-- ADR 0029 (required Keycloak JWT claim schema)
-- ADR 0033 (initial implementation targets — EKS + GitHub; AKS deferred; kind for dev)
-- ADR 0037 (tenant onboarding)
-- ADR 0026 (independent-cluster install)
-- ADR 0016 (multi-tenancy via namespaces)
+- [architecture-overview.md § 6.11](../architecture-overview.md#611-identity-federation)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.17](../architecture-backlog.md#117-identity-federation-details), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0029](./0029-keycloak-jwt-claim-schema.md) (required Keycloak JWT claim schema)
+- [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial implementation targets — EKS + GitHub; AKS deferred; kind for dev)
+- [ADR 0037](./0037-tenant-onboarding-xrd.md) (tenant onboarding)
+- [ADR 0026](./0026-independent-cluster-install-no-federation.md) (independent-cluster install)
+- [ADR 0016](./0016-multi-tenancy-via-namespaces.md) (multi-tenancy via namespaces)

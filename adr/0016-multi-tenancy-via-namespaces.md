@@ -24,7 +24,7 @@ Tenancy is a Kubernetes namespace: a tenant maps to one or more namespaces, and 
 
 ## References
 
-- architecture-overview.md § 6.9
-- architecture-backlog.md § 1.2, § 6
-- ADR 0018 (RBAC-floor / OPA-restrictor), ADR 0028 (identity federation), ADR 0029 (Keycloak JWT claim schema)
-- ADR 0037 (tenant onboarding flow via `TenantOnboarding` XRD), ADR 0039 (Headlamp graphical editors for platform CRDs)
+- [architecture-overview.md § 6.9](../architecture-overview.md#69-multi-tenancy-and-namespacing)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.2](../architecture-backlog.md#12-multi-tenancy-details), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor), [ADR 0028](./0028-identity-federation.md) (identity federation), [ADR 0029](./0029-keycloak-jwt-claim-schema.md) (Keycloak JWT claim schema)
+- [ADR 0037](./0037-tenant-onboarding-xrd.md) (tenant onboarding flow via `TenantOnboarding` XRD), [ADR 0039](./0039-headlamp-graphical-editors-for-platform-crds.md) (Headlamp graphical editors for platform CRDs)

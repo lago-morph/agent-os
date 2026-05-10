@@ -103,11 +103,11 @@ remain out of scope for this ADR and deferred per architecture-backlog.md
 
 ## References
 
-- architecture-overview.md § 6.1, § 14.1 (component A17)
-- architecture-backlog.md § 1.9, § 1.11
-- ADR 0009 (OpenSearch hosting)
-- ADR 0013 (Capability CRD and CapabilitySet layering)
-- ADR 0014 (Postgres / managed databases)
-- ADR 0021 (Crossplane XR composition pattern)
-- ADR 0033 (initial implementation targets / dual-mode hosting)
-- ADR 0038 (policy simulator — used for search/scrape OPA bundle)
+- [architecture-overview.md](../architecture-overview.md) [§ 6.1](../architecture-overview.md#61-gateway-architecture), [§ 14.1](../architecture-overview.md#141-workstream-a--platform-installation-and-operations) (component A17)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.9](../architecture-backlog.md#19-mcp-server-health-check-details), [§ 1.11](../architecture-backlog.md#111-initial-mcp-services-details-a17)
+- [ADR 0009](./0009-opensearch-search-vector-store.md) (OpenSearch hosting)
+- [ADR 0013](./0013-capability-crd-and-capabilityset-layering.md) (Capability CRD and CapabilitySet layering)
+- [ADR 0014](./0014-postgres-primary-opensearch-retrieval.md) (Postgres / managed databases)
+- [ADR 0021](./0021-grafanadashboard-xrs.md) (Crossplane XR composition pattern)
+- [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial implementation targets / dual-mode hosting)
+- [ADR 0038](./0038-policy-simulators.md) (policy simulator — used for search/scrape OPA bundle)

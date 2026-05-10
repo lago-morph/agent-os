@@ -23,8 +23,8 @@ The Knowledge Base is a first-class `RAGStore` named `platform-knowledge-base`, 
 
 ## References
 
-- architecture-overview.md § 6.4
-- architecture-backlog.md § 1.7, § 3.10, § 7 item 22
-- ADR 0009 (OpenSearch as search and vector store)
-- ADR 0012 (HolmesGPT as a first-class Platform Agent)
-- ADR 0024 (Vendor doc acquisition as a separate companion project)
+- [architecture-overview.md § 6.4](../architecture-overview.md#64-the-knowledge-base-as-a-separate-primitive)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.7](../architecture-backlog.md#17-knowledge-base-access-pattern-from-agent-pods), [§ 3.10](../architecture-backlog.md#310-knowledge-base-interactive-ui-beyond-librechat), § 7 item 22
+- [ADR 0009](./0009-opensearch-search-vector-store.md) (OpenSearch as search and vector store)
+- [ADR 0012](./0012-holmesgpt-first-class-agent.md) (HolmesGPT as a first-class Platform Agent)
+- [ADR 0024](./0024-vendor-doc-separate-project.md) (Vendor doc acquisition as a separate companion project)

@@ -23,6 +23,6 @@ The platform commits to the top-level CloudEvent type namespaces enumerated in a
 
 ## References
 
-- architecture-overview.md § 6.7 (Eventing architecture — top-level type namespaces)
-- architecture-backlog.md § 4 (deferred per-event-type schemas), § 6 (invariant)
-- ADR 0004 (NATS JetStream broker), ADR 0030 (CRD/API versioning), ADR 0034 (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)
+- [architecture-overview.md § 6.7](../architecture-overview.md#67-eventing-architecture-knative--nats-jetstream) (Eventing architecture — top-level type namespaces)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 4](../architecture-backlog.md#4-topics-that-need-further-design-before-implementation) (deferred per-event-type schemas), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs) (invariant)
+- [ADR 0004](./0004-nats-jetstream-broker.md) (NATS JetStream broker), [ADR 0030](./0030-crd-and-api-versioning-policy.md) (CRD/API versioning), [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)

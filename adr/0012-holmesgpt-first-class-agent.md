@@ -114,13 +114,13 @@ architecture-backlog.md § 3.11).
 
 ## References
 
-- ADR 0002 (OPA gating)
-- ADR 0017 (Generalized Approval system)
-- ADR 0027 (Platform threat model)
-- ADR 0034 (Audit emission adapter)
-- ADR 0035 (Dynamic diagnostics toggle)
-- ADR 0038 (OPA policy simulator)
-- ADR 0039 (Headlamp graphical policy editors)
-- architecture-overview.md § 6.7, § 6.10
-- architecture-backlog.md § 3.11, § 6
-- future-enhancements.md § 3 (SLO breach response via HolmesGPT)
+- [ADR 0002](./0002-opa-gatekeeper-policy-engine.md) (OPA gating)
+- [ADR 0017](./0017-generalized-approval-system.md) (Generalized Approval system)
+- [ADR 0027](./0027-threat-model-scope-and-b22.md) (Platform threat model)
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (Audit emission adapter)
+- [ADR 0035](./0035-dynamic-log-and-trace-toggle.md) (Dynamic diagnostics toggle)
+- [ADR 0038](./0038-policy-simulators.md) (OPA policy simulator)
+- [ADR 0039](./0039-headlamp-graphical-editors-for-platform-crds.md) (Headlamp graphical policy editors)
+- [architecture-overview.md](../architecture-overview.md) [§ 6.7](../architecture-overview.md#67-eventing-architecture-knative--nats-jetstream), [§ 6.10](../architecture-overview.md#610-platform-self-management-with-holmesgpt)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 3.11](../architecture-backlog.md#311-holmesgpt-autonomous-remediation-expansion), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [future-enhancements.md § 3](../future-enhancements.md#3-operations-metrics-and-slo-management) (SLO breach response via HolmesGPT)

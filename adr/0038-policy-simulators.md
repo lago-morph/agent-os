@@ -79,12 +79,12 @@ Comprehensive policy verification is out of v1.0 scope.
 
 ## References
 
-- architecture-overview.md § 6.6 (security and policy architecture)
-- architecture-overview.md § 6.10 (HolmesGPT self-management)
-- ADR 0002 (OPA + Gatekeeper)
-- ADR 0003 (Envoy egress proxy)
-- ADR 0012 (HolmesGPT as a first-class Platform Agent)
-- ADR 0017 (Generalized approval system)
-- ADR 0018 (RBAC-floor / OPA-restrictor)
-- ADR 0027 (Threat-model scope and B22)
-- ADR 0039 (Headlamp policy editors)
+- [architecture-overview.md § 6.6](../architecture-overview.md#66-security-and-policy-architecture) (security and policy architecture)
+- [architecture-overview.md § 6.10](../architecture-overview.md#610-platform-self-management-with-holmesgpt) (HolmesGPT self-management)
+- [ADR 0002](./0002-opa-gatekeeper-policy-engine.md) (OPA + Gatekeeper)
+- [ADR 0003](./0003-envoy-egress-proxy.md) (Envoy egress proxy)
+- [ADR 0012](./0012-holmesgpt-first-class-agent.md) (HolmesGPT as a first-class Platform Agent)
+- [ADR 0017](./0017-generalized-approval-system.md) (Generalized approval system)
+- [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor)
+- [ADR 0027](./0027-threat-model-scope-and-b22.md) (Threat-model scope and B22)
+- [ADR 0039](./0039-headlamp-graphical-editors-for-platform-crds.md) (Headlamp policy editors)

@@ -53,10 +53,10 @@ ownership and links are filled in later.
 
 ## References
 
-- architecture-overview.md § 6.4 (The Knowledge Base as a separate primitive)
-- architecture-overview.md § 14.6 Workstream C item C8, Workstream F item F3
-- architecture-overview.md § Glossary entry "Knowledge Base"
-- README.md "What's NOT in this repository"
-- ADR 0022 (Knowledge Base as a separate primitive)
-- ADR 0008 (Material for MkDocs documentation portal)
-- ADR 0009 (OpenSearch as RAG / vector store backend)
+- [architecture-overview.md § 6.4](../architecture-overview.md#64-the-knowledge-base-as-a-separate-primitive) (The Knowledge Base as a separate primitive)
+- [architecture-overview.md § 14.6](../architecture-overview.md#146-workstream-f--production-readiness) Workstream C item C8, Workstream F item F3
+- [architecture-overview.md § Glossary](../architecture-overview.md#15-glossary) entry "Knowledge Base"
+- [README.md](../README.md) "What's NOT in this repository"
+- [ADR 0022](./0022-knowledge-base-as-separate-primitive.md) (Knowledge Base as a separate primitive)
+- [ADR 0008](./0008-material-mkdocs-documentation-portal.md) (Material for MkDocs documentation portal)
+- [ADR 0009](./0009-opensearch-search-vector-store.md) (OpenSearch as RAG / vector store backend)

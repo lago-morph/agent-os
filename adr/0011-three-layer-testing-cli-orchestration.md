@@ -41,10 +41,10 @@ Stress probes are implemented as low-volume concurrent invocation harnesses on t
 
 ## References
 
-- architecture-overview.md § 13
-- architecture-backlog.md § 2.12, 2.13, 2.14, 3.4, 3.7, 3.8, 4
-- ADR 0009 (OpenSearch advisory index role)
-- ADR 0010 (GitHub Actions only)
-- ADR 0015 (Tempo + Langfuse / OTel Tempo+Mimir+Loki path)
-- ADR 0034 (audit pipeline — test runs emit audit through the same adapter)
-- ADR 0035 (dynamic log-level and trace-granularity toggle)
+- [architecture-overview.md § 13](../architecture-overview.md#13-testing-framework)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 2.12](../architecture-backlog.md#212-test-reporting-allure-vs-reportportal-vs-none-initially), [2.13](../architecture-backlog.md#213-load-testing-custom-harness-vs-chainsaw--playwright-concurrent-invocation), [2.14](../architecture-backlog.md#214-test-execution-model-declarative-test-crds-vs-cli-orchestration), [3.4](../architecture-backlog.md#34-allure-or-reportportal), [3.7](../architecture-backlog.md#37-test-crds), [3.8](../architecture-backlog.md#38-custom-load-testing-harness), [4](../architecture-backlog.md#4-topics-that-need-further-design-before-implementation)
+- [ADR 0009](./0009-opensearch-search-vector-store.md) (OpenSearch advisory index role)
+- [ADR 0010](./0010-github-actions-only-v1.md) (GitHub Actions only)
+- [ADR 0015](./0015-tempo-langfuse-correlated-tracing.md) (Tempo + Langfuse / OTel Tempo+Mimir+Loki path)
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — test runs emit audit through the same adapter)
+- [ADR 0035](./0035-dynamic-log-and-trace-toggle.md) (dynamic log-level and trace-granularity toggle)

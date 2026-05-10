@@ -34,6 +34,6 @@ Event *sources* are explicitly out of the architectural commitment: each install
 
 ## References
 
-- architecture-overview.md § 6.7
-- architecture-backlog.md § 5
-- ADR 0004 (NATS JetStream broker), ADR 0031 (CloudEvent taxonomy), ADR 0033 (initial cloud target)
+- [architecture-overview.md § 6.7](../architecture-overview.md#67-eventing-architecture-knative--nats-jetstream)
+- [architecture-backlog.md § 5](../architecture-backlog.md#5-open-questions-to-leave-open)
+- [ADR 0004](./0004-nats-jetstream-broker.md) (NATS JetStream broker), [ADR 0031](./0031-cloudevent-top-level-taxonomy.md) (CloudEvent taxonomy), [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial cloud target)

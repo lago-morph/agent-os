@@ -43,9 +43,9 @@ The Test CLI (ADR 0011) gains a debug/tracing flag that activates the toggle for
 
 ## References
 
-- architecture-overview.md § 6.5 (observability architecture), § 6.10 (HolmesGPT)
-- ADR 0006 (Python kopf packaging — in-process toggle target)
-- ADR 0011 (three-layer testing CLI — debug/tracing flag)
-- ADR 0012 (HolmesGPT as first-class agent — primary consumer of the toggle)
-- ADR 0015 (Tempo + Langfuse correlated tracing — what trace granularity feeds)
-- ADR 0034 (audit endpoint — in-process toggle target)
+- [architecture-overview.md](../architecture-overview.md) [§ 6.5](../architecture-overview.md#65-observability-architecture) (observability architecture), [§ 6.10](../architecture-overview.md#610-platform-self-management-with-holmesgpt) (HolmesGPT)
+- [ADR 0006](./0006-python-kopf-litellm-operator.md) (Python kopf packaging — in-process toggle target)
+- [ADR 0011](./0011-three-layer-testing-cli-orchestration.md) (three-layer testing CLI — debug/tracing flag)
+- [ADR 0012](./0012-holmesgpt-first-class-agent.md) (HolmesGPT as first-class agent — primary consumer of the toggle)
+- [ADR 0015](./0015-tempo-langfuse-correlated-tracing.md) (Tempo + Langfuse correlated tracing — what trace granularity feeds)
+- [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit endpoint — in-process toggle target)

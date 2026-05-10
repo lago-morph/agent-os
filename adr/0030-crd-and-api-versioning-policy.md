@@ -23,6 +23,6 @@ CRDs use Kubernetes API versioning (`v1alpha1`, `v1beta1`, `v1`); breaking chang
 
 ## References
 
-- architecture-overview.md § 6.13
-- architecture-backlog.md § 1.18, 6
-- ADR 0031 (CloudEvent taxonomy), ADR 0013 (CapabilitySet schema), ADR 0029 (JWT claim schema)
+- [architecture-overview.md § 6.13](../architecture-overview.md#613-versioning-policy)
+- [architecture-backlog.md](../architecture-backlog.md) [§ 1.18](../architecture-backlog.md#118-versioning-specifics-per-surface), [6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
+- [ADR 0031](./0031-cloudevent-top-level-taxonomy.md) (CloudEvent taxonomy), [ADR 0013](./0013-capability-crd-and-capabilityset-layering.md) (CapabilitySet schema), [ADR 0029](./0029-keycloak-jwt-claim-schema.md) (JWT claim schema)
