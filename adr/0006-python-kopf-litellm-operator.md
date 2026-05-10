@@ -1,0 +1,33 @@
+# ADR 0006: Python kopf operator for LiteLLM reconciliation
+
+- **Status**: Accepted
+- **Date**: 2026-05-10
+
+## Context
+
+LiteLLM is the single gateway for every LLM, MCP, and A2A call (architecture-overview.md §6.1) and exposes an admin API rather than a Kubernetes-native interface. The platform needs a CRD-driven reconciler to keep LiteLLM in sync with the capability surface — `MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, and `BudgetPolicy` (§6.8, §6.6, CRD catalog in §6.12) — so that capabilities are declarative, GitOps-reconciled, and OPA-gated like every other platform surface. There is no native Crossplane provider for LiteLLM (§9), so the choice is between writing one in Go or writing a custom controller in Python with kopf (architecture-backlog.md § 2.5).
+
+## Decision
+
+The platform implements a **custom Python kopf operator** (component **B13**, architecture-overview.md §5, §6.8) that reconciles the LiteLLM-facing CRDs above into LiteLLM's admin API and into OPA data where applicable (§6.6). Kopf is used for application-API reconciliation against LiteLLM; **Crossplane v2 remains the controller for cloud-shaped resources** (component B4) — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, and `GrafanaDashboard` XRs (§6.12, §11). The split is the platform-wide invariant: every controller is either Crossplane (cloud-shaped) or kopf (app-API), with no bespoke controller frameworks (architecture-backlog.md § 6).
+
+## Alternatives considered
+
+- **Go Crossplane provider for LiteLLM** — Rejected: the team has no Go experience; a kopf operator achieves the same reconciliation outcome and keeps Python as the platform's default language (architecture-backlog.md § 2.5). The trade-off is losing Crossplane's connection-secret handling, package model, and Composition integration for the LiteLLM-specific surface; these losses are bounded to the LiteLLM-facing CRDs and do not affect the Crossplane track.
+
+## Consequences
+
+- The kopf operator (B13) owns reconciliation for `MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, and `BudgetPolicy`, including the dependency edges between them and LiteLLM's runtime registry (architecture-overview.md §6.8, §6.6, §6.12).
+- The controller-framework invariant is reinforced: **all controllers either use Crossplane (cloud-shaped) or kopf (application-API). No bespoke controller frameworks** (architecture-backlog.md § 6).
+- Python remains the default language for custom platform code, alongside the explicit Headlamp/TypeScript exception (architecture-backlog.md § 6); the operator joins LiteLLM callbacks, Crossplane composition functions, glue services, and HolmesGPT toolsets in the Python "platform glue" workstream (architecture-overview.md §9).
+- Crossplane's connection-secret handling, package model, and Composition integration are unavailable for LiteLLM-specific CRDs; the operator implements equivalent secret wiring (via ESO / Kubernetes Secrets) and CRD lifecycle directly, and does not participate in Crossplane Compositions.
+- Crossplane v2 (B4) remains authoritative for cloud-shaped XRs — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, and `GrafanaDashboard` (architecture-overview.md §6.12, §11; ADR 0021); the kopf operator does not encroach on that surface.
+- The operator emits capability-registry reconcile events to the audit pipeline (architecture-overview.md §6.7) and exposes an HTTP admin API versioned under `/v1/...` per the API-versioning policy (§6.13).
+- The operator inherits the standard custom-component deliverables: HolmesGPT toolset, OPA contribution, audit emission, observability, Knative trigger flow, tests, and tutorial / how-to documentation (architecture-backlog.md § 6).
+
+## References
+
+- architecture-overview.md §6.1, §6.6, §6.8, §6.12, §6.13, §9, §5 (component B13), §11
+- architecture-backlog.md § 2.5, § 6
+- ADR 0001 (ARK as the agent operator) — sibling reconciler in the controller landscape
+- ADR 0021 (`GrafanaDashboard` XRs use Crossplane Compositions) — Crossplane side of the kopf/Crossplane split
