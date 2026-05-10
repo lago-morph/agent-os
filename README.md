@@ -9,7 +9,7 @@ This is **not an implementation repository.** Implementation happens in independ
 - **Architecture overview** — the canonical description of what the platform is, what it's made of, how the pieces fit together. ([architecture-overview.md](architecture-overview.md))
 - **Architecture backlog and preserved ideas** — deferred design decisions, alternatives considered and rejected with rationale, evolution paths to revisit, ADR candidates, open questions to leave open. ([architecture-backlog.md](architecture-backlog.md))
 - **Future enhancements** — capabilities consciously deferred past v1.0 (redundancy and degraded operations, continuous container security, operations-metrics / SLO management, etc.). Distinct from the backlog: the backlog tracks "we may revisit if X happens"; future-enhancements tracks "we commit to doing this in vNext, just not in v1.0." ([future-enhancements.md](future-enhancements.md))
-- **Architecture Decision Records (ADRs)** — formal records of decisions, with context and consequences. (Added as decisions land.)
+- **Architecture Decision Records (ADRs)** — formal records of decisions, with context and consequences. (39 land in `adr/` covering the v1.0 decisions; new ones added per decision.)
 - **Design specifications** — detailed design for cross-component concerns (capability set semantics, multi-tenancy model, approval system shape, etc.) that the architecture defers to design-time.
 - **Standards** — coding standards, naming conventions, schema conventions, that all implementation components are expected to follow.
 - **Interfaces** — formal contracts between components (CRD schemas, CloudEvent schemas, API specs, SDK signatures) where the contract belongs to the architecture rather than to any one component.

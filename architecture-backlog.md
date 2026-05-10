@@ -21,7 +21,7 @@ The architecture now commits to add-if-not-there / replace-if-there field-level 
 
 The architecture model is established (tenancy = namespace, RBAC + OPA + network enforcement, dynamic agent registration, three visibility modes, **tenant carried as Keycloak claims with required JWT schema specified in section 6.9**). Details deferred to design:
 
-- Tenant onboarding flow: who creates a tenant, what gets provisioned automatically.
+- ~~Tenant onboarding flow: who creates a tenant, what gets provisioned automatically.~~ **RESOLVED by ADR 0037.**
 - Tenant-scoped resource quotas (max agents, max sandboxes, max virtual keys, cost budget, rate limit) — defaults and how they're customized.
 - Cross-tenant collaboration patterns when explicitly published.
 - Concrete `platform_roles` catalog (the architecture commits to the claim's presence and shape; the role names are design-time).
@@ -96,12 +96,14 @@ Architecture introduces the concept (declarative mapping of pre-defined Kubernet
 
 ### 1.11 Initial MCP services details (A17)
 
-Architecture lists the initial set: GitHub, Google Drive, Firecrawl, Context7. Per-service details deferred:
+Architecture lists the initial set per ADR 0020: GitHub, Google Drive, Context7, OpenSearch, Postgres, MongoDB, and generic web-search + web-scrape. Per-service details deferred:
 
 - **GitHub**: exact mechanism for system-credential vs user-credential modes; how LiteLLM brokers OAuth on behalf of the user; what scopes get requested; how revocation flows.
-- **Firecrawl**: secret storage shape (probably ESO + a `Secret` referenced by the `MCPServer` CRD), per-agent access restriction model, budget enforcement specifically for system-authenticated services where one account serves many agents.
 - **Google Drive**: probably similar to GitHub (system + user credential modes), but specifics depend on the MCP server implementation.
 - **Context7**: less complex; install + register.
+- **OpenSearch**: system-mediated mode for the platform's own OpenSearch cluster vs agent/tenant/user-credentialed mode for external instances; secret storage shape; per-agent access restriction.
+- **Postgres / MongoDB**: shape of the `AgentDatabase` Crossplane XRD that provisions per-agent/tenant/user databases; role grants; connection-secret return path; cleanup on deprovision.
+- **Web search + web scrape**: in-cluster endpoint implementation (build vs adopt OSS); OPA bundle structure for blocking specific search/scrape requests at the MCP-server-access layer; rate-limiting; IP-block recovery (commercial fallback deferred to future-enhancements).
 
 ### 1.12 Coach Component mechanism details
 
@@ -113,7 +115,7 @@ Architecture establishes Coach as a Platform Agent on schedule, dependent on Lan
 
 ### 1.13 Audit retention policy (deferred to Workstream F)
 
-The architecture establishes the dual-write path (OpenSearch + S3 archive). The actual retention policy — durations, lifecycle rules, redaction strategy, regulatory compliance review — is part of Workstream F and gets defined when the platform is ready to ship.
+The canonical audit pipeline (per ADR 0034) is: every component emits through the platform audit adapter to a single audit endpoint; Postgres + S3 are the system of record (Postgres only on kind); OpenSearch is advisory fanout, rebuildable from the primaries. The actual retention policy — durations, lifecycle rules, redaction strategy, regulatory compliance review — is part of Workstream F and gets defined when the platform is ready to ship.
 
 ### 1.14 Agent development environment (B21)
 
@@ -263,6 +265,9 @@ Currently independent installs. **Trigger**: a use case that requires cross-clus
 ### 3.15 Adding SDKs beyond Langchain Deep Agents
 v1.0 ships single-SDK with multi-SDK harness shape preserved. **Trigger**: a use case that fits another SDK better than Langchain Deep Agents.
 
+### 3.16 GitOps progressive-delivery promotion (Kargo or equivalent)
+Current stance: PR + ArgoCD sync + the generalized approval system (ADR 0017) gates production changes. **Trigger to revisit**: enough environments and frequent enough config promotions that the manual approval flow starts to friction over staged rollouts. Architecturally compatible with the `Approval` CRD; the open design choice is whether Kargo subsumes or wraps the `Approval` CRD for promotion-shaped flows.
+
 ## 4. Topics that need further design before implementation
 
 These are not "alternatives" — they're concrete pieces of the architecture that need design specifications before code.
@@ -282,6 +287,8 @@ These are not "alternatives" — they're concrete pieces of the architecture tha
 - Concrete `platform_roles` catalog — names and semantics of each platform role used in Keycloak claims.
 - Cluster OIDC → Keycloak federation token-exchange flow (section 1.17).
 - Per-event-type CloudEvent schemas under each top-level namespace (section 6.7).
+- Cluster-OIDC mapper concrete implementations for kind, EKS, AKS (now in scope per ADR 0028).
+- kind-cluster OIDC bootstrap utility (kubeadm patch + static JWKS host) as a concrete deliverable (ADR 0028, ADR 0033).
 
 ## 5. Open questions to leave open
 
@@ -304,7 +311,7 @@ Invariants that are implicit in the architecture but should become explicit (the
 - All controllers either use Crossplane (for cloud-shaped resources) or kopf (for application-API reconciliation). No bespoke controller frameworks.
 - All configuration is in Git.
 - Anything in OpenSearch must be reproducible from a primary source (Postgres, object storage, or external system).
-- Every audit-relevant action emits a structured event to the audit index, regardless of which component performed it.
+- Every audit-relevant action emits a structured event through the platform audit adapter to the single audit endpoint, regardless of which component performed it. Postgres + S3 are the system of record (Postgres only on kind); OpenSearch is advisory fanout (ADR 0034).
 - Every Platform Agent invocation traverses LiteLLM. The Envoy egress proxy handles non-LiteLLM HTTP. There are no other paths to external services.
 - Every component contributes a HolmesGPT toolset, an OPA policy contribution, audit emission, observability, Knative trigger flow design, tests, and tutorial / how-to documentation.
 - SSO is exclusively Keycloak. No tool maintains its own user store. **All privileged platform identity ultimately resolves to a Keycloak-issued JWT carrying the section 6.9 claim schema.**
@@ -315,42 +322,5 @@ Invariants that are implicit in the architecture but should become explicit (the
 - Each cluster is an independent install of the platform. Multi-cluster federation is not a v1.0 requirement.
 - **All platform CloudEvents fall under one of the committed top-level namespaces** (section 6.7).
 - **Every API surface (CRDs, CloudEvents, SDKs, CLIs, HTTP APIs, agent A2A/MCP interfaces) carries an explicit version, owned by the component that exposes it** (section 6.13).
-- **Mapper authoring (translating upstream IdP attributes into platform claims) is out of scope for this architecture**; the platform commits to the claim schema, not the mappers (section 6.9).
-
-## 7. ADR candidates
-
-Decisions large enough that they deserve their own Architecture Decision Records, prioritized.
-
-1. ARK as the agent operator (chose ARK over kagent).
-2. OPA + Gatekeeper as the policy engine (chose over Kyverno).
-3. Envoy egress proxy as CNI-agnostic egress control (chose over Cilium L7).
-4. NATS JetStream as the broker backend (chose over Kafka).
-5. Letta as the memory backend.
-6. Python kopf operator for LiteLLM reconciliation (chose over Go Crossplane provider).
-7. LibreChat locked down as frontend-only (chose over Open WebUI, custom UI).
-8. Material for MkDocs as the documentation portal (chose over Backstage, Confluence).
-9. OpenSearch as the search/vector store (chose over Elasticsearch).
-10. CI/CD via GitHub Actions only for v1.0 (chose over multi-CI from day one).
-11. Three-layer testing with CLI orchestration.
-12. HolmesGPT as a first-class Platform Agent rather than an external tool.
-13. The capability CRD model and CapabilitySet layering (architectural primitive).
-14. Postgres as primary storage, OpenSearch as retrieval optimization only.
-15. Tempo + Langfuse correlated by trace_id.
-16. Multi-tenancy via Kubernetes namespaces with RBAC + OPA + network enforcement.
-17. Generalized approval system via `Approval` CRD + Argo Workflows + OPA elevation only.
-18. RBAC-as-floor / OPA-as-restrictor enforcement model platform-wide.
-19. Langchain Deep Agents as the single v1.0 agent SDK with multi-SDK harness shape preserved.
-20. Initial MCP services set: GitHub (system + user creds), Google Drive, Firecrawl, Context7.
-21. Dashboards as namespaced Crossplane-composed `GrafanaDashboard` XRs.
-22. Knowledge Base as a separate primitive (not built into HolmesGPT or any other agent).
-23. Knative broker is in the architecture but sources are environment-specific by design.
-24. Vendor doc acquisition is a separate companion project, not part of v1.0 architecture scope.
-25. Memory access modes (private / namespace-shared / RBAC-OPA-controlled) declared per memory store.
-26. Independent-cluster-install topology with no v1.0 federation.
-27. Threat-model scope: unintentional access excess as the v1.0 primary, dedicated adversarial threat model (B22) as a required pre-implementation design specification.
-28. Identity federation: cluster OIDC → IRSA (AWS) or Workload Identity (Azure) for cloud resources; cluster OIDC → Keycloak federation for platform JWT.
-29. Required Keycloak JWT claim schema for the platform.
-30. CRD and API versioning policy with per-component ownership.
-31. CloudEvent top-level type taxonomy (`platform.lifecycle.*`, `platform.audit.*`, etc.).
-32. CapabilitySet overlay semantics: add-if-not-there / replace-if-there field-level resolution, processed in declared order, with per-Agent overrides last.
-33. Initial implementation targets: AWS (EKS) and GitHub. Azure supported architecturally but not exercised in v1.0.
+- **Upstream-IdP mapper authoring** (translating Active Directory / Okta / etc. attributes into the platform claim schema): out of scope for this architecture; the platform commits to the schema, not the upstream-IdP mappers (section 6.9).
+- **Cluster-OIDC mapper authoring** (translating Kubernetes ServiceAccount tokens minted by the cluster OIDC issuer into platform JWTs for workload identity): IN SCOPE — the platform ships these for kind, EKS, and AKS per ADR 0028 / 0029.
