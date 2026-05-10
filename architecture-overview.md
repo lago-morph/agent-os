@@ -228,6 +228,20 @@ The **A2A endpoint** accepts internal calls (one Platform Agent calling another)
 
 This keeps behavior predictable. Agents that don't want silent failover declare exactly one provider; agents that need resilience declare an ordered list.
 
+**Initial MCP services (ADR 0020).** The v1.0 set of MCP services brokered by LiteLLM is fixed and exercised end-to-end so the secret-plumbing, OPA admission, CapabilitySet wiring, audit tagging, and Headlamp inspection all have concrete integrations from day one:
+
+- **GitHub** — system-credential and user-credential modes.
+- **Google Drive** — system-credential and user-credential modes.
+- **Context7** — documentation/library lookup.
+- **OpenSearch** — system-mediated mode against the platform's own OpenSearch (in-cluster on kind, AWS-managed via Crossplane on AWS), plus an agent/tenant/user-credentialed mode for connecting to externally operated OpenSearch instances.
+- **Postgres** — agent/tenant/user-scoped database access. Per-agent / per-tenant / per-user database provisioning is wrapped by a new Crossplane XRD (working name `AgentDatabase`) that creates the database, role, and grants.
+- **MongoDB** — same XRD-fronted provisioning pattern as Postgres, same RBAC + OPA gating.
+- **Web search + web scrape** — generic in-cluster MCP servers (built or adopted from OSS). The endpoints themselves do not carry the platform's full RBAC/OPA stack internally; access control is enforced at the **MCP-server-access** layer, where OPA can block specific search or scrape requests by policy.
+
+Firecrawl is **not** in the initial set; its role is taken by the generic web-search and web-scrape services. A commercial fallback (Firecrawl, Google Search API) for IP-block / rate-limit scenarios is acknowledged but deferred to future-enhancements.
+
+**Operator packaging (ADR 0006).** The kopf operator that reconciles the LiteLLM-managed CRDs (`MCPServer`, `A2APeer`, virtual-key issuance, etc.) into the LiteLLM registry ships as a **subchart of the LiteLLM Helm chart** — single ArgoCD release, lifecycle bound to LiteLLM. This eliminates version-skew between the gateway and the operator that drives it.
+
 ### 6.2 Agent runtime architecture
 
 ARK is the chosen agent operator. Agents declared as `Agent` CRDs reconcile through ARK into pods running inside Sandboxes.
@@ -264,6 +278,16 @@ flowchart TB
 ```
 
 **Skills are managed by LiteLLM's skill gateway.** Skills are stored in Git (which is what LiteLLM's skill gateway already supports) and served to Platform Agents through that gateway, the same way MCP servers and A2A peers are. We do not build a separate skill management system for v1.0; we lean on what LiteLLM already provides. If specific skill management features prove insufficient over time, we revisit then. Skills are **not user-controllable** and are not exposed at the user-facing UI; they are part of the agent's CapabilitySet, configured by admins.
+
+**Primary SDK (ADR 0019).** v1.0 ships **LangGraph as the supported agent SDK**, with **Langchain Deep Agents (built on LangGraph) as the opinionated, batteries-included default** used in tutorials, how-to guides, the agent profile library, and the recommended compositions. Reference documentation covers both. The multi-SDK harness shape (B7) is preserved so OpenAI Agents SDK, Strands, Anthropic Agent SDK, Mastra, and ARK ADK can be enrolled later as additive changes; the `Agent` CRD's `sdk` field accepts `langgraph` and `deep-agents` in v1.0 and grows by enrollment without a schema break.
+
+**Platform-SDK interaction surfaces.** The contract between the harness and the platform is:
+
+- **Kubernetes CRDs**: `Agent`, `CapabilitySet`, `Memory`, `MCPServer`, `EgressTarget`, `Skill` — declarative configuration consumed by ARK, the kopf operator, and the supporting controllers.
+- **LiteLLM call path** for LLM, MCP, and A2A traffic — the harness uses the platform SDK's `memory.*`, `rag.*`, model invocation, and A2A registration helpers, all of which terminate at LiteLLM where authentication, OPA, audit, and Langfuse callbacks fire.
+- **Envoy egress proxy** for any outbound HTTP that does not go through LiteLLM — only allowlisted destinations declared via `EgressTarget` are reachable.
+
+**Adventurous users can build their own harness images** that comply with this interface; **third-party harness images are NOT officially supported**, but the path is documented because all enforcement happens externally (LiteLLM for LLM/MCP/A2A, OPA for policy, Envoy for egress, Kubernetes for declarative state) — the perimeter applies regardless of harness internals.
 
 ### 6.3 Memory and data architecture
 
@@ -304,9 +328,17 @@ flowchart LR
 
 The access mode is part of the `MemoryStore` CRD spec. Agent CRDs reference memory stores by name; the access mode determines what the platform allows.
 
-**Postgres deployment.** Lean on managed Postgres in the cloud provider (RDS / Cloud SQL / Azure Database for Postgres) and use its built-in backup, point-in-time recovery, and replication. This includes the LibreChat database, Letta state, long-running Platform Agent checkpoints, and any other Postgres-resident state. DR procedures get tested as part of the Production Readiness workstream (see section 14.6, Workstream F).
+**Postgres deployment (ADR 0014, ADR 0033).** Postgres is dual-mode hosted: **in-cluster on kind** for dev/integration (so kind is functionally complete without cloud services), and **AWS RDS via Crossplane MR/XRD on AWS** with its built-in backup, point-in-time recovery, and replication. This includes the LibreChat database, Letta state, long-running Platform Agent checkpoints, and any other Postgres-resident state. DR procedures get tested as part of the Production Readiness workstream (see section 14.6, Workstream F).
 
-**Audit retention.** Audit logs flow into OpenSearch for searchable short-term retention and are also archived to object storage (S3 or equivalent) for long-term retention. The exact retention policy, lifecycle rules, and redaction strategy are out of scope for v1.0 architecture and assigned to Production Readiness — the architecture establishes the dual-write path; the policy is set when the platform is ready to ship.
+**OpenSearch deployment (ADR 0009, ADR 0033).** Same dual-mode pattern: **in-cluster on kind** for dev/integration, **AWS-managed OpenSearch via Crossplane MR on AWS**. OpenSearch is purely a retrieval-optimization layer (vectors, hybrid search, advisory audit fanout); see the rule of thumb above and the audit pipeline below.
+
+**Audit pipeline (ADR 0034).** Every component emits audit through the **platform audit adapter** — a Python library every component links against — to a single deployable **audit endpoint**. No component writes audit records directly to Postgres, S3, or OpenSearch.
+
+- **Postgres + S3 are the system of record.** The audit endpoint writes received events to a Postgres `audit_events` table. On AWS, a batch CronJob (~every 5 minutes) writes pending rows as immutable objects to S3, verifies the write, and only then deletes the corresponding Postgres rows. **On kind, S3 is not provisioned and Postgres alone is the system of record.**
+- **OpenSearch is advisory fanout only.** An asynchronous indexer ships events to OpenSearch for query and dashboards; the audit OpenSearch index is rebuildable from S3 (AWS) or Postgres (kind) and is never authoritative. If OpenSearch is unavailable, audit ingestion still succeeds.
+- A new Crossplane **`AuditLog` XRD** wraps the whole pipeline: Postgres backing store, S3 bucket + lifecycle (AWS only), OpenSearch indexer, batch CronJob (AWS only), and the audit endpoint Deployment.
+
+The exact retention policy, lifecycle rules, and redaction strategy are out of scope for v1.0 architecture and assigned to Production Readiness — the architecture establishes the topology; the policy is set when the platform is ready to ship.
 
 ### 6.4 The Knowledge Base as a separate primitive
 
@@ -346,7 +378,11 @@ flowchart LR
   GRAF[Grafana - baseline]
   LF[Langfuse]
   PF[promptfoo<br/>in CI]
-  OS[(Audit index<br/>OpenSearch)]
+  ADAPT[Audit adapter<br/>library]
+  AEP[Audit endpoint]
+  PG[(Postgres<br/>audit_events<br/>system of record)]
+  S3[(S3 archive<br/>AWS only)]
+  OS[(OpenSearch<br/>advisory audit index<br/>+ test results)]
 
   AG -->|OTel| OTEL
   GW -->|OTel| OTEL
@@ -364,12 +400,30 @@ flowchart LR
   AG -->|LLM-grade traces| LF
   GW -->|prompts, costs, evals| LF
   PF -->|red-team results| LF
-  GW -->|audit events| OS
-  EP -->|egress audit| OS
+  AG -->|audit| ADAPT
+  GW -->|audit| ADAPT
+  EP -->|audit| ADAPT
+  ARK -->|audit| ADAPT
+  UI -->|audit| ADAPT
+  ADAPT --> AEP
+  AEP --> PG
+  PG -.->|5-min batch<br/>AWS only| S3
+  AEP -.->|advisory<br/>async indexer| OS
   GRAF -.->|trace_id deep links| LF
 ```
 
 **Tempo and Langfuse correlate by `trace_id`** — every span emitted by the agent SDK and the gateway carries the same trace_id whether it's LLM-flavored or not, so a developer in Grafana can click into Langfuse for prompt-level detail and back. Mimir holds long-term metrics; Prometheus stays as the scrape layer.
+
+**Audit emission via the adapter / endpoint pattern (ADR 0034).** No component writes audit records directly to OpenSearch (or to Postgres / S3); every component links the **platform audit adapter** library and posts to a single deployable **audit endpoint**. The endpoint persists to Postgres (system of record), batches to S3 archive (AWS only, every ~5 minutes, verified-then-delete), and asynchronously indexes to OpenSearch as an advisory fanout. The OpenSearch audit index is rebuildable from primaries; if OpenSearch is unavailable, ingestion still succeeds.
+
+**Dynamic log-level / trace-granularity toggle (ADR 0035).** HolmesGPT and admins can raise verbosity for diagnostics — for a specific component, tenant, or event class — and lower it back. Two per-component patterns are declared:
+
+- **In-process toggle** — the component watches a `LogLevel` CR (or equivalent reload signal) and reconfigures its own logger / tracer at runtime. This is the default for components built in-house.
+- **Rolling-restart toggle** — for non-reloadable services like LiteLLM, toggling level requires a rolling restart of the workload with the new configuration. The platform records this distinction so operators see the cost of toggling.
+
+**Off-mode has zero performance cost.** When verbosity is at the baseline, there is no always-on tracing-then-sample-and-drop pipeline; the cost is only paid when verbosity is raised.
+
+**Test result and OTel publication (ADR 0011).** Non-unit test results (integration, end-to-end, evaluation, red-team) **stream to OpenSearch** as an advisory index, and metrics + logs publish via **OpenTelemetry** through the same collector path the rest of the platform uses. This shares pipelines with production observability rather than running a parallel test-only stack.
 
 **Scope note.** The architecture commits to the observability infrastructure (collection, storage, correlation, per-component dashboards, alert rules for failure conditions) and to broad audit emission. **Operations-metrics work — SLI / SLO definitions, error budgets, reliability summaries, automated alert→remediation loops via HolmesGPT — is deferred to future enhancements** (see `future-enhancements.md`). The collection paths for those metrics exist; the policy and dashboards on top of them are the deferred portion.
 

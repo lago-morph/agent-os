@@ -11,8 +11,10 @@ These don't need answers now but should be revisited at the right moment.
 - **Specific recommended agent compositions for B18.** Tracked in `architecture-backlog.md` section 4.
 - **Specific OPA policy library content for B16.** Tracked in `architecture-backlog.md` section 4.
 - **Whether Coach has access to OPA and other components**, decided per the design of B10.
-- **Headlamp deep-link strategy** (URL schemas, auth handoff, context preservation). Tracked in `architecture-backlog.md` section 1.15.
+- **Headlamp deep-link strategy** (URL schemas, auth handoff, context preservation). Tracked in `architecture-backlog.md` section 1.15. ADR 0039 (graphical editors for platform CRDs) informs but does not resolve this.
 - **Glossary maintenance process** — keeping terminology consistent as the platform evolves. Tracked in `architecture-backlog.md` section 4.
+- **Audit retention durations and redaction rules** — ADR 0034 fixes the audit pipeline topology but explicitly defers retention durations, redaction rules, and lifecycle specifics to Workstream F (architecture-backlog § 1.13).
+- **Tenant offboarding / decommissioning specifics** — ADR 0037 covers onboarding via XRD; offboarding (tenant deletion ordering, retention-bound cleanup, tenant-scoped quotas) remains deferred.
 
 ## Items needing verification during implementation, not now
 
