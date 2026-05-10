@@ -19,7 +19,7 @@ The architecture now commits to add-if-not-there / replace-if-there field-level 
 
 ### 1.2 Multi-tenancy details
 
-The architecture model is established (tenancy = namespace, RBAC + OPA + network enforcement, dynamic agent registration, three visibility modes, **tenant carried as Keycloak claims with required JWT schema specified in section 6.9**). Details deferred to design:
+The architecture model is established (tenancy = namespace, RBAC + Gatekeeper admission + OPA gateway authorization + network enforcement (four layers, defense-in-depth), dynamic agent registration, three visibility modes, **tenant carried as Keycloak claims with required JWT schema specified in section 6.9**). Details deferred to design:
 
 - ~~Tenant onboarding flow: who creates a tenant, what gets provisioned automatically.~~ **RESOLVED by ADR 0037.**
 - Tenant-scoped resource quotas (max agents, max sandboxes, max virtual keys, cost budget, rate limit) — defaults and how they're customized.
@@ -39,7 +39,6 @@ Virtual keys are CRDs reconciled by the kopf operator and issuance is self-serve
 
 Architecture commits to OPA as the policy layer + LiteLLM as the spend tracker, with Headlamp as the editing surface. Details deferred:
 
-- Whether a `BudgetPolicy` CRD is its own type or budget data is attached to CapabilitySet — design-time call.
 - Specific enforcement actions on threshold crossing: rate-limit, suspend, alert, OPA-deny.
 - Verification of which LiteLLM budget features are OSS vs enterprise; if features we need are enterprise, where the gap-filling callbacks live.
 
@@ -102,7 +101,7 @@ Architecture lists the initial set per ADR 0020: GitHub, Google Drive, Context7,
 - **Google Drive**: probably similar to GitHub (system + user credential modes), but specifics depend on the MCP server implementation.
 - **Context7**: less complex; install + register.
 - **OpenSearch**: system-mediated mode for the platform's own OpenSearch cluster vs agent/tenant/user-credentialed mode for external instances; secret storage shape; per-agent access restriction.
-- **Postgres / MongoDB**: shape of the `AgentDatabase` Crossplane XRD that provisions per-agent/tenant/user databases; role grants; connection-secret return path; cleanup on deprovision.
+- **Postgres / MongoDB**: shape of the `XAgentDatabase` Crossplane XRD that provisions per-agent/tenant/user databases; role grants; connection-secret return path; cleanup on deprovision.
 - **Web search + web scrape**: in-cluster endpoint implementation (build vs adopt OSS); OPA bundle structure for blocking specific search/scrape requests at the MCP-server-access layer; rate-limiting; IP-block recovery (commercial fallback deferred to future-enhancements).
 
 ### 1.12 Coach Component mechanism details
@@ -196,7 +195,7 @@ These were evaluated and not chosen. Captured here so the rationale is preserved
 **Chose OpenSearch.** OSS Security plugin includes OIDC and SAML; vector and hybrid search at parity.
 
 ### 2.16 Initial agent SDK choice
-**Chose Langchain Deep Agents** (single SDK in v1.0). Multi-SDK harness shape preserved for future additions.
+**Chose LangGraph as the supported v1.0 SDK with Langchain Deep Agents as the opinionated default layered on top** (per ADR 0019). Multi-SDK harness shape preserved for future additions.
 
 ### 2.17 CI system support: GitHub Actions only for v1.0 vs multi-CI
 **Chose GitHub Actions only for v1.0.** Jenkins and GitLab CI explicitly out of scope. CLI-based design means adding them later is mechanical.
@@ -222,6 +221,7 @@ Decisions that are right for the current scope but worth revisiting under specif
 
 ### 3.1 LiteLLM at high RPS
 LiteLLM has known Python overhead at 5,000+ RPS. v1.0 target is well below that. **Trigger to revisit**: gateway throughput or latency due to overhead becoming a measurable concern. Bifrost is the Go alternative.
+- Cross-ref ADR 0035 revisit triggers: a future component that cannot meet either toggle pattern, or a shift to always-on sampled tracing as default, would also reopen LiteLLM-shape decisions.
 
 ### 3.2 Adding Temporal alongside Argo Workflows
 **Trigger**: when a workflow is awkward to express in Argo Workflows.
@@ -262,11 +262,11 @@ Currently independent installs. **Trigger**: a use case that requires cross-clus
 ### 3.14 Multi-CI support beyond GitHub Actions
 **Trigger**: a deployment environment requires Jenkins or GitLab CI.
 
-### 3.15 Adding SDKs beyond Langchain Deep Agents
-v1.0 ships single-SDK with multi-SDK harness shape preserved. **Trigger**: a use case that fits another SDK better than Langchain Deep Agents.
+### 3.15 Adding SDKs beyond LangGraph and Langchain Deep Agents
+v1.0 ships single-SDK with multi-SDK harness shape preserved. **Trigger**: a use case that fits another SDK better than LangGraph or Deep Agents.
 
-### 3.16 Add the third Stage (prod cluster)
-**Resolved for v1.0**: Kargo is in v1.0 with two Stages (dev, staging) per ADR 0040. **Trigger to revisit**: v1.0 feature-complete and ready for real workloads — at that point add the third Stage (prod cluster) into the Kargo promotion pipeline. Cross-ref ADR 0040.
+### 3.16 Kargo Stage trajectory
+**Resolved for v1.0**: Kargo is in v1.0 deployed in single-cluster mode starting with one Stage (dev) per ADR 0040. **Trigger to add a staging Stage**: multiple agent teams converge on the platform, at which point a staging Stage is added between dev and the (still-future) prod Stage. **Trigger to add a prod Stage**: v1.0 feature-complete and ready for real workloads — at that point the prod Stage (prod cluster) is added into the Kargo promotion pipeline. Cross-ref ADR 0040.
 
 ## 4. Topics that need further design before implementation
 
@@ -276,7 +276,7 @@ These are not "alternatives" — they're concrete pieces of the architecture tha
 - Specific agent profiles to ship in the profile library (B17 scope).
 - Specific recommended agent compositions (B18 scope).
 - Specific OPA policy library content — concrete Rego bundles for v1.0 (B16 scope).
-- Specific Crossplane Compositions to build first — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, `GrafanaDashboard` (B4 scope).
+- Specific Crossplane Compositions to build first — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, `GrafanaDashboard`, plus the substrate XRDs `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore` (per ADR 0041) (B4 scope).
 - Specific cross-cutting Headlamp plugins owned by B5 (capability inspector, approval queue UI, virtual key admin).
 - Specific tutorials and how-to guides to write first.
 - Memory namespace and sharing model details (3-mode access already specified).
@@ -305,13 +305,14 @@ These questions don't need answers yet but should be revisited at the right mome
 - Whether B5 (cross-cutting Headlamp framework + cross-component plugins) ends up overlapping with per-component Headlamp plugins enough to merge or split.
 - Agent topology for the AI agents that will implement the platform — what kinds of agents, how they coordinate, what human-in-the-loop patterns apply. Held for a separate conversation after architecture is solid.
 - Unifying `OidcRoleMapping` CRD vs per-service config in v1.0 — **trigger to revisit**: when N service mappings get out of sync repeatedly. Cross-ref ADR 0040 and the future-enhancements entry that will be added.
+- How should non-LibreChat chat surfaces integrate? (CLOSED — ADR 0036: Mattermost via Knative Eventing for v1.0; generic chat-platform driver pattern; Teams/Slack drop-ins deferred to future-enhancements.)
 
 ## 6. Architecture-level invariants worth documenting as ADRs
 
 Invariants that are implicit in the architecture but should become explicit (these are good ADR candidates).
 
 - All custom code is Python (with the explicit exception of Headlamp plugins — TypeScript/React because Headlamp is).
-- All controllers either use Crossplane (for cloud-shaped resources) or kopf (for application-API reconciliation). No bespoke controller frameworks.
+- All controllers either use Crossplane (for substrate-abstracted and cloud-shaped resources, including kind in-cluster Compositions per ADR 0041) or kopf (for application-API reconciliation). No bespoke controller frameworks.
 - All configuration is in Git.
 - Anything in OpenSearch must be reproducible from a primary source (Postgres, object storage, or external system).
 - Every audit-relevant action emits a structured event through the platform audit adapter to the single audit endpoint, regardless of which component performed it. Postgres + S3 are the system of record (Postgres only on kind); OpenSearch is advisory fanout (ADR 0034).

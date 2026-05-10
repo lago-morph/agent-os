@@ -8,13 +8,13 @@ Each entry includes (a) the v1.0 stance, (b) what the future enhancement adds, a
 
 ### v1.0 stance
 
-The architecture deploys each component in its single-instance default. Failure of a chokepoint (LiteLLM gateway, OPA, the kopf operator, the NATS broker, OpenSearch, Postgres) produces a hard error; there is no graceful degradation path defined, no fail-open vs fail-closed policy committed per chokepoint, and no cross-AZ or cross-region replication beyond what the underlying managed services provide by default. Workstream F (Production readiness) includes a one-time DR drill (F2), but ongoing redundancy is not in scope.
+The architecture deploys each component in its single-instance default, with one carve-out: ADR 0035 raised LiteLLM to `replicas >= 2` (with readiness/preStop/`terminationGracePeriodSeconds` tuned for SSE-safe rolling restarts), so the two-replica restart-safety baseline is in v1.0; broader HA-clustering for LiteLLM remains future. Failure of a chokepoint (OPA, the kopf operator, the NATS broker, Postgres) produces a hard error; there is no graceful degradation path defined, no fail-open vs fail-closed policy committed per chokepoint, and no cross-AZ or cross-region replication beyond what the underlying managed services provide by default. (Note: per ADR 0034, audit ingestion does not depend on OpenSearch — Postgres + S3 are the system of record, OpenSearch is advisory fanout and rebuildable, so OpenSearch availability affects search/dashboard freshness rather than audit durability.) Workstream F (Production readiness) includes a one-time DR drill (F2), but ongoing redundancy is not in scope.
 
 ### Future enhancement
 
-- **HA topologies for chokepoints**: LiteLLM gateway clustering, OPA replicas with consistent bundle distribution, kopf operator leader election, NATS JetStream clustering with explicit replication factor per stream, OpenSearch master / data tier separation with replica counts.
+- **HA topologies for chokepoints**: LiteLLM gateway clustering beyond the two-replica restart-safety baseline established by ADR 0035, OPA replicas with consistent bundle distribution, kopf operator leader election, NATS JetStream clustering with explicit replication factor per stream, OpenSearch master / data tier separation with replica counts.
 - **Per-chokepoint fail-open vs fail-closed policy**, surfaced as configuration: e.g., when OPA is unavailable, do callbacks fail closed (deny all) or fail open with audit-only? Per chokepoint, the call is not currently made.
-- **Graceful degradation paths**: define what the platform does when Langfuse is down (continue serving, queue traces, lose traces?), when OpenSearch is down (continue, queue audit, lose audit?), when NATS is down (degraded eventing or hard fail?).
+- **Graceful degradation paths**: define what the platform does when Langfuse is down (continue serving, queue traces, lose traces?), when OpenSearch is down (audit ingestion continues per ADR 0034 since Postgres + S3 are the system of record — the open question is the user-visible behavior of search and dashboards while OpenSearch is unavailable or rebuilding, not audit durability), when NATS is down (degraded eventing or hard fail?). LiteLLM rolling-restart drain semantics (readiness drop before SIGTERM, preStop sleep, raised termination grace period) are already specified by ADR 0035; the deferred work is the broader fail-open vs fail-closed posture per chokepoint.
 - **Cross-region or cross-AZ replication patterns** for stateful components.
 - **Backup-restore automation and DR exercise schedule**, making the v1.0 one-time drill (F2) into an ongoing cadence with measured RTO / RPO.
 - **Multi-cluster federation** when redundancy spans clusters (cross-references backlog 3.13).
@@ -113,7 +113,7 @@ ADR 0035 accepts **rolling-restart-as-staged-restart** for LiteLLM. LiteLLM has 
 
 ### v1.0 stance
 
-ADR 0026 commits to an independent-cluster topology, with a single region per environment. Kargo (ADR 0040) promotes within that single-region-per-environment shape: dev → staging → prod, each environment one cluster.
+ADR 0026 commits to an independent-cluster topology, with a single region per environment. Kargo (ADR 0040) promotes within that single-region-per-environment shape: dev → staging → prod, each environment one cluster — this is the target end-state of ADR 0040's phased trajectory, not the v1.0 initial deployment (v1.0 starts with one Stage; additional Stages are added incrementally).
 
 ### Future enhancement
 
@@ -124,7 +124,7 @@ ADR 0026 commits to an independent-cluster topology, with a single region per en
 
 ### v1.0 stance
 
-Per-service OIDC role-mapping configuration (Grafana, OpenSearch, ArgoCD, LiteLLM, LibreChat, Mattermost, Langfuse) lives in each service's native config in Git. Edits go through Headlamp graphical editors per ADR 0039 and are promoted via Kargo per ADR 0040. Each service speaks its own config schema; mappings are maintained N times.
+Per-service OIDC role-mapping configuration (Grafana `grafana.ini`, OpenSearch `roles_mapping.yml`, ArgoCD, LiteLLM, LibreChat, Mattermost, Langfuse) lives in each service's native config in Git. These are not platform CRDs and therefore fall outside ADR 0039's editor scope (which targets platform CRDs); edits flow through Git/PR with schema-aware validation and are promoted via Kargo per ADR 0040. Each service speaks its own config schema; mappings are maintained N times.
 
 ### Future enhancement
 
@@ -142,13 +142,25 @@ ADR 0041 ships kind + AWS Compositions. The XRD shape is substrate-agnostic; the
 - **One Composition per XRD per additional substrate** (AKS, GCP / GKE, on-prem variants such as vSphere or bare-metal). The XRD shape itself is unchanged — adding a substrate is implementation work, not architecture work.
 - Architectural hooks already exist (XRD/Composition split per ADR 0041). Captured here for visibility so the work isn't mistaken for new architectural decisions when it comes up.
 
-## 13. Other deferred items (cross-references)
+## 13. Cross-layer policy-conflict analysis and policy drift detection
+
+### v1.0 stance
+
+ADR 0038 ships the per-layer policy simulator: given a hypothetical request as input, it shows the per-layer decisions (Kubernetes RBAC, OPA Gatekeeper admission, OPA gateway / agent-runtime authorization, etc.) that the platform would produce for that single request. This is reactive — it answers "what happens to this specific request?" — and is the v1.0 commitment.
+
+### Future enhancement
+
+- **Proactive cross-layer conflict analysis**: tooling that scans the complete OPA bundle plus the RBAC binding set plus Gatekeeper constraints together, surfacing conflicting rules, unreachable rules, and rules that one layer permits while another silently denies. ADR 0038 explicitly defers this.
+- **Policy drift detection**: continuous comparison between declared policy (the bundle / RBAC / constraints in Git) and the policy actually being evaluated at runtime, flagging divergence (e.g., a stale bundle on a replica, a Gatekeeper constraint that failed to install, an RBAC binding edited out-of-band). Also explicitly deferred by ADR 0038.
+- Both items extend ADR 0038's per-layer simulator into a whole-bundle / whole-system analysis surface; the simulator's data model is reusable, but the analysis algorithms and drift-comparison machinery are net-new work.
+
+## 14. Other deferred items (cross-references)
 
 These are tracked elsewhere but fit the "future enhancement" framing. Listed here for visibility:
 
 - **Multi-cluster federation** — backlog 3.13. Not in v1.0; each cluster is an independent install. Trigger to revisit: a use case requiring cross-cluster awareness or shared resources.
 - **Multi-CI support beyond GitHub Actions** — backlog 3.14. v1.0 ships GitHub Actions only.
-- **Adding SDKs beyond Langchain Deep Agents** — backlog 3.15. Multi-SDK harness shape is preserved in v1.0; only Langchain Deep Agents ships.
+- **Adding SDKs beyond LangGraph and Langchain Deep Agents** — backlog 3.15. Multi-SDK harness shape is preserved in v1.0; LangGraph (supported low-level SDK) and Langchain Deep Agents (opinionated default) ship per ADR 0019.
 - **Power-user personal agents in LibreChat** — backlog 3.12. LibreChat is locked down in v1.0.
 - **Allure / ReportPortal for test reporting** — backlog 3.4. Not added in v1.0; CI output + Grafana metrics cover MVP.
 - **SPIFFE identity** — backlog 3.5. Not needed for v1.0's independent-cluster model.
