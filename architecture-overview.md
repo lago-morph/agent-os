@@ -128,20 +128,20 @@ Each component is classified by **activity type**: install, configuration, or cu
 
 | Component | Role | Activity type |
 |---|---|---|
-| **LiteLLM Proxy** | Unified gateway: LLM, MCP, A2A, virtual keys, OpenAI-compat ↔ A2A translation, callbacks. | Install (Helm) + configuration (YAML for static parts: default models, callback registrations, fallbacks) + **custom Python callbacks** for PII scrubbing, audit, guardrails. |
-| **Custom kopf operator for LiteLLM** | Reconciles `MCPServer`, `A2APeer`, `VirtualKey`, `CapabilitySet`, `RAGStore` CRDs to LiteLLM's admin API. Python. | **Custom development (Python + kopf).** Functionally equivalent to a Crossplane provider; sits alongside Crossplane Compositions for cloud resources. |
+| **LiteLLM Proxy** | Unified gateway: LLM, MCP, A2A, virtual keys, OpenAI-compat ↔ A2A translation, callbacks. Ships with `replicas >= 2` plus readiness probe, `preStop: sleep 10-15s`, and `terminationGracePeriodSeconds` 60-300s per ADR 0035 to support the rolling-restart toggle. | Install (Helm) + configuration (YAML for static parts: default models, callback registrations, fallbacks) + **custom Python callbacks** for PII scrubbing, audit, guardrails. |
+| **Custom kopf operator for LiteLLM** | Reconciles `MCPServer`, `A2APeer`, `VirtualKey`, `CapabilitySet`, `RAGStore`, `EgressTarget`, `Skill`, `BudgetPolicy` CRDs to LiteLLM's admin API. Python. | **Custom development (Python + kopf).** Functionally equivalent to a Crossplane provider; sits alongside Crossplane Compositions for cloud resources. |
 | **Argo Workflows** | Workflow orchestration for triggered, scheduled, long-running agents, and approval flows. | Install (Helm) + workflow templates (config-heavy YAML). |
 | **Knative Eventing** | Event sources, brokers, triggers (CloudEvents-native). | Install (Helm) + EventSource and Trigger configs. See section 6.7. |
 | **NATS JetStream** | Broker backend for Knative Eventing. Same in dev and prod. | Install (Helm) + stream configuration. |
-| **ARK** | Agent CRDs and operator: `Model`, `Agent`, `Team`, `Tool`, `Memory`, `Evaluation`, `Query`. | Install (Helm) + Agent CRD authoring (configuration). |
+| **ARK** | Agent CRDs and operator: `Agent`, `AgentRun`, `Team`, `Tool`, `Memory`, `Evaluation`, `Query`. | Install (Helm) + Agent CRD authoring (configuration). |
 | **agent-sandbox** (kubernetes-sigs) | Sandbox CRDs for gVisor / Kata isolation, warm pools, hibernation. | Install + SandboxTemplate authoring (configuration). |
 | **Envoy egress proxy** | All non-LiteLLM agent egress: FQDN allowlist, mTLS, audit, OPA hook. Replaces dependence on CNI L7 policy. | Install (Helm) + per-agent-class config (configuration). |
 | **OPA / Gatekeeper** | Admission and runtime policy. | Install + **Rego policy bundle authoring (custom development — Rego is code)**. |
 | **Tempo** | Distributed tracing backend. Extends the Grafana stack. | Install (Helm) + retention configuration. |
 | **Mimir** | Long-term metrics storage; Prometheus-compatible. Extends the Grafana stack. | Install (Helm) + retention configuration. |
-| **Langfuse** | LLM-grade observability, prompt management with A/B labels, datasets, experiments, evaluators. Always-on for every agent run. | Install (Helm) + configuration. |
+| **Langfuse** | LLM-grade observability, prompt management with A/B labels, datasets, experiments, evaluators. Default destination for LLM-grade traces from every agent run, with span emission gated by the dynamic log/trace toggle (ADR 0035). | Install (Helm) + configuration. |
 | **promptfoo** | Adversarial evaluation and red-teaming in CI. | Container image consumed in CI + **eval suites (custom development — YAML and Python)**. |
-| **LibreChat** | End-user chat UI. **Locked down to frontend-only**: native agent feature, plugins, MCP, file upload all disabled. Users see only the endpoint picker (Platform Agents via LiteLLM) and chat history. | Install (Helm) + configuration (lockdown plus Keycloak SSO). |
+| **LibreChat** | End-user chat UI. **Locked down to frontend-only**: native agent feature, plugins, MCP all disabled. File upload is permitted with OPA gating per ADR 0007. Users see only the endpoint picker (Platform Agents via LiteLLM) and chat history. | Install (Helm) + configuration (lockdown plus Keycloak SSO). |
 | **Headlamp** | Kubernetes admin/dev UI; primary entry point for platform navigation. | Install (Helm) + **custom plugins (custom development — TypeScript/React)**. |
 | **OpenSearch** | Vector + hybrid search, RAG indexes, audit search, knowledge base index. Storage role only. OIDC against Keycloak in OSS. | Install (or managed OpenSearch) + index templates and ingest pipelines (configuration). |
 | **Letta (memory backend)** | Agent memory service consumed via ARK's `Memory` CRD. Fully OSS. | Install + memory adapter (custom development for the adapter only). |
@@ -149,9 +149,9 @@ Each component is classified by **activity type**: install, configuration, or cu
 | **HolmesGPT** | Platform self-management agent: diagnostics, root cause, suggested remediations. Runs as a Platform Agent (Agent CRD), not an external system. OPA-gated. | Install (Helm) + per-component toolset contributions (configuration that grows with the platform). Plus **custom Python toolsets** for our specific components. |
 | **`oauth2-proxy`** | Authenticating reverse proxy for tools whose OSS versions lack SSO (LiteLLM admin UI, etc.). | Install (Helm, multiple instances) + per-tool config against Keycloak. |
 | **Reloader (stakater/reloader)** | Triggers rolling restart of dependent workloads when ConfigMaps or Secrets they consume change. | Install (Helm). |
-| **Crossplane v2 Compositions** | XRDs and Compositions for cloud-shaped resources (`AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, etc.). | **Custom development — Composition YAML, possibly with Python composition functions.** |
+| **Crossplane v2 Compositions** | Declarative substrate-abstraction (ADR 0041): XRDs with per-substrate Compositions covering both in-cluster (kind) and cloud (AWS) backends. Substrate XRDs include `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`; cloud-shaped/composed XRs include `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, etc. | **Custom development — Composition YAML, possibly with Python composition functions.** |
 | **Platform SDK (Python + TypeScript)** | Library Platform Agents use for memory, skills, tools, RAG, OTel emission. | **Custom development.** |
-| **Agent base container image** | Multi-SDK harness (LangGraph, OpenAI Agents SDK, Strands, Anthropic Agent SDK, Mastra, ARK ADK) wrapping the platform SDK. | **Custom development.** |
+| **Agent base container image** | Multi-SDK harness wrapping the platform SDK. v1.0 ships LangGraph + Langchain Deep Agents as the supported SDKs (per ADR 0019), with ARK ADK bundled in the base image. OpenAI Agents SDK, Strands, Anthropic Agent SDK, and Mastra are enrollable later as additive changes. | **Custom development.** |
 | **Coach Component** | Scheduled Platform Agent that consumes traces and audit data and proposes improvements via PR or suggestion card. | **Custom development — built using the platform itself.** |
 | **CI/CD integration kit** | Vendor-neutral CLI and container images called from native CI pipelines. | **Custom development.** |
 | **Knative event adapter services** | Two thin services: CloudEvent → AgentRun CR, CloudEvent → Argo Workflow. Filtering happens at Knative Trigger level (declarative); adapters are pure field-mapping. | **Custom development (Python).** |
@@ -209,7 +209,7 @@ flowchart LR
   A2A --> AGENTS
 ```
 
-The **callbacks pipeline** is LiteLLM's hook chain — Python callbacks fire at `pre-call`, `post-call`, `success`, `failure`. Each is a class we register. Custom callbacks add PII scrubbing (Presidio), OPA runtime decisions, **audit emission via the platform audit adapter to the audit endpoint (ADR 0034)** — not direct writes to OpenSearch — and Langfuse instrumentation. The pipeline is configured in the LiteLLM ConfigMap; reload-on-change via Reloader.
+The **callbacks pipeline** is LiteLLM's hook chain — Python callbacks fire at `pre-call`, `post-call`, `success`, `failure`. Each is a class we register. Custom callbacks add PII scrubbing (Presidio), OPA runtime decisions, **audit emission via the platform audit adapter to the audit endpoint (ADR 0034)** — not direct writes to OpenSearch — and Langfuse instrumentation. The pipeline is configured in the LiteLLM ConfigMap; reload-on-change is a **rolling restart per ADR 0035 — LiteLLM has no in-process reload**, so Reloader triggers a graceful rollout against the `replicas >= 2` Deployment.
 
 The **A2A endpoint** accepts internal calls (one Platform Agent calling another) and outbound calls to external A2A peers we have approved. **External organizations do not register A2A peers with us.** When we want to call an external A2A endpoint, an admin defines an `A2APeer` CRD through the Headlamp plugin, which the kopf operator reconciles into LiteLLM's registry. We do not allow outside parties to onboard themselves into our gateway. Same registry, same auth, same audit for all directions.
 
@@ -233,9 +233,9 @@ This keeps behavior predictable. Agents that don't want silent failover declare 
 - **GitHub** — system-credential and user-credential modes.
 - **Google Drive** — system-credential and user-credential modes.
 - **Context7** — documentation/library lookup.
-- **OpenSearch** — system-mediated mode against the platform's own OpenSearch (in-cluster on kind, AWS-managed via Crossplane on AWS), plus an agent/tenant/user-credentialed mode for connecting to externally operated OpenSearch instances.
-- **Postgres** — agent/tenant/user-scoped database access. Per-agent / per-tenant / per-user database provisioning is wrapped by a new Crossplane XRD (working name `AgentDatabase`) that creates the database, role, and grants.
-- **MongoDB** — same XRD-fronted provisioning pattern as Postgres, same RBAC + OPA gating.
+- **OpenSearch** — system-mediated mode against the platform's own OpenSearch (in-cluster on kind, AWS-managed via Crossplane on AWS); the system-mediated path reuses the `XSearchIndex` substrate XRD per ADR 0041. Plus an agent/tenant/user-credentialed mode for connecting to externally operated OpenSearch instances.
+- **Postgres** — agent/tenant/user-scoped database access. Per-agent / per-tenant / per-user database provisioning is wrapped by the Crossplane `XAgentDatabase` XRD (X-prefix per ADR 0020 / 0041) that creates the database, role, and grants. `XAgentDatabase` composes `XPostgres` (CloudNativePG on kind / RDS on AWS) per ADR 0041.
+- **MongoDB** — same XRD-fronted provisioning pattern as Postgres, same RBAC + OPA gating. `XAgentDatabase` composes `XMongoDocStore` (Bitnami on kind / DocumentDB-or-self-managed on AWS) per ADR 0041.
 - **Web search + web scrape** — generic in-cluster MCP servers (built or adopted from OSS). The endpoints themselves do not carry the platform's full RBAC/OPA stack internally; access control is enforced at the **MCP-server-access** layer, where OPA can block specific search or scrape requests by policy.
 
 Firecrawl is **not** in the initial set; its role is taken by the generic web-search and web-scrape services. A commercial fallback (Firecrawl, Google Search API) for IP-block / rate-limit scenarios is acknowledged but deferred to future-enhancements.
@@ -251,7 +251,7 @@ flowchart TB
   GIT[(Git: Agent CRDs,<br/>Skills, Capabilities,<br/>OPA bundles)]
   AC[ArgoCD]
   K8s[Kubernetes API]
-  ARK[ARK operator<br/>Agent / Team / Tool /<br/>Memory / Evaluation]
+  ARK[ARK operator<br/>Agent / AgentRun / Team / Tool /<br/>Memory / Evaluation / Query]
   SBC[agent-sandbox<br/>controller]
   POOL[Warm pod pool]
   AG[Agent pod]
@@ -279,7 +279,7 @@ flowchart TB
 
 **Skills are managed by LiteLLM's skill gateway.** Skills are stored in Git (which is what LiteLLM's skill gateway already supports) and served to Platform Agents through that gateway, the same way MCP servers and A2A peers are. We do not build a separate skill management system for v1.0; we lean on what LiteLLM already provides. If specific skill management features prove insufficient over time, we revisit then. Skills are **not user-controllable** and are not exposed at the user-facing UI; they are part of the agent's CapabilitySet, configured by admins.
 
-**Primary SDK (ADR 0019).** v1.0 ships **LangGraph as the supported agent SDK**, with **Langchain Deep Agents (built on LangGraph) as the opinionated, batteries-included default** used in tutorials, how-to guides, the agent profile library, and the recommended compositions. Reference documentation covers both. The multi-SDK harness shape (B7) is preserved so OpenAI Agents SDK, Strands, Anthropic Agent SDK, Mastra, and ARK ADK can be enrolled later as additive changes; the `Agent` CRD's `sdk` field accepts `langgraph` and `deep-agents` in v1.0 and grows by enrollment without a schema break.
+**Primary SDK (ADR 0019).** v1.0 ships **LangGraph as the supported agent SDK**, with **Langchain Deep Agents (built on LangGraph) as the opinionated, batteries-included default** used in tutorials, how-to guides, the agent profile library, and the recommended compositions. Reference documentation covers both. ARK ADK is bundled in the base image now; the multi-SDK harness shape (B7) is preserved so OpenAI Agents SDK, Strands, Anthropic Agent SDK, and Mastra can be enrolled later as additive changes; the `Agent` CRD's `sdk` field accepts `langgraph` and `deep-agents` in v1.0 and grows by enrollment without a schema break.
 
 **Platform-SDK interaction surfaces.** The contract between the harness and the platform is:
 
@@ -297,6 +297,7 @@ Storage roles are deliberately separate. Postgres is the system of record for st
 flowchart LR
   AG[Agent pod]
   SDK[Platform SDK<br/>memory.* + rag.*]
+  GW[LiteLLM gateway]
   MEM[Letta<br/>memory service]
   OS[(OpenSearch<br/>vectors + hybrid<br/>+ audit search)]
   PG[(Postgres<br/>state · checkpoints<br/>LibreChat DB)]
@@ -306,7 +307,8 @@ flowchart LR
 
   AG --> SDK
   SDK --> MEM
-  SDK --> KB
+  SDK --> GW
+  GW --> KB
   MEM --> PG
   MEM --> OS
   MEM --> OBJ
@@ -318,7 +320,7 @@ flowchart LR
   XP -.->|provisions| OBJ
 ```
 
-**Rule of thumb**: anything in OpenSearch must be reproducible from a primary source. Vectors and embeddings can be re-derived from documents in object storage. Audit indexes can be re-derived from object-storage archive. Checkpoints live in Postgres (primary); search indexes over checkpoints, if we add them, are derived. This keeps OpenSearch purely as a retrieval-optimization layer, not a system of record.
+**Rule of thumb**: anything in OpenSearch must be reproducible from a primary source. Vectors and embeddings can be re-derived from documents in object storage. Audit indexes can be re-derived from S3 (AWS) or Postgres (kind) per ADR 0034. Checkpoints live in Postgres (primary); search indexes over checkpoints, if we add them, are derived. This keeps OpenSearch purely as a retrieval-optimization layer, not a system of record.
 
 **Memory access modes.** Each memory store declares one of three access modes:
 
@@ -332,7 +334,7 @@ The access mode is part of the `MemoryStore` CRD spec. Agent CRDs reference memo
 
 **OpenSearch deployment (ADR 0009, ADR 0033).** Same dual-mode pattern: **in-cluster on kind** for dev/integration, **AWS-managed OpenSearch via Crossplane MR on AWS**. OpenSearch is purely a retrieval-optimization layer (vectors, hybrid search, advisory audit fanout); see the rule of thumb above and the audit pipeline below.
 
-**Substrate abstraction via Crossplane Compositions (ADR 0041).** The dual-mode hosting pattern above (kind in-cluster vs. AWS managed services) is implemented uniformly through Crossplane XRDs with per-substrate Compositions rather than parallel hand-maintained manifests. The v1.0 substrate XRDs are `XPostgres`, `XSearchIndex`, `XObjectStore`, and `XMongoDocStore`; consumers reference the XRD claim and the platform selects the appropriate Composition for the target substrate. **Connection-secret schema is part of the XRD contract** — every Composition writes the same shape of connection secret (host, port, credentials key names, etc.) so consumers don't branch on substrate. **Status fields are substrate-agnostic** — the XR's status surface exposes a normalized health/readiness view rather than substrate-specific conditions. **Documented capability-parity caveat:** the kind path may produce reduced functionality by design (for example, no S3 archive in the kind audit pipeline — Postgres alone is the system of record on kind; see the audit pipeline below). Reduced-capability gaps are explicit in the Composition documentation, not silent.
+**Substrate abstraction via Crossplane Compositions (ADR 0041).** The dual-mode hosting pattern above (kind in-cluster vs. AWS managed services) is implemented uniformly through Crossplane XRDs with per-substrate Compositions rather than parallel hand-maintained manifests. The v1.0 substrate XRDs are `XPostgres`, `XSearchIndex`, `XObjectStore`, and `XMongoDocStore`; consumers reference the XRD claim and the platform selects the appropriate Composition for the target substrate. **Connection-secret schema is part of the XRD contract** — every Composition writes the same shape of connection secret (host, port, credentials key names, etc.) so consumers don't branch on substrate. **Status fields are substrate-agnostic** — the XR's status surface exposes a normalized health/readiness view rather than substrate-specific conditions. **Documented capability-parity caveat:** the kind path may produce reduced functionality by design (for example, no S3 archive in the kind audit pipeline — Postgres alone is the system of record on kind; see the audit pipeline below). Reduced-capability gaps are explicit in the Composition documentation, not silent. **Substrate selection is label-driven and admission-validated:** every cluster carries a `platform.io/environment=kind|aws` label that the Composition selectors match against, and Gatekeeper admission **rejects claims whose target substrate has no matching Composition** so substrate gaps fail at admission rather than at runtime (cross-ref ADR 0002 + ADR 0041).
 
 **Audit pipeline (ADR 0034).** Every component emits audit through the **platform audit adapter** — a Python library every component links against — to a single deployable **audit endpoint**. No component writes audit records directly to Postgres, S3, or OpenSearch.
 
@@ -421,7 +423,7 @@ flowchart LR
 **Dynamic log-level / trace-granularity toggle (ADR 0035).** HolmesGPT and admins can raise verbosity for diagnostics — for a specific component, tenant, or event class — and lower it back. Two per-component patterns are declared:
 
 - **In-process toggle** — the component watches a `LogLevel` CR (or equivalent reload signal) and reconfigures its own logger / tracer at runtime. This is the default for components built in-house.
-- **Rolling-restart toggle** — for non-reloadable services like LiteLLM, toggling level requires a rolling restart of the workload with the new configuration. The platform records this distinction so operators see the cost of toggling.
+- **Rolling-restart toggle** — for non-reloadable services like LiteLLM, toggling level requires a rolling restart of the workload with the new configuration. The platform records this distinction so operators see the cost of toggling. **ADR 0035 deployment-shape constraints make the rolling restart safe by construction:** LiteLLM ships with `replicas >= 2`, a readiness probe gating Service traffic, `preStop: sleep 10-15s` to drain in-flight connections, and `terminationGracePeriodSeconds` in the 60-300s range so long-running streaming responses can complete before pod shutdown.
 
 **Off-mode has zero performance cost.** When verbosity is at the baseline, there is no always-on tracing-then-sample-and-drop pipeline; the cost is only paid when verbosity is raised.
 
@@ -494,7 +496,7 @@ The exact request flow, key delivery mechanism, rotation policy, and scope gramm
 
 Cost budgets are configured **through OPA**, not through LiteLLM's admin UI. The flow:
 
-- A `BudgetPolicy` CRD (or budget data attached to a CapabilitySet — design-time decision) declares the budget for a virtual key, agent, team, or tenant.
+- A `BudgetPolicy` CRD declares the budget for a virtual key, agent, team, or tenant (per ADR 0006).
 - The kopf operator reconciles this into OPA's data and into LiteLLM's budget tracking.
 - LiteLLM tracks spend per virtual key (this is built-in functionality).
 - On each request, LiteLLM's OPA callback consults OPA: "given current spend and the budget policy, allow this call?" OPA returns allow/deny.
@@ -514,26 +516,26 @@ Calling these out explicitly so they get implemented as each component lands.
 - Kubernetes admission via Gatekeeper — every CR admit/deny.
 - Envoy egress proxy — every outbound HTTP connection.
 - Knative broker — event arrival and dispatch outcome.
-- ARK operator — Agent / Team / Sandbox / AgentRun lifecycle events.
-- agent-sandbox controller — Sandbox creation, destruction, hibernation.
+- ARK operator — Agent, AgentRun, Team, Tool, Memory, Evaluation, Query lifecycle events.
+- agent-sandbox controller (A6) — Sandbox creation, destruction, hibernation. Sandbox lifecycle is owned by agent-sandbox, not ARK.
 - ESO — secret access (built in).
 - ArgoCD — sync events.
 - LibreChat — conversation events.
 - Headlamp plugin actions — admin operations through our plugins, including virtual-key issuance and budget edits.
-- Approval workflows — request created, OPA elevation decision, approver decision, escalation triggered, timeout fired, CloudEvent delivery to requesting agent.
+- Approval workflows — request created, OPA elevation decision, approver decision, timeout fired, CloudEvent delivery to requesting agent. (Escalation is out of v1.0 per ADR 0017.)
 - Coach Component — auto-PR creation, suggestion card emission.
 - HolmesGPT — queries run, recommendations made, actions taken.
 - LiteLLM kopf operator — capability registry changes (MCPServer, A2APeer, RAGStore, EgressTarget, Skill, CapabilitySet, VirtualKey, BudgetPolicy reconcile events).
 
 **OPA decision points:**
 
-- Kubernetes admission via Gatekeeper — Agent, AgentRun, Sandbox, SandboxTemplate, Memory, MemoryStore, MCPServer, A2APeer, RAGStore, EgressTarget, Skill, CapabilitySet, VirtualKey, BudgetPolicy, Approval, and the Crossplane XRs (AgentEnvironment, SyntheticMCPServer, GrafanaDashboard).
+- Kubernetes admission via Gatekeeper — Agent, AgentRun, Sandbox, SandboxTemplate, Memory, MemoryStore, MCPServer, A2APeer, RAGStore, EgressTarget, Skill, CapabilitySet, VirtualKey, BudgetPolicy, Approval, and the Crossplane XRs (AgentEnvironment, SyntheticMCPServer, GrafanaDashboard, AuditLog, XAgentDatabase, and the substrate XRDs `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`).
 - LiteLLM callbacks — runtime tool/model authorization, rate limiting, content checks, **budget enforcement**.
 - LiteLLM dynamic registration — whether a Platform Agent is allowed to register an A2A or MCP interface in its namespace.
 - LibreChat — which Platform Agents a user can pick (via Keycloak claims).
 - Envoy egress proxy — which destinations are allowed for which agent class.
 - Headlamp plugin actions — which admin can approve which suggestion cards, **issue virtual keys**, edit budgets, perform other privileged operations.
-- Approval system — required-level elevation evaluation, escalation policy.
+- Approval system — required-level elevation evaluation.
 - agent-platform CLI — CI pipeline gates: can this PR promote to which environment?
 - HolmesGPT — what tools it can invoke, what it can do autonomously vs require human approval.
 
@@ -541,10 +543,10 @@ Calling these out explicitly so they get implemented as each component lands.
 
 The platform ships a **policy simulator** that answers "what would happen for this request at each enforcement layer?" without actually performing the action. Two surfaces:
 
-- **Headlamp panel** — admins paste or compose a request (subject + action + target) and see, layer by layer, what each enforcement point (Gatekeeper admission, LiteLLM OPA callback, Envoy egress OPA, approval-system elevation, etc.) would decide and why. The panel is the primary editing companion for OPA bundles.
+- **Headlamp panel** — admins paste or compose a request (subject + action + target) and see, layer by layer, what each enforcement point would decide and why. The reported layers are **Kubernetes RBAC**, **Gatekeeper admission** (including its audit-mode constraints), **LiteLLM OPA callback**, **Envoy egress OPA**, **approval-system elevation**, and the **`agent-platform` CLI promotion gates** — RBAC is reported as a separately-attributed layer alongside the OPA-driven layers so admins can see when access is denied at the floor versus restricted by policy. The panel is the primary editing companion for OPA bundles.
 - **HolmesGPT skill (equivalent)** — the same simulator exposed as a skill HolmesGPT can invoke when diagnosing why a request was (or would be) denied, or when proposing a policy change.
 
-Implementation requires a **structured dry-run mode at each layer** — every OPA decision point exposes a dry-run input and emits the same decision shape as the live path, with `simulated: true`. Components that implement runtime authorization (LiteLLM callbacks, Envoy egress, the approval system, Headlamp action gates) all honor the dry-run flag without side effects (no audit emission, no state change). The simulator composes per-layer dry-runs into a single response.
+Implementation requires a **structured dry-run mode at each layer** — every OPA decision point exposes a dry-run input and emits the same decision shape as the live path, with `simulated: true`. Components that implement runtime authorization (LiteLLM callbacks, Envoy egress, the approval system, Headlamp action gates), Gatekeeper (consulted in audit-mode for the dry-run), and the `agent-platform` CLI promotion gates all honor the dry-run flag without enforcement-path side effects (no state change, no real denial of a live request). **Simulator runs ARE audited under `platform.policy.*`** — every dry-run decision is recorded by the platform audit adapter so the policy-edit history is itself observable — but they never produce enforcement-path effects. The simulator composes per-layer dry-runs into a single response.
 
 ### 6.7 Eventing architecture (Knative + NATS JetStream)
 
@@ -604,12 +606,12 @@ The architecture commits to the following top-level event-type namespaces. Speci
 | Namespace | What it covers |
 |---|---|
 | `platform.lifecycle.*` | Agent, AgentRun, Sandbox, Workflow, MemoryStore lifecycle (created, started, paused, resumed, completed, failed, deleted). |
-| `platform.audit.*` | Audit-emission events from any component (gateway request/response, admission decisions, egress connections, secret access). Mirrors what flows to OpenSearch. |
+| `platform.audit.*` | Audit-emission events from any component (gateway request/response, admission decisions, egress connections, secret access). Consumed by the platform audit adapter into the Postgres + S3 system of record per ADR 0034; OpenSearch indexing is advisory fanout. |
 | `platform.gateway.*` | LiteLLM-specific events that aren't pure audit: routing decisions, provider failover, MCP health changes, A2A handoffs. |
 | `platform.policy.*` | OPA decisions, policy violations, dynamic registration accept/deny. |
 | `platform.capability.*` | Changes to the capability registry: MCPServer / A2APeer / RAGStore / EgressTarget / Skill / CapabilitySet add/update/delete. |
 | `platform.evaluation.*` | Evaluation run started / completed, A/B test results, red-team findings. |
-| `platform.approval.*` | Approval requested, OPA-elevated, decided (approved or rejected), escalated, timed out. |
+| `platform.approval.*` | Approval requested, OPA-elevated, decided (approved or rejected), timed out. (Escalation deferred per ADR 0017.) |
 | `platform.observability.*` | Threshold crossings, alert routing (e.g., budget-exceeded notifications, SLA-style alerts). |
 | `platform.tenant.*` | Tenant onboarding, namespace association changes, cross-tenant publish events. |
 | `platform.security.*` | Security-relevant events distinct from audit: sandbox-escape signal, repeated authn failures, policy-bypass attempts. |
@@ -945,7 +947,7 @@ A summary of every CRD in the architecture, who reconciles it, and where it is d
 | `AgentRun` | ARK | namespaced | A single execution of an Agent, created by Knative event adapters or workflow steps. | `agentRef`, `inputs`, `traceId`, `triggeredBy`, `state` | §6.7, §7.2 |
 | `Team` | ARK | namespaced | A coordinated multi-agent grouping. | `members[]`, `coordinationStrategy` | §5 (component A5) |
 | `Tool` | ARK | namespaced | An ARK-native tool definition. | (defers to ARK) | §5 (component A5) |
-| `Memory` | ARK | namespaced | An agent-scoped memory binding. | `memoryStoreRef`, `accessMode` | §6.3 |
+| `Memory` | ARK | namespaced | An agent-scoped memory binding. Per ADR 0025 the access mode lives on the `MemoryStore`, not on this binding. | `memoryStoreRef` | §6.3 |
 | `Evaluation` | ARK | namespaced | An agent evaluation specification. | `agentRef`, `datasetRef`, `evaluators[]` | §5 (component A5), §7.4 |
 | `Query` | ARK | namespaced | An ARK-native query primitive. | (defers to ARK) | §5 (component A5) |
 | `Sandbox` | agent-sandbox | namespaced | A sandbox instance running agent pods. | `templateRef`, `runtime` (gVisor/Kata), `state` | §6.2 |
@@ -965,8 +967,8 @@ A summary of every CRD in the architecture, who reconciles it, and where it is d
 | `GrafanaDashboard` (Crossplane XR) | Crossplane (B4) | namespaced | A namespaced dashboard. | `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled) | §11 |
 | `LogLevel` | per-component (in-process or rolling-restart) | namespaced | Declarative log-level / trace-granularity toggle target (ADR 0035). | `componentSelector`, `level`, `traceGranularity`, `scope` (component/tenant/eventClass), `expiresAt` | §6.5, §13 |
 | `AuditLog` (Crossplane XRD) | Crossplane (B4) | namespaced | Composes the audit pipeline (ADR 0034) — Postgres `audit_events` backing store, S3 archive bucket + lifecycle (AWS only), OpenSearch indexer, batch CronJob (AWS only), and the audit-endpoint Deployment. | `postgresRef`, `s3BucketRef`, `indexerRef`, `batchScheduleSpec`, `endpointReplicas` | §6.3, §6.5 |
-| `TenantOnboarding` (Crossplane XRD) | Crossplane (B4) | namespaced | Provisions a tenant — creates the tenant namespace(s), templated default ServiceAccounts, and the claim-to-tenant binding in Keycloak (ADR 0037). CapabilitySets are intentionally not coupled. | `tenantId`, `namespaces[]`, `defaultServiceAccounts[]`, `keycloakBinding` | §6.9 |
-| `AgentDatabase` (Crossplane XRD) | Crossplane (B4) | namespaced | Provisions per-agent / per-tenant / per-user databases for the Postgres and MongoDB MCP services (ADR 0020) — creates the database, role, and grants. | `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef` | §6.1, §6.3 |
+| `TenantOnboarding` (Crossplane XRD) | Crossplane (B4) | namespaced | Provisions a tenant — creates the tenant namespace(s), templated default ServiceAccounts, and the cluster-OIDC-side claim mapper (ADR 0028 / ADR 0037). CapabilitySets are intentionally not coupled. | `tenantId`, `namespaces[]`, `defaultServiceAccounts[]`, `clusterOIDCClaimMapping` | §6.9 |
+| `XAgentDatabase` (Crossplane XRD) | Crossplane (B4) | namespaced | Provisions per-agent / per-tenant / per-user databases for the Postgres and MongoDB MCP services (ADR 0020 / 0041) — creates the database, role, and grants. Composes `XPostgres` (CloudNativePG on kind / RDS on AWS) and `XMongoDocStore` (Bitnami on kind / DocumentDB-or-self-managed on AWS) per ADR 0041. | `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef` | §6.1, §6.3 |
 | `XPostgres` (Crossplane XRD) | Crossplane (B4) | namespaced | Substrate-abstracted Postgres instance (ADR 0041). Per-substrate Compositions resolve to in-cluster Postgres on kind or AWS RDS on AWS. Writes a uniform connection secret per the XRD contract; status is substrate-agnostic. | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass` | §6.3 |
 | `XSearchIndex` (Crossplane XRD) | Crossplane (B4) | namespaced | Substrate-abstracted search/index backend (ADR 0041). Per-substrate Compositions resolve to in-cluster OpenSearch on kind or AWS-managed OpenSearch on AWS. Uniform connection secret; substrate-agnostic status. | `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass` | §6.3 |
 | `XObjectStore` (Crossplane XRD) | Crossplane (B4) | namespaced | Substrate-abstracted object storage (ADR 0041). Per-substrate Compositions resolve to an in-cluster MinIO-compatible store on kind or AWS S3 on AWS. Uniform connection secret; substrate-agnostic status. **Capability-parity caveat:** the kind path may expose reduced functionality (e.g., no S3 archive lifecycle) by design. | `bucketName`, `lifecycle`, `connectionSecretRef`, `substrateClass` | §6.3 |
@@ -1012,7 +1014,7 @@ The default endpoint a typical user sees is the **Interactive Access Agent** —
 
 **Streaming.** Responses stream end-to-end: LLM provider → LiteLLM → Platform Agent → LiteLLM → LibreChat → user, with stream chunks preserved at every layer. The same path applies in reverse for streaming inputs.
 
-**Mattermost as an alternative chat surface (ADR 0036).** Users may also reach Platform Agents through **Mattermost** — messages flow over Knative Eventing as CloudEvents through the same LiteLLM call path, with OPA-driven Trigger filters deciding which channels see which events. See section 6.7 for the integration model. The user-facing capability is the same as LibreChat (chat with Platform Agents, receive streamed responses); the difference is the surface and the bidirectional channel-routing model.
+**Mattermost as the operator / chatops surface (ADR 0036).** Mattermost is **not** an end-user alternative for agent chat. Per ADR 0036 it is the **operator-facing chatops surface**: alerts, approval prompts, HolmesGPT findings, and chatops invocations flow there for platform operators and on-call engineers. End-user agent chat lives in **LibreChat**; operator interactions (alert triage, approving suspended workflows, inspecting HolmesGPT findings, invoking chatops commands) live in **Mattermost**. Messages on the Mattermost side flow over Knative Eventing as CloudEvents through the same LiteLLM call path, with OPA-driven Trigger filters deciding which channels see which events. See section 6.7 for the integration model.
 
 **Architecture:**
 
@@ -1216,7 +1218,9 @@ sequenceDiagram
 
 A skill, prompt, or capability change flows through Git → CI evals → ArgoCD reconcile. The custom Python kopf operator keeps LiteLLM in sync with capability CRDs.
 
-**PR + ArgoCD sync is the deploy path within a single environment.** Environment-to-environment progression is handled separately by **Kargo (ADR 0040)**: once the candidate commit is merged and reconciled into dev, Kargo advances it through subsequent Stages (staging, prod) with per-Stage verification suites and `Approval`-CRD-backed human gates where required. The diagram below shows the within-environment loop; see section 8 and component A23 for the Kargo promotion fabric on top of it.
+**PR + ArgoCD sync is the deploy path within a single environment.** Environment-to-environment progression is handled separately by **Kargo (ADR 0040)**: once the candidate commit is merged and reconciled into dev, Kargo advances it through subsequent Stages with per-Stage verification suites and `Approval`-CRD-backed human gates where required. **Phased trajectory:** v1.0 starts with a **single Stage** — additional Stages (staging, prod) exist only after they have been added per ADR 0040's phased rollout. The diagram below shows the within-environment loop; see section 8 and component A23 for the Kargo promotion fabric on top of it.
+
+**Recovery model.** Rollback is **not `git revert`** — instead, an operator **promotes a previous Warehouse commit through the affected Stages** via Kargo. The same per-Stage verification suites and approval gates apply to the rollback promotion as to a forward promotion (per ADR 0040).
 
 **Architecture:**
 
@@ -1292,7 +1296,7 @@ Approvals are for actions taken by Platform Agents that require human review bef
 - When an `Approval` is created, OPA is consulted. OPA can **only elevate** the required approval level — for example, an action whose default is `operator` may be elevated to `org-admin` if OPA determines the action operates on sensitive data. OPA cannot lower the bar.
 - The `Approval` enters a workqueue surfaced through the Headlamp plugin to anyone with the resolved permission level.
 - Approve and reject both produce an audit trail entry and a CloudEvent routed to the requesting agent. The agent, on receiving the result event, takes its action (or doesn't) using the metadata in the original request.
-- The Argo Workflow underneath manages the suspend/resume mechanics and the timeout / escalation behavior.
+- The Argo Workflow underneath manages the suspend/resume mechanics, timeout, and decision-event emission (per ADR 0017; no escalation in v1.0).
 
 **RBAC/OPA semantics for approvals (and elsewhere).** Throughout the platform, RBAC is the standard authorization layer; OPA is the policy layer that **can only restrict** what RBAC has granted. OPA never grants permissions RBAC didn't already give. This applies to approval levels (OPA can elevate the required level — i.e., deny the originally-permitted approver from being sufficient), to virtual key issuance, to capability access decisions, and across the platform. The mental model: RBAC is the floor; OPA may raise the floor on a per-decision basis.
 
@@ -1397,7 +1401,7 @@ We fill these gaps with recurring patterns, all custom development:
 | LiteLLM | Advanced budget features (alert routing, automated suspension on threshold) may be enterprise; basic per-key budgets are OSS | Architecture commits to OPA as policy layer + LiteLLM as spend tracker. Anything missing from OSS gets added via callback. Headlamp is the editing surface; OPA enforces. |
 | LiteLLM | No native Crossplane provider | Hand-written Python kopf operator reconciles CRDs to LiteLLM admin API. |
 | Langfuse | Some advanced RBAC, audit, and SCIM features paid | Use API + scripts; auth proxy or OIDC for SSO; thin SCIM bridge if needed. |
-| LibreChat | Native agent feature, plugins, MCP, file upload could leak platform/user boundaries | Lock down via `librechat.yaml` config; only the endpoint picker and chat history remain user-visible. |
+| LibreChat | Native agent feature, plugins, and per-conversation MCP could leak platform/user boundaries | Lock down via `librechat.yaml` config; only the endpoint picker and chat history remain user-visible. **File upload is retained** and routed to the conversation's `Memory` CRD, gated by the OPA allowed / forbidden / scan-then-allow model (ADR 0007 — see §7.1). |
 | Headlamp | OIDC supported but plugin gating is DIY | Plugin gating logic in our plugin code (Keycloak claims). |
 | Argo Workflows / ArgoCD | OIDC works against Keycloak; multi-tenant Workflows console is basic | OIDC config; high-level cross-environment views via Headlamp plugins. |
 | ARK | Technical-preview status; multi-tenancy and per-tenant RBAC may be thin | Pin a tested version. Plan for upstream contributions. Namespace-based isolation + OPA admission + Headlamp plugin for cross-tenant visibility. |
@@ -1444,7 +1448,7 @@ For someone who has never used the platform. Hand-holding, end-to-end, working r
 
 - How to issue a virtual key with custom budget and model allowlist.
 - How to write an OPA policy for tool access.
-- How to integrate with **GitHub Actions**, **GitLab CI**, **Jenkins** — three reference pipelines.
+- How to integrate with **GitHub Actions** — the v1.0 reference pipeline (per ADR 0010 / ADR 0033; GitLab CI and Jenkins are out of scope for v1.0).
 - How to debug an agent using traces in Langfuse and Tempo.
 - How to write a Headlamp plugin.
 - How to roll out an agent change with canary using Langfuse A/B labels.
@@ -1708,7 +1712,7 @@ Per-product docs (10.5) and per-product runbooks (10.7) are delivered by Workstr
 |---|---|
 | C1 | Documentation portal infrastructure — Material for MkDocs, search, versioning, contribution workflow. |
 | C2 | Diataxis tutorials. |
-| C3 | Diataxis how-to guides — including the three CI/CD reference pipelines. |
+| C3 | Diataxis how-to guides — including the GitHub Actions reference pipeline (per ADR 0010 / ADR 0033). |
 | C4 | Diataxis reference. |
 | C5 | Diataxis explanation. |
 | C6 | Cross-cutting / integrated runbooks. |
