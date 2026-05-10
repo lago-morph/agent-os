@@ -5,7 +5,7 @@
 
 ## Context
 
-All platform events — agent and resource lifecycle, audit emissions, gateway events, policy decisions, evaluation runs, approvals — flow through Knative Eventing as CloudEvents on the NATS JetStream broker (ADR 0004). Knative Triggers route events declaratively by `type`, so a stable, agreed-upon top-level taxonomy is what makes filtering, fan-out, side-effect wiring, and external subscription tractable. Without a fixed namespace set, each component would invent its own naming and Triggers would have to match on ad-hoc patterns, breaking predictable consumption and audit-category alignment with what flows to OpenSearch. The architecture therefore commits to a closed set of top-level type namespaces; specific event names within each namespace are design-time per component.
+All platform events — agent and resource lifecycle, audit emissions, gateway events, policy decisions, evaluation runs, approvals — flow through Knative Eventing as CloudEvents on the NATS JetStream broker (ADR 0004). Knative Triggers route events declaratively by `type`, so a stable, agreed-upon top-level taxonomy is what makes filtering, fan-out, side-effect wiring, and external subscription tractable. Without a fixed namespace set, each component would invent its own naming and Triggers would have to match on ad-hoc patterns, breaking predictable consumption and audit-category alignment with the durable audit pipeline (ADR 0034) and its downstream subscribers. The architecture therefore commits to a closed set of top-level type namespaces; specific event names within each namespace are design-time per component.
 
 ## Decision
 
@@ -17,7 +17,7 @@ The platform commits to the top-level CloudEvent type namespaces enumerated in a
 - Per-event-type schema design under each namespace is deferred to component design time (architecture-backlog.md § 4); B12's registry is the single source of truth for the concrete schemas as they land.
 - Every CloudEvent carries CloudEvents-native `specversion` plus a per-event-type `schemaVersion` field (ADR 0030, architecture-overview.md § 6.13); backward-compatible additions bump minor and breaking changes mint a new event type rather than breaking subscribers.
 - Knative Trigger filtering becomes straightforward: subscribers match on the namespace prefix (e.g., `platform.audit.*` for an audit sink, `platform.approval.*` for the approval-decision dispatcher) without coupling to component-internal event names.
-- The taxonomy aligns with consumption boundaries already present in the platform: `platform.audit.*` mirrors what flows to OpenSearch (architecture-overview.md § 6.7), `platform.security.*` is intentionally distinct from audit, and `platform.observability.*` covers threshold-crossing and alert-routing flows such as the v1.0 budget-exceeded notification.
+- The taxonomy aligns with consumption boundaries already present in the platform: `platform.audit.*` is the namespace consumed by the platform audit adapter into its Postgres + S3 system of record (ADR 0034), with OpenSearch as an advisory fanout for query and dashboards rebuildable from those primaries; `platform.security.*` is intentionally distinct from audit; and `platform.observability.*` covers threshold-crossing and alert-routing flows such as the v1.0 budget-exceeded notification.
 - The two initial v1.0 trigger flows (AlertManager → HolmesGPT, budget-exceeded → email user) and every subsequent component's flow design (architecture-overview.md § 6.7) author their event types under these namespaces.
 - External subscribers can rely on the namespace set as a stable contract for declarative subscription; introducing a new top-level namespace is a breaking change to that contract.
 
@@ -25,4 +25,4 @@ The platform commits to the top-level CloudEvent type namespaces enumerated in a
 
 - architecture-overview.md § 6.7 (Eventing architecture — top-level type namespaces)
 - architecture-backlog.md § 4 (deferred per-event-type schemas), § 6 (invariant)
-- ADR 0004 (NATS JetStream broker), ADR 0030 (CRD/API versioning)
+- ADR 0004 (NATS JetStream broker), ADR 0030 (CRD/API versioning), ADR 0034 (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)

@@ -23,12 +23,12 @@ The platform adopts **NATS JetStream** as the Knative Eventing broker backend (c
 - JetStream provides at-least-once delivery and durability for CloudEvents in flight; consumers (Knative Triggers and their sinks) must remain idempotent, which is already a CloudEvent-handling requirement.
 - NATS runs anywhere (kind, EKS, Azure equivalents) with a small footprint, keeping the dev cluster lightweight and the prod cluster install tractable for the independent-cluster model (ADR 0026).
 - Knative Trigger filtering and CloudEvent taxonomy (ADR 0031) are unaffected by the backend choice — broker selection is encapsulated below the Trigger layer.
-- Operating NATS JetStream (stream sizing, retention, monitoring, upgrade) is a Workstream A responsibility; the Knative broker is observed via the standard observability stack (architecture-overview.md §460, broker arrival and dispatch metrics).
-- Environment-specific event sources (ADR 0023) feed this single broker, preserving uniform downstream behavior across environments.
+- Operating NATS JetStream (stream sizing, retention, monitoring, upgrade) is a Workstream A responsibility; the Knative broker is observed via the standard observability stack (architecture-overview.md §6.5, broker arrival and dispatch metrics).
+- Environment-specific event sources (ADR 0023) feed this single broker, preserving uniform downstream behavior across environments; the Mattermost integration (ADR 0036) is the first non-trivial cross-broker consumer to validate this.
 - If event volumes ever outgrow NATS JetStream, the Knative abstraction lets us swap the backend without rewriting triggers or adapters; this is captured as a future evolution path rather than a current concern.
 
 ## References
 
 - architecture-overview.md §6.7, §5, §14.1
 - architecture-backlog.md § 2.7, 2.8
-- ADR 0023 (environment-specific Knative sources), ADR 0031 (CloudEvent taxonomy)
+- ADR 0023 (environment-specific Knative sources), ADR 0031 (CloudEvent taxonomy), ADR 0036 (Mattermost integration via Knative Eventing)

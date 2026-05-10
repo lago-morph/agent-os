@@ -27,5 +27,5 @@ The platform adopts **ARK** as the agent operator (component **A5**, architectur
 
 ## References
 
-- architecture-overview.md §5, §6.2, §6.12, §6.13, §9, §14.1
-- architecture-backlog.md § 2.1
+- [architecture-overview.md](../architecture-overview.md) [§5](../architecture-overview.md#5-software-added-to-baseline), [§6.2](../architecture-overview.md#62-agent-runtime-architecture), [§6.12](../architecture-overview.md#612-crd-inventory), [§6.13](../architecture-overview.md#613-versioning-policy), [§9](../architecture-overview.md#9-oss-limitations-and-required-custom-development), [§14.1](../architecture-overview.md#141-workstream-a--platform-installation-and-operations)
+- [architecture-backlog.md § 2.1](../architecture-backlog.md#21-agent-operator-kagent-vs-ark)

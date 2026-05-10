@@ -18,7 +18,8 @@ Tenancy is a Kubernetes namespace: a tenant maps to one or more namespaces, and 
 - Cross-tenant resource sharing (e.g., a `CapabilitySet` defined in one namespace and referenced from another) is allowed only when explicitly published with an OPA-checked policy; the default for every resource is namespace-private.
 - The four enforcement layers are independent: a misconfiguration in one (e.g., an over-broad RBAC grant) is still bounded by the others (Gatekeeper admission, OPA gateway decision, network policy). This composes with the platform-wide RBAC-as-floor / OPA-as-restrictor model — see ADR 0018.
 - Headlamp provides an admin override path (force-register / force-deregister), which is itself OPA-gated and audit-emitting; tenant administrators do not gain implicit cross-tenant powers.
-- Sub-decisions are deferred per architecture-backlog.md § 1.2: tenant onboarding flow (who creates a tenant, what gets provisioned), tenant-scoped resource quotas (agents, sandboxes, virtual keys, cost, rate-limit) and their defaults, concrete cross-tenant collaboration patterns when explicitly published, and the concrete `platform_roles` catalog.
+- Tenant onboarding is performed via a `TenantOnboarding` XRD reconciled through the Headlamp graphical editors (ADR 0039) with Git/ArgoCD as the system of record. The XRD provisions the namespace, default ServiceAccounts, and the JWT-claim-to-tenant mapping consumed by OPA and LiteLLM. See ADR 0037 for the onboarding flow. CapabilitySets are kept deliberately separate from the onboarding XRD: the Headlamp plugin recommends seeding at least one CapabilitySet during onboarding as a UX hint, but there is no code-level coupling, so a tenant can exist without a CapabilitySet and CapabilitySets can be authored, versioned, and shared independently.
+- Sub-decisions previously deferred per architecture-backlog.md § 1.2 are now partially resolved: the **tenant onboarding flow** and **what gets provisioned by default** are decided by ADR 0037. The remaining items — **tenant-scoped resource quotas** (agents, sandboxes, virtual keys, cost, rate-limit) and their customization, and the concrete **`platform_roles` catalog** — remain design-time. Cross-tenant collaboration patterns when explicitly published also remain design-time.
 - Multi-cluster federation is explicitly out of scope (ADR 0026); each cluster install carries its own tenant set.
 
 ## References
@@ -26,3 +27,4 @@ Tenancy is a Kubernetes namespace: a tenant maps to one or more namespaces, and 
 - architecture-overview.md § 6.9
 - architecture-backlog.md § 1.2, § 6
 - ADR 0018 (RBAC-floor / OPA-restrictor), ADR 0028 (identity federation), ADR 0029 (Keycloak JWT claim schema)
+- ADR 0037 (tenant onboarding flow via `TenantOnboarding` XRD), ADR 0039 (Headlamp graphical editors for platform CRDs)

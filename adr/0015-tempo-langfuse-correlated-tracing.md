@@ -56,9 +56,23 @@ toolset.
 - Any component that originates a request without a `trace_id` breaks the
   correlation; SDK defaults must generate one at request entry and propagate
   it through A2A, MCP, and gateway hops.
+- **Trace granularity in both Tempo and Langfuse is gated by the dynamic
+  log/trace toggle from ADR 0035**, so HolmesGPT (and platform admins via
+  Headlamp) can raise verbosity on a specific component for diagnostics and
+  lower it back afterwards. v1.0 explicitly does **not** run always-on tracing
+  with sample-and-drop — span creation is conditional on the live config, so
+  off-mode has no performance cost and Tempo/Langfuse cost scales with
+  verbosity rather than with traffic.
+- **Non-unit test runs publish run metrics and logs via OpenTelemetry** along
+  the Tempo/Mimir/Loki path (per ADR 0011), and any traces those runs emit
+  flow through the same Tempo/Langfuse correlation described above — test
+  diagnostics share the platform's observability surfaces rather than running
+  on a parallel pipeline.
 
 ## References
 
 - architecture-overview.md § 6.5
 - architecture-backlog.md § 2.4
+- ADR 0011 (three-layer testing — non-unit runs publish via OTel)
 - ADR 0012 (HolmesGPT)
+- ADR 0035 (dynamic log/trace toggle — gates trace granularity)

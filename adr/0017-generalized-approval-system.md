@@ -24,6 +24,8 @@ The platform ships one approval mechanism with four parts. (1) An `Approval` CRD
 - Creates ongoing reuse pressure: any future approval surface (capability registration, budget exceptions, dynamic MCP registration, virtual key issuance overrides) must justify why it would not flow through this mechanism. The default is "use the `Approval` CRD."
 - Decisions emit a CloudEvent on the `platform.approval.*` taxonomy back to the requesting agent and an audit-index entry, so approval traceability is uniform regardless of action type.
 - Depends on Argo Workflows (ADR 0003-equivalent install — see §A3 in architecture-overview.md) and OPA (ADR 0002); couples the OPA policy library (B16) to a new policy surface (`approval.elevation`).
+- The HolmesGPT three-state permission model (ADR 0012) has an "upon-approval" state whose entire mechanic is creating an `Approval` CRD here — a third concrete consumer alongside Coach skill changes and HolmesGPT remediation, reinforcing the "use one mechanism" invariant.
+- Admins can preview the approval impact of an OPA policy change before submitting it via the Headlamp policy simulator (ADR 0038), which dry-runs `approval.elevation` rules against recent and synthetic `Approval` requests.
 
 ## References
 
@@ -31,3 +33,5 @@ The platform ships one approval mechanism with four parts. (1) An `Approval` CRD
 - architecture-backlog.md § 1.5, 2.18, 2.22, 3.3, 6
 - future-enhancements.md § 4 (M-of-N approvers)
 - ADR 0018 (RBAC-floor / OPA-restrictor)
+- ADR 0012 (HolmesGPT three-state permission model — "upon-approval" consumer)
+- ADR 0038 (Headlamp OPA policy simulator)

@@ -63,10 +63,32 @@ resolution semantics are deferred to ADR 0032 and design specs.
 - **Versioning and ownership.** Capability CRDs follow the platform's
   CRD/API versioning policy (ADR 0030) and are owned by the kopf
   operator component (B13) for reconciliation lifecycle.
+- **Capability-change notification model.** When an Agent definition or
+  any referenced CapabilitySet changes (overlay rules per ADR 0032),
+  enforcement points update immediately, but running agents may already
+  be in a turn that assumed prior permissions. The platform handles this
+  with two mechanisms working together:
+  - *CloudEvent fanout (primary):* kopf reconciliation emits a
+    `platform.capability.changed` CloudEvent (under the existing
+    taxonomy in ADR 0031) carrying the affected Agent / CapabilitySet
+    identifiers. The platform SDK (ADR 0019) subscribes and surfaces a
+    callback / interrupt / next-turn notification to the agent code.
+  - *Poll fallback (always available):* the SDK exposes a
+    `refresh_capabilities()` API for runtimes that can't subscribe to
+    CloudEvents. Worst-case staleness is one turn.
+
+  This is **best-effort**, not a hard correctness guarantee —
+  enforcement still happens at LiteLLM / OPA / Envoy regardless. The
+  point is to avoid the agent thinking it has access to something,
+  then trying to use it, and getting denied with a confusing error.
 
 ## References
 
 - architecture-overview.md § 6.8
 - architecture-backlog.md § 1.1, 6
+- ADR 0019 (platform SDK is the agent-facing surface for capability
+  notifications)
+- ADR 0031 (CloudEvent taxonomy carrying `platform.capability.changed`)
 - ADR 0032 (CapabilitySet overlay semantics)
 - ADR 0018 (RBAC-floor / OPA-restrictor)
+- ADR 0039 (Headlamp surfaces the resolved capability set live)

@@ -11,6 +11,8 @@ LiteLLM is the single gateway for every LLM, MCP, and A2A call (architecture-ove
 
 The platform implements a **custom Python kopf operator** (component **B13**, architecture-overview.md §5, §6.8) that reconciles the LiteLLM-facing CRDs above into LiteLLM's admin API and into OPA data where applicable (§6.6). Kopf is used for application-API reconciliation against LiteLLM; **Crossplane v2 remains the controller for cloud-shaped resources** (component B4) — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, and `GrafanaDashboard` XRs (§6.12, §11). The split is the platform-wide invariant: every controller is either Crossplane (cloud-shaped) or kopf (app-API), with no bespoke controller frameworks (architecture-backlog.md § 6).
 
+The kopf operator is packaged as a **subchart of the LiteLLM Helm chart**, so a single ArgoCD-applied chart deploys both, the operator's lifecycle is bound to LiteLLM, and version pinning is automatic. Crossplane is deliberately not used for this packaging: Crossplane's value is composing cloud-shaped resources, not packaging a Kubernetes Deployment for an in-cluster reconciler.
+
 ## Alternatives considered
 
 - **Go Crossplane provider for LiteLLM** — Rejected: the team has no Go experience; a kopf operator achieves the same reconciliation outcome and keeps Python as the platform's default language (architecture-backlog.md § 2.5). The trade-off is losing Crossplane's connection-secret handling, package model, and Composition integration for the LiteLLM-specific surface; these losses are bounded to the LiteLLM-facing CRDs and do not affect the Crossplane track.
@@ -24,6 +26,7 @@ The platform implements a **custom Python kopf operator** (component **B13**, ar
 - Crossplane v2 (B4) remains authoritative for cloud-shaped XRs — `AgentEnvironment`, `MemoryStore`, `SyntheticMCPServer`, and `GrafanaDashboard` (architecture-overview.md §6.12, §11; ADR 0021); the kopf operator does not encroach on that surface.
 - The operator emits capability-registry reconcile events to the audit pipeline (architecture-overview.md §6.7) and exposes an HTTP admin API versioned under `/v1/...` per the API-versioning policy (§6.13).
 - The operator inherits the standard custom-component deliverables: HolmesGPT toolset, OPA contribution, audit emission, observability, Knative trigger flow, tests, and tutorial / how-to documentation (architecture-backlog.md § 6).
+- The kopf reconciler ships and upgrades together with LiteLLM as a subchart of the LiteLLM Helm chart, giving a single ArgoCD-applied release, automatic version pinning between gateway and operator, and a shared lifecycle.
 
 ## References
 
