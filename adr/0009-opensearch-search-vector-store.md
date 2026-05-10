@@ -18,6 +18,8 @@ Per ADR 0033 (dual-mode initial targets), OpenSearch runs in two shapes:
 - **Dev / integration (kind):** an in-cluster OpenSearch deployment, provisioned alongside other foundation components.
 - **AWS deployments:** the AWS-managed OpenSearch service, provisioned through Crossplane (MR/XRD) so the cluster manifests look identical to the in-cluster case from the operator's perspective.
 
+The dual-mode hosting is implemented via the **`XSearchIndex` Crossplane XRD**, with one Composition per substrate (in-cluster on kind, AWS-managed on AWS). Both Compositions write a uniform connection-secret shape (endpoint, user, password, optional TLS material), so consumers don't know which substrate is active. This follows the substrate-abstraction-via-Crossplane-Compositions pattern established in ADR 0041, and the resulting connection secret is consumed by the Kargo promotion fabric (ADR 0040) during environment promotion.
+
 Operators do not write audit events, KB indexes, or test-result documents directly into either deployment. All writes go through component adapters (the audit adapter, the RAG adapter, the test-results streamer); OpenSearch is never addressed as a primary write endpoint.
 
 ## Alternatives considered
@@ -74,3 +76,5 @@ Operators do not write audit events, KB indexes, or test-result documents direct
 - [ADR 0014](./0014-postgres-primary-opensearch-retrieval.md) (Postgres primary, OpenSearch retrieval-only) — directly related
 - [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (dual-mode initial targets) — kind + AWS-managed hosting model
 - [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (platform audit pipeline) — Postgres + S3 system of record, OpenSearch fanout
+- [ADR 0040](./0040-kargo-promotion-fabric.md) (Kargo promotion fabric) — consumer of the uniform connection-secret abstraction during environment promotion
+- [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate abstraction via Crossplane Compositions) — architectural pattern for the `XSearchIndex` XRD and per-substrate Compositions

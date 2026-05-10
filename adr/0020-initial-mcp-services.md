@@ -30,10 +30,14 @@ access gated by CapabilitySet inclusion plus OPA:
   connecting to externally operated OpenSearch instances.
 - **Postgres** — agent/tenant/user-scoped database access. Per-agent /
   per-tenant / per-user database provisioning is wrapped by a **new Crossplane
-  XRD** (working name `AgentDatabase`) that creates the database, role, and
-  grants. RBAC + OPA decide which agent gets which database.
-- **MongoDB** — same pattern as Postgres (its own XRD-fronted provisioning,
-  same RBAC/OPA gating).
+  XRD** (`XAgentDatabase`) that creates the database, role, and
+  grants. RBAC + OPA decide which agent gets which database. `XAgentDatabase`
+  is itself an instance of the substrate-abstraction pattern (ADR 0041): on
+  kind, it composes `XPostgres` (CloudNativePG); on AWS, it composes
+  `XPostgres` (RDS). The same claim shape works on every substrate.
+- **MongoDB** — same pattern as Postgres: `XAgentDatabase` composes
+  `XMongoDocStore` (Bitnami) on kind and `XMongoDocStore` (DocumentDB or
+  self-managed) on AWS, with the same RBAC/OPA gating.
 - **Web search + web scrape** — generic in-cluster MCP servers, either
   implemented by us or adopted from an existing OSS implementation. The
   endpoints themselves do **not** carry the platform's full RBAC/OPA stack
@@ -66,13 +70,19 @@ remain out of scope for this ADR and deferred per architecture-backlog.md
   platform's own OpenSearch with platform-mediated identity is a third
   distinct credential shape alongside system- and user-credential, and it
   validates the in-cluster vs AWS-managed dual-hosting story (ADR 0009,
-  ADR 0033).
+  ADR 0033). The OpenSearch MCP server's system-mediated mode reuses
+  `XSearchIndex` from the substrate-abstraction pattern (ADR 0041), so the
+  same claim shape works on every substrate.
 - **Per-agent/tenant/user database provisioning becomes a Crossplane XR.**
-  Postgres and MongoDB each get an XRD (e.g., `AgentDatabase`,
-  `AgentMongoDatabase`) that follows the platform's composition pattern from
-  ADR 0021. This is the first place the XR pattern is used to mint *runtime*
-  per-agent state rather than only infra; the precedent matters for later
-  per-agent resources.
+  Postgres and MongoDB are both fronted by the **`XAgentDatabase`** XRD,
+  which follows the platform's composition pattern from ADR 0021 and is
+  itself an instance of the substrate-abstraction pattern (ADR 0041): on
+  kind, `XAgentDatabase` composes `XPostgres` (CloudNativePG) or
+  `XMongoDocStore` (Bitnami); on AWS, it composes `XPostgres` (RDS) or
+  `XMongoDocStore` (DocumentDB or self-managed). Kargo promotes these claims
+  uniformly across substrates (ADR 0040). This is the first place the XR
+  pattern is used to mint *runtime* per-agent state rather than only infra;
+  the precedent matters for later per-agent resources.
 - **RBAC + OPA decide database assignment.** Which agent / tenant / user
   resolves to which provisioned database is gated at admission and at request
   time, not hard-coded into the MCPServer spec (ADR 0014).
@@ -111,3 +121,5 @@ remain out of scope for this ADR and deferred per architecture-backlog.md
 - [ADR 0021](./0021-grafanadashboard-xrs.md) (Crossplane XR composition pattern)
 - [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial implementation targets / dual-mode hosting)
 - [ADR 0038](./0038-policy-simulators.md) (policy simulator — used for search/scrape OPA bundle)
+- [ADR 0040](./0040-kargo-promotion-fabric.md) (Kargo promotes `XAgentDatabase` / `XSearchIndex` claims uniformly across substrates)
+- [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate-abstraction pattern — `XAgentDatabase` composes `XPostgres` / `XMongoDocStore`; OpenSearch MCP reuses `XSearchIndex`)

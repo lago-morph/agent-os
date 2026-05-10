@@ -26,6 +26,7 @@ The platform ships one approval mechanism with four parts. (1) An `Approval` CRD
 - Depends on Argo Workflows (ADR 0003-equivalent install — see §A3 in architecture-overview.md) and OPA (ADR 0002); couples the OPA policy library (B16) to a new policy surface (`approval.elevation`).
 - The HolmesGPT three-state permission model (ADR 0012) has an "upon-approval" state whose entire mechanic is creating an `Approval` CRD here — a third concrete consumer alongside Coach skill changes and HolmesGPT remediation, reinforcing the "use one mechanism" invariant.
 - Admins can preview the approval impact of an OPA policy change before submitting it via the Headlamp policy simulator (ADR 0038), which dry-runs `approval.elevation` rules against recent and synthetic `Approval` requests.
+- Composes with **Kargo (ADR 0040)** as Kargo's human gate during environment promotion: when a Kargo Stage requires human approval, Kargo creates an `Approval` CRD instance, and the existing Argo Workflow backing the `Approval` CRD reports the decision back to Kargo. The two systems compose — neither subsumes the other. This is the first external-system consumer of the generalized approval mechanism beyond the original platform-internal flows.
 
 ## References
 
@@ -36,3 +37,4 @@ The platform ships one approval mechanism with four parts. (1) An `Approval` CRD
 - [ADR 0012](./0012-holmesgpt-first-class-agent.md) (HolmesGPT three-state permission model — "upon-approval" consumer)
 - [ADR 0038](./0038-policy-simulators.md) (Headlamp OPA policy simulator)
 - [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — Postgres + S3 system of record, OpenSearch advisory fanout)
+- [ADR 0040](./0040-kargo-promotion-fabric.md) (Kargo — uses the `Approval` CRD as its human gate during environment promotion)

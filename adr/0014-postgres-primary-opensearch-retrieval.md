@@ -9,6 +9,8 @@ The platform has two stateful tiers that can both store text-shaped data: Postgr
 
 Postgres itself runs in two modes consistent with the platform's dual-mode hosting rule (ADR 0033): **in-cluster on kind** for developer laptops and integration testing, and as **AWS RDS provisioned via a Crossplane MR/XRD** on AWS deployments. Consuming components see only a Postgres connection string supplied through the standard secret/config path; the dual-mode is invisible above the connection. The system-of-record commitment in this ADR is what makes that invisibility safe: components depend on Postgres semantics, not on the hosting shape.
 
+The dual-mode hosting is implemented via the **`XPostgres` Crossplane XRD** with one Composition per substrate. The kind Composition produces a CloudNativePG `Cluster`; the AWS Composition produces a Crossplane `RDSInstance`. Both Compositions write a uniform connection-secret shape (`host`, `port`, `user`, `password`, `dbname`), so consumers bind to the same secret keys regardless of substrate. This follows the substrate abstraction pattern established in [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate abstraction via Crossplane Compositions); during environment promotion the connection-secret is consumed by [ADR 0040](./0040-kargo-promotion-fabric.md)'s Kargo promotion fabric.
+
 ## Decision
 
 The platform treats **Postgres (and, where appropriate, object storage or an external system of record) as the primary store for all stateful data**, and **OpenSearch as a retrieval-optimization layer only**. This is the architecture-backlog.md §6 invariant: *"Anything in OpenSearch must be reproducible from a primary source (Postgres, object storage, or external system."* OpenSearch is never the system of record; every index in it must have a documented rebuild path from a primary. Components that write platform state write to a primary first, and any OpenSearch index is derived from that primary either synchronously (dual-write) or by reindex.
@@ -32,3 +34,5 @@ The platform treats **Postgres (and, where appropriate, object storage or an ext
 - [ADR 0011](./0011-three-layer-testing-cli-orchestration.md) (three-layer testing — test results streamed to OpenSearch as advisory index)
 - [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial implementation targets — dual-mode hosting: kind locally, AWS RDS via Crossplane on AWS)
 - [ADR 0034](./0034-audit-pipeline-durable-adapter.md) (audit pipeline — Postgres + S3 system of record, OpenSearch advisory only)
+- [ADR 0040](./0040-kargo-promotion-fabric.md) (Kargo promotion fabric — consumer of the uniform connection-secret during environment promotion)
+- [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate abstraction via Crossplane Compositions — architectural pattern for `XPostgres` XRD with per-substrate Compositions)

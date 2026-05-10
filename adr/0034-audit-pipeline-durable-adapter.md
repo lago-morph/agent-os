@@ -31,6 +31,8 @@ A new Crossplane XRD, **`AuditLog`**, wraps the whole pipeline (consistent with 
 - The 5-minute batch CronJob (AWS only).
 - The audit endpoint Deployment.
 
+The `AuditLog` XRD is **a canonical instance of the substrate-abstraction pattern formalized in [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md)**: it composes `XPostgres` (system of record on kind and AWS) and `XObjectStore` (S3 archive on AWS; MinIO or no-op on kind), with the explicit capability-parity caveat that the kind path produces no archive — the audit pipeline degrades gracefully. **Kargo ([ADR 0040](./0040-kargo-promotion-fabric.md)) promotes the `AuditLog` claim** uniformly across substrates during environment promotion — the consumer of the substrate abstraction.
+
 The retention durations, redaction rules, and lifecycle specifics remain deferred to Workstream F under architecture-backlog.md § 1.13; this ADR fixes the topology, not the policy.
 
 ## Consequences
@@ -55,3 +57,5 @@ The retention durations, redaction rules, and lifecycle specifics remain deferre
 - [ADR 0021](./0021-grafanadashboard-xrs.md) (Crossplane-composed XR pattern, applied here as the `AuditLog` XRD)
 - [ADR 0033](./0033-initial-implementation-targets-aws-github.md) (initial implementation targets AWS + kind; dual-mode hosting rule)
 - [ADR 0035](./0035-dynamic-log-and-trace-toggle.md) (dynamic log-level toggle on the audit endpoint)
+- [ADR 0040](./0040-kargo-promotion-fabric.md) (Kargo environment promotion — promotes the `AuditLog` claim uniformly across substrates)
+- [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate-abstraction pattern — `AuditLog` is a canonical instance composing `XPostgres` and `XObjectStore`)

@@ -20,9 +20,12 @@ All dashboards — per-component, integrated, developer-facing, and any dashboar
 - Platform Agents (Coach, HolmesGPT, others) can publish dashboards declaratively as part of their Agent CRD spec or as standalone resources, without bypassing platform governance.
 - Crossplane stays scoped to cloud-shaped and composition-shaped resources; LiteLLM-specific reconciliation remains on the kopf operator path per ADR 0006. Dashboards qualify for Crossplane because they are composed declarative resources, not application-API state.
 - SLO dashboards, error-budget tracking, and operations-metrics summaries are out of scope here and deferred to future enhancements (per overview §11); when they ship, they ship as additional `GrafanaDashboard` instances under the same model.
+- The `GrafanaDashboard` XR is the earliest concrete example of the substrate-abstraction pattern formalized in ADR 0041: the same XRD shape applies on kind and AWS, with one Composition per substrate behind a uniform claim shape.
+- That uniform claim shape is what Kargo consumes during environment promotion per ADR 0040, so dashboard promotion follows the same substrate-agnostic flow as other composed resources.
 
 ## References
 
 - [architecture-overview.md](../architecture-overview.md) [§ 11](../architecture-overview.md#11-grafana-dashboards), [§ 14.4](../architecture-overview.md#144-workstream-d--dashboards)
 - [architecture-backlog.md](../architecture-backlog.md) [§ 4](../architecture-backlog.md#4-topics-that-need-further-design-before-implementation) (B4 Compositions), [§ 6](../architecture-backlog.md#6-architecture-level-invariants-worth-documenting-as-adrs)
 - [ADR 0006](./0006-python-kopf-litellm-operator.md) (kopf vs Crossplane split), [ADR 0016](./0016-multi-tenancy-via-namespaces.md) (namespace tenancy), [ADR 0018](./0018-rbac-floor-opa-restrictor.md) (RBAC-floor / OPA-restrictor)
+- [ADR 0040](./0040-kargo-promotion-fabric.md) (Kargo environment promotion), [ADR 0041](./0041-substrate-abstraction-via-crossplane-compositions.md) (substrate abstraction via Crossplane Compositions)
