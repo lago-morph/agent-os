@@ -1,6 +1,6 @@
 # Inspired by Claude Managed Agents
 
-This project was born out of a desire to clone Claude Managed Agents as an open source project.
+This project was born out of a desire to clone [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) as an open source project.
 
 # Agent Runtime Architecture
 
