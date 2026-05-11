@@ -1,3 +1,7 @@
+# Inspired by Claude Managed Agents
+
+This project was born out of a desire to clone Claude Managed Agents as an open source project.
+
 # Agent Runtime Architecture
 
 This repository defines the architecture for an **agent runtime environment** with built-in guardrails and self-improvement. It is the architecture-of-record for a platform that runs AI agents as governed, observable, policy-controlled Kubernetes workloads, with a single chokepoint for LLM, MCP, A2A, and outbound HTTP traffic, and a self-management agent (HolmesGPT) that grows with the platform.
