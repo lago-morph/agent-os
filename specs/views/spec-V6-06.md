@@ -28,7 +28,7 @@ The problem it solves: an agent platform's primary v1.0 threat is **users or Pla
 - Capability-registry CRD model / CapabilitySet layering — view V6-08 / ADR 0013 / ADR 0032.
 - Multi-tenancy / namespacing model — view V6-09 / ADR 0016.
 - Identity federation chain / JWT claim schema — view V6-11 / ADR 0028 / ADR 0029.
-- Approval-system mechanics (Approval CRD + Argo Workflow) — view (V6-12/CRD inventory) / component B19 / ADR 0017 (referenced here as an OPA decision point and audit point).
+- Approval-system mechanics (`Approval` CRD + Argo Workflow) — component B19 / ADR 0017 (referenced here only as an OPA decision point and audit point).
 - Policy-simulator service implementation — component A20 / ADR 0038 (consumed here).
 
 ## 3. Context & Dependencies
