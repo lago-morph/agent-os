@@ -25,7 +25,7 @@ A23,COMPONENT,Kargo promotion fabric,A,T1,W4,A7;B19,B5,L
 B1,COMPONENT,SSO/auth proxy layer,B,T1,W1,A1;A2;A8;A9,,M
 B2,COMPONENT,LiteLLM custom callbacks,B,T1,W1,A1;A7,,L
 B3,COMPONENT,OPA policy library (framework),B,T0,W1,A7,B16,M
-B4,COMPONENT,Crossplane v2 Compositions,B,T1,W1,,,XL
+B4,COMPONENT,Crossplane v2 Compositions,B,T0,W1,,A18;A21;A23;B19;B11,XL
 B5,COMPONENT,Cross-cutting Headlamp plugins,B,T1,W4,A23,B19,L
 B6,COMPONENT,Platform SDK (Python + TypeScript),B,T0,W2,A1;A2,B7;B10;B21,XL
 B7,COMPONENT,Initial agent SDK — LangGraph + Deep Agents,B,T0,W3,B6;A6;A5,B18;B21,L
