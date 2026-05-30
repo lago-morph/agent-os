@@ -21,7 +21,8 @@ each completed attack-mapping immediately unblocks the security review of the co
 rather than holding everything for a single big-bang release. Finally, apply the forward-feed edits
 to §6.6, the Workstream A deliverable lists, and the B16 OPA policy targets.
 
-## 2. Ordered Task List (authoring sequence)
+## 2. Ordered Task List
+> Authoring sequence — B22 is a design spec, so these produce analysis/standards documents, not code.
 - **TASK-01:** Choose the analytical structure (`[PROPOSED]` STRIDE-per-trust-boundary + attack-tree
   per attack) and the standards/enforcement-map template — produces: method + templates — depends-on: []
 - **TASK-02:** Adversary-class catalog (all §6.6 classes) — produces: adversary catalog — depends-on: [TASK-01]
@@ -68,9 +69,10 @@ to §6.6, the Workstream A deliverable lists, and the B16 OPA policy targets.
 - TASK-09 forward-feed edits can begin per-component as soon as that component's standards in TASK-07/08
   are settled (no need to wait for the full set).
 
-## 5. Publish / Conformance Map (replaces a code test strategy)
-> B22 ships no test code; instead it *defines* the mandatory tests others run and is itself verified
-> by completeness/forward-feed conformance (mapping to SPEC §9 ACs):
+## 5. Test Strategy
+> B22 ships no test code (design spec). This is a **publish / conformance map**: B22 *defines* the
+> mandatory tests other components run, and is itself verified by completeness/forward-feed
+> conformance against SPEC §9 ACs (no Chainsaw/Playwright/PyTest layer applies to B22 directly):
 - **Completeness conformance:** AC-B22-01..05 — adversary/asset/boundary/attack-catalog coverage and
   no-unmapped-attack — verified by a structured checklist against the §6.6 minimum sets.
 - **Output conformance:** AC-B22-06/07 — every standard yields a concrete AC/test/dashboard/OPA target

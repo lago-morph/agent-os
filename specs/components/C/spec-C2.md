@@ -27,7 +27,7 @@ Platform Agents query.
 - The full set of §10.1 tutorials, each learning-oriented, end-to-end, with a working result:
   - Build your first Platform Agent (declarative `Agent` CRD, deploy via ArgoCD, invoke via
     LibreChat or A2A).
-  - Build your first agent with the Platform SDK (BYO container).
+  - Build your first agent with the Python SDK (BYO container) — the Platform SDK (B6).
   - Add an MCP server through the gateway (define an `MCPServer` CR, see it appear in the registry).
   - Compose a synthetic MCP server from an OpenAPI spec (`SyntheticMCPServer`).
   - Create a `Skill`, attach it to an agent, test it.
