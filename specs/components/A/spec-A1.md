@@ -1,206 +1,230 @@
 # SPEC A1 — LiteLLM (gateway)
 
 > kind: COMPONENT · workstream: A · tier: T0
-> upstream: [] · downstream: [A16, A17, A19, A20, B1, B2, B16, B6, B9, B13, B17, B18] · adrs: [0006, 0001, 0030, 0031, 0034, 0013, 0002, 0003, 0035, 0020] · views: [6.1, 6.8]
-> canon-glossary: 6aadcc2a4f383a26 · canon-interface: 54f5ede58e5f8c05
+> upstream: [] · downstream: [A16, A17, A19, A20, B1, B2, B6, B9, B13, B16, B17, B18] · adrs: [0006, 0001] · views: [6.1, 6.8]
+> canon-glossary: b0edae10 · canon-interface: 0ce201d5
 
 ## 1. Purpose & Problem Statement
 
-LiteLLM is the single chokepoint for every LLM, MCP, and A2A call a Platform Agent makes (architecture-overview.md §6.1). Beyond LLM routing it brokers MCP tool calls, peers A2A (internal and approved external), issues virtual keys, and performs **OpenAI-compatible ↔ A2A translation** so frontends like LibreChat see Platform Agents as models. A1 is the install-+-configure-+-operate package for the gateway: the LiteLLM Helm chart (with the kopf operator as a subchart per ADR 0006), the callbacks pipeline configuration, the MCP/A2A/RAG registry wiring, and the dynamic-registration path.
+LiteLLM is the **single mandatory chokepoint** for all model, tool, and inter-agent traffic on the platform (component A1; §6.1). No Platform Agent talks to a model provider, an MCP server, or another Platform Agent directly; every such call is brokered through LiteLLM. This is the architectural property that makes governance, observability, and cost control uniform across the platform — it is the trust boundary between Platform Agents and everything external (providers, MCP servers, A2A peers) and is therefore a tier-0 availability and security concern (§6.1, lines 172–175, 211).
 
-The problem it solves is **a single governed perimeter for all model/tool/agent traffic**. Without a single chokepoint, authentication, OPA policy, audit emission, PII scrubbing, and Langfuse tracing would have to be re-implemented at every call site. By forcing all such traffic through LiteLLM's callbacks pipeline, the platform gets one place to enforce policy and emit audit, and capability composition becomes declarative (CRDs → kopf → LiteLLM registry) rather than gateway-internal config.
+The problem A1 solves is *uniform external enforcement of every agent egress*: model routing/failover, virtual-key issuance scoped to a CapabilitySet + identity, MCP server brokering (tool calls proxied and policy-checked), A2A brokering (inter-agent calls), skill-gateway management, and emission of callbacks/hooks that feed audit, observability, and policy. OpenAI-compatible HTTP requests are translated to A2A at the gateway so agents written against the OpenAI API can call peers natively (§6.1, lines 174, 188). The gateway is **never hand-configured**: capability state is reconciled into it by the kopf operator (B13) from CRDs (ADR 0006; §6.8), and request-time behaviour is governed by B2 callbacks + OPA.
 
-A1 is **T0, contract-owning, highest blast radius** — almost every other component depends on it: the agent runtime (A6), MCP services (A17), Mattermost (A19), the policy simulator (A20), the kopf operator (B13), the SDK (B6), the CLI (B9), and the agent profile/composition libraries (B17/B18).
+A1 is the install + configure + operate package for upstream LiteLLM: it pins a tested version (Helm), **packages the B13 kopf operator as a subchart of the LiteLLM Helm chart so gateway and operator ship as a single ArgoCD release with no version skew (ADR 0006; §6.1 line 245)**, exposes the admin/virtual-key surface that B13 is the sole writer of, ships the callback/hook registration surface that B2 fills, provisions backing Postgres via the `XPostgres` substrate XRD, and delivers the standard Workstream A deliverables (§6.1; §14.1). A1 ships the hook *registration*; B2 ships the *handlers* — the split is deliberate so the gateway install and the policy/audit logic version independently. Config changes take effect via a **Reloader-triggered rolling restart against a `replicas >= 2` Deployment — LiteLLM has no in-process reload (ADR 0035; §6.1 line 214)**.
 
 ## 2. Scope
 
 ### 2.1 In scope
 
-- LiteLLM proxy install via Helm with `replicas >= 2` Deployment.
-- The **callbacks pipeline** configuration (hook chain at `pre-call`, `post-call`, `success`, `failure`) and registration of the platform callback classes.
-- **OpenAI-compatible ↔ A2A translation** so Platform Agents appear as models; stream-chunk preservation end-to-end.
-- The **A2A endpoint** (internal calls + outbound to approved external `A2APeer`s).
-- The **MCP gateway** (tool namespacing, OAuth flows) consuming the `MCPServer` registry.
-- The **MCP/A2A/RAG registry** populated by B13 from CRDs.
-- **Virtual key auth + Keycloak claims** verification on inbound requests (Platform JWT claim schema).
-- **Dynamic agent registration** of A2A/MCP interfaces at agent startup, OPA-gated.
-- **LLM provider failover** behavior (single/multiple provider rules per §6.1).
-- **MCP server health** signal surfacing (metrics, audit, traces) to the extent MCP exposes it.
-- ConfigMap-driven config with **Reloader-triggered rolling restart** per ADR 0035 (no in-process reload).
-- Helm packaging of B13 kopf operator as a **subchart** (ADR 0006).
-- Emission of `platform.gateway.*` and `platform.audit.*` CloudEvents and audit via the audit adapter (ADR 0034).
-- The §14.1 standard deliverable set (docs, runbook, alerts, dashboard, Headlamp plugin integration, OPA integration, audit, Knative trigger flow, HolmesGPT toolset, 3-layer tests, tutorials).
+- LiteLLM install (Helm values / manifests in Git) pinned to a tested upstream version; non-secret config GitOps-managed, secret material via ESO (§6.1, lines 207, 222).
+- The five logical gateway surfaces (§6.1, line 178): OpenAI-compatible completion/chat API; MCP brokering surface; A2A brokering surface; skill-gateway admin surface; virtual-key admin API (consumed only by B13).
+- OpenAI-compatible → A2A translation at the gateway, so an agent written against the OpenAI API can call an internal Platform Agent or an approved external `A2APeer` transparently (§6.1, line 188).
+- MCP brokering: proxying tool calls to approved `MCPServer`s, applying the pre-call OPA decision, recording the call, and forwarding using system or per-user credentials per `MCPServer.authMode` (§6.1, line 186).
+- A2A brokering: internal and approved-external inter-agent calls, honoring `A2APeer.direction` (internal/external) and `A2APeer.auth` (§6.1, line 188).
+- Model routing/failover via LiteLLM's native router with the source-stated four-case behaviour (§6.1, lines 224–231): one provider available → use it; one provider unavailable → error; multiple all unavailable → error; multiple with ≥1 available → silent failover to the next-priority working provider. A model alias (`Agent.modelRef`) maps to one or more provider deployments; provider credentials are platform-managed secrets never exposed to agents (§6.1, line 184). Admission rejects a resolved CapabilitySet declaring zero LLM providers (§6.1 line 224).
+- The B13 kopf operator packaged as a **subchart** of the LiteLLM Helm chart (single ArgoCD release, lifecycle bound to LiteLLM, automatic version pinning; ADR 0006; §6.1 line 245).
+- Config delivered via ConfigMap with **Reloader-triggered graceful rolling restart** (no in-process reload; ADR 0035; §6.1 line 214) against the `replicas >= 2` Deployment.
+- PII scrubbing (Presidio) and Langfuse instrumentation as callback-pipeline stages — registration here, handler logic in B2 (§6.1 line 214).
+- A **dry-run decision surface** on the OPA callback for the policy simulator (A20): same decision shape with `simulated: true` and no enforcement-path side effects (§6.6 simulator; ADR 0038).
+- Brokering the ADR 0020 v1.0 MCP service set (GitHub, Google Drive, Context7, OpenSearch, Postgres, MongoDB, web-search, web-scrape) as registered `MCPServer`s (§6.1 lines 233–243).
+- Virtual-key enforcement: the gateway enforces the key (bound to identity from the Platform JWT, a `CapabilitySet`, a `BudgetPolicy`, with `allowedModels`/`ttl` constraints); **B13 is the only writer** of key state via the admin API (§6.1, line 182; ADR 0006).
+- The skill gateway managing `Skill` artifacts referenced by CapabilitySets (§6.1, line 178).
+- Callback/hook **registration** at the three defined points — pre-call (authn/authz, budget check, OPA decision), post-call (audit emission, trace recording, cost accounting), on-failure (provider failover, error audit) — as the B2 integration surface (§6.1, line 180).
+- Two-layered budget enforcement: LiteLLM per-key/per-model spend tracking integrated with `BudgetPolicy` CRDs; threshold crossings emit `platform.observability.*` and, per `thresholdActions`, may block or require approval (§6.1, line 190).
+- Dynamic-registration enforcement point: when an `Agent` declaring `exposes` (A2A/MCP surfaces) is admitted, registering those surfaces with the gateway is OPA-gated and emits `platform.policy.*` (§6.1, line 192).
+- Emission of `platform.gateway.*` events (routing decisions, provider failover, MCP health changes, A2A handoffs); audit via the audit adapter under `platform.audit.*`; budget/threshold under `platform.observability.*`; dynamic-registration accept/deny under `platform.policy.*` (§6.1, line 194).
+- Three observability planes wired from the gateway: audit (compliance, via A18 adapter), OTel traces (Tempo), LLM-traces/generations (Langfuse) — correlated by `trace_id` (ADR 0015; §6.1, lines 205, 209).
+- Backing Postgres (key/spend/config state) provisioned via the `XPostgres` substrate XRD; gateway code identical on kind vs AWS (§6.1, lines 196, 198).
+- HA posture: stateless-per-request, horizontally scalable, PodDisruptionBudgets, readiness gated on backing store; fail-closed governance behaviour (§6.1, lines 196, 201).
+- HolmesGPT gateway toolset (routing, redacted key state, provider health, budget posture) (§6.1, line 205).
+- Standard Workstream A deliverables: per-product docs, operator runbook, alerts, `GrafanaDashboard` XR, Headlamp plugin, OPA/Rego integration surface, three-layer tests, tutorials & how-tos (§14.1).
 
 ### 2.2 Out of scope (and where it lives instead)
 
-- **Callback implementations** (PII/Presidio, OPA bridge, audit, guardrails) — owned by **B2** (LiteLLM custom callbacks); A1 ships the pipeline + registration surface and the *mandatory* audit + OPA-bridge callbacks ride here only if A1 lands first (ADR 0002, §14.2 B2 note). A1 defines the registration contract; B2 supplies logic.
-- **CRD reconciliation into LiteLLM** (`MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, `BudgetPolicy`) — owned by **B13** (kopf operator), packaged as A1's subchart.
-- **OPA engine + Rego bundles** — **A7** (engine), **B3/B16** (policy content).
-- **The audit endpoint + audit adapter library** — **A18** (A1 *links* the adapter, does not implement it).
-- **Langfuse** install — **A2**.
-- **Envoy egress** (non-LiteLLM HTTP) — **A6**.
-- **OpenAI ↔ A2A adapter if LiteLLM OSS lacks translation** — fallback lives in **A8** (LibreChat) per §14.1 A8 note.
-- **CapabilitySet overlay resolution semantics** — ADR 0032 + B13 design.
-- **CloudEvent per-event-type schemas** — B12 registry.
+- Reconciling capability CRDs (`MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, `BudgetPolicy`) into gateway admin state — **B13** kopf operator (ADR 0006/0013). A1 ships the admin API and *packages* B13 as a subchart; B13 owns the reconciliation logic and is the only writer.
+- The OpenAI-compat ↔ A2A translation adapter **if upstream LiteLLM OSS does not ship it** — fallback lands in **A8** (LibreChat), not forked into A1 (§14.1 A8 note). A1 assumes the upstream translation surface and surfaces the gap as a risk (R-A1-9).
+- The callback **handler logic** (OPA decision execution, audit-event construction, trace recording) — **B2** (LiteLLM custom callbacks). A1 ships only the hook registration points.
+- OPA policy **content** / Rego (including break-glass / fail-open exceptions) — **B3** (framework) / **B16** (initial content). A1 calls the decision point; it does not author policy.
+- The audit endpoint + audit adapter library implementation — **A18** (ADR 0034). A1 links against the adapter; it never writes audit records directly to Postgres/S3/OpenSearch.
+- The Knative broker, Triggers, and event delivery — **A4**; the per-event-type schemas — **B12**. A1 emits CloudEvents; it does not own the mesh or the schema registry.
+- The `XPostgres` substrate XRD + Compositions — **B4** (ADR 0041). A1 *consumes* a claim; it does not author the Composition.
+- Identity/JWT issuance (Keycloak) and the SSO proxy in front of UIs — **Keycloak** (ADR 0028/0029) / **B1**. A1 consumes the Platform JWT claims; it does not issue them.
+- Egress proxying for non-gateway traffic — **A6** Envoy egress proxy. A1 governs model/tool/A2A egress only.
+- Initial MCP services themselves (GitHub, Drive, Context7, etc.) — **A17** (ADR 0020). A1 brokers to them once B13 registers them.
+- Letta memory / RAG backends — **A10** / **A11**. A1 brokers RAG capability references; it does not own the stores.
+- ESO install — **A17/A15** context; A1 consumes secrets ESO syncs.
 
 ## 3. Context & Dependencies
 
-**Upstream consumed:** None (W0 foundation; no internal deps). LiteLLM is an OSS product installed onto the k8-platform baseline.
+**Upstream pieces consumed (HARD):** None in the wave sense — A1 is W0 foundation (`piece-index.csv`: empty upstream; waves.md W0). At install it consumes an `XPostgres` claim for its backing store, but B4 (Crossplane Compositions) is W1; per the platform's phased posture A1 bootstraps against a directly-provisioned Postgres on kind and is rewired onto the `XPostgres` claim as B4 lands (see §7 bootstrap tolerance; §6.1 line 196).
 
-**Downstream consumers (what they consume):**
-- A16 Interactive Access Agent, A17 MCP services, A19 Mattermost, B17/B18 agents — the gateway call path (LLM/MCP/A2A) + virtual keys.
-- A20 policy simulator — the LiteLLM OPA-callback **dry-run** decision surface.
-- B1 oauth2-proxy — fronts LiteLLM for SSO.
-- B2 callbacks — register into A1's callbacks pipeline.
-- B6 Platform SDK — terminates `memory.*`, `rag.*`, model invocation, A2A registration helpers at LiteLLM.
-- B9 CLI, B13 kopf operator — admin API.
+**Upstream pieces consumed (continuous / non-blocking):** B14 test framework, B22 threat-model standards (waves.md fan-out edges); A13 (Tempo + Mimir) and A2 (Langfuse) as trace/metric destinations; A18 audit adapter library (links against as available — durable-buffering bootstrap path, ADR 0034); A7 (OPA/Gatekeeper) for the pre-call decision point (fails closed if unreachable).
+
+**Downstream consumers (`piece-index.csv`):** A16 (Interactive Access Agent calls models/peers through A1), A17 (initial MCP services brokered by A1), A19 (Mattermost adapter), A20 (policy simulator exercises gateway decisions), B1 (SSO/auth proxy fronting A1's surfaces), B2 (callbacks register into A1's hooks), B6 (Platform SDK targets the gateway API), B9 (`agent-platform` CLI drives gateway/key state via CRDs), B13 (kopf operator writes A1's admin API), B16 (OPA content targets gateway decisions), B17/B18 (agent profiles/compositions reference `modelRef` and capabilities resolved at A1).
 
 **ADR decisions honored:**
-- **ADR 0006** — kopf operator ships as a **subchart of the LiteLLM Helm chart**; single ArgoCD release; no gateway/operator version skew. The gateway exposes an HTTP admin API versioned `/v1/...` (§6.13).
-- **ADR 0001** — ARK is the agent operator; agents reach LiteLLM through the SDK call path; this constrains A1 to present the OpenAI-compat ↔ A2A surface ARK-run agents expect.
-- **ADR 0031** — every CloudEvent A1 emits falls under exactly one of the ten top-level namespaces (`platform.gateway.*` for routing/failover/MCP-health/A2A-handoffs; `platform.audit.*` for audit; `platform.observability.*` for budget-exceeded).
-- **ADR 0034** — audit emission is **only** via the platform audit adapter to the audit endpoint; A1 **never** writes audit directly to Postgres/S3/OpenSearch.
-- **ADR 0013** — capability registry shape; capability changes emit `platform.capability.changed` (emitted by B13, not A1).
-- **ADR 0002 / 0018** — OPA callbacks are restrictors over an RBAC-bounded identity (RBAC-as-floor / OPA-as-restrictor); budgets enforced through OPA, not LiteLLM admin UI.
-- **ADR 0003** — non-LiteLLM HTTP goes through Envoy, not LiteLLM (perimeter invariant).
-- **ADR 0035** — config reload = rolling restart via Reloader (no in-process reload).
-- **ADR 0030** — CRD/CloudEvent/HTTP-API versioning policy.
-- **ADR 0020** — the v1.0 initial MCP service set brokered by LiteLLM.
+
+- **ADR 0006** — LiteLLM has no native CRD interface; B13 (kopf) is the **only writer** of LiteLLM admin-API state; A1 ships the admin API + virtual-key surface and versions that contract with B13 via URL-path `/v1` (interface-contract §3.3). A1 is never hand-configured.
+- **ADR 0001** — LiteLLM is one of the external enforcement perimeters (with OPA, Envoy) for the ARK-run agent model; the gateway is THE chokepoint while ARK does not enforce egress/policy itself.
+- **ADR 0013** (capability model, via §6.8) — capabilities are CRDs reconciled into the gateway; unapproved capabilities are unreachable; the gateway/OPA consume `visibility`/`scopes`/`tags` on capability CRDs for per-call decisions.
+- **ADR 0031 / §6.7** — the gateway emits only under the closed ten-namespace CloudEvent taxonomy (`platform.gateway.*`, `platform.audit.*`, `platform.observability.*`, `platform.policy.*`); per-event-type names are deferred to B12.
+- **ADR 0034** — audit is durable-async via the adapter (A18), never direct-write; policy is synchronous-blocking — this asymmetry is deliberate (§6.1 line 203).
+- **ADR 0015** — gateway OTel traces (Tempo) and LLM-traces (Langfuse) correlate by `trace_id`; three distinct observability planes (§6.1 line 209).
+- **ADR 0041** — backing Postgres via `XPostgres`; gateway code identical across kind/AWS substrate.
+- **ADR 0030 / §6.13** — per-component versioning; A1 owns the version of its admin/OpenAI/MCP/A2A/skill HTTP surfaces (URL-path `/v1`, interface-contract §3.3); it owns no platform CRD reconciler (B13 owns the capability CRDs).
 
 ## 4. Interfaces & Contracts
 
+Use ONLY Canon names. Anything not in Canon is tagged `[PROPOSED — not in source]`.
+
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 
-A1 does **not own** any CRD reconciler (B13 owns the LiteLLM-facing CRDs). A1 **consumes** the registry these CRDs produce. Owned-by-B13 CRDs A1 reads via the registry (versioned `v1alpha1` → `v1beta1` → `v1` per ADR 0030, owner B13):
+A1 **owns no CRD reconciler**. The capability CRDs that govern gateway state are reconciled by **B13** (interface-contract §1.4; ADR 0006). A1 *consumes* their reconciled effect and *enforces* it. The CRDs whose effect lands in the gateway (source-stated fields only):
 
-| CRD | Scope | Fields A1 relies on (source-stated) |
+| CRD | Owner (reconciler) | Source-stated fields A1 enforces |
 |---|---|---|
-| `MCPServer` | namespaced | `endpoint`, `authMode` (system/user-cred), `credentialsRef`, `tags`, `scopes`, `visibility` |
-| `A2APeer` | namespaced | `endpoint`, `direction` (internal/external), `auth`, `tags` |
-| `RAGStore` | namespaced | `backend`, `indexes[]`, `contentSourceRefs[]`, `ingestionPipelineRef` |
-| `Skill` | namespaced | `gitRef`, `versionPin`, `schemaRef` (served via LiteLLM's skill gateway) |
-| `VirtualKey` | namespaced | `ownerIdentity`, `capabilitySetRef`, `budgetRef`, `environment`, `allowedModels[]`, `ttl` |
-| `BudgetPolicy` | namespaced | `scope`, `period`, `limits`, `thresholdActions[]` (consumed by OPA + LiteLLM) |
-| `CapabilitySet` | namespaced | `mcpServers[]`, `a2aPeers[]`, `ragStores[]`, `egressTargets[]`, `skills[]`, `llmProviders[]`, `opaPolicyRefs[]` |
-| `Agent` (ARK, A5) | namespaced | `exposes` (A2A/MCP) drives dynamic-registration intent; `modelRef`, `capabilitySetRefs[]` |
+| `MCPServer` | B13 | `endpoint`, `authMode` (system/user-cred), `credentialsRef`, `tags`, `scopes`, `visibility` |
+| `A2APeer` | B13 | `endpoint`, `direction` (internal/external), `auth`, `tags` |
+| `RAGStore` | B13 | `backend`, `indexes[]`, `contentSourceRefs[]`, `ingestionPipelineRef` |
+| `EgressTarget` | B13 | `fqdn`, `port`, `scheme`, `allowedMethods` (egress-target enforcement is shared with A6 Envoy) |
+| `Skill` | B13 | `gitRef`, `versionPin`, `schemaRef` (managed via the gateway's skill gateway) |
+| `CapabilitySet` | B13 | `mcpServers[]`, `a2aPeers[]`, `ragStores[]`, `egressTargets[]`, `skills[]`, `llmProviders[]`, `opaPolicyRefs[]` |
+| `VirtualKey` | B13 | `ownerIdentity`, `capabilitySetRef`, `budgetRef`, `environment`, `allowedModels[]`, `ttl` |
+| `BudgetPolicy` | B13 | `scope` (key/agent/team/tenant), `period`, `limits`, `thresholdActions[]` |
 
-CRDs owned/reconciled here: **N/A — A1 owns no reconciler; B13 (subchart) reconciles all LiteLLM-facing CRDs (ADR 0006).**
+- Substrate XRD consumed: **`XPostgres`** (XRD) — `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass` (interface-contract §1.6; ADR 0041). A1 consumes the resulting connection secret (`host`, `port`, `user`, `password`, `dbname`).
+- A1 produces **no** XRD/Composition.
+- `[PROPOSED — not in source]` LiteLLM's *internal* admin-API object shapes (key records, model-deployment config) are upstream-LiteLLM data structures, not Canon CRD fields; A1 reuses upstream shapes and exposes them only to B13.
 
 ### 4.2 APIs / SDK surfaces
 
-- **OpenAI-compatible HTTP API** (inbound) — LiteLLM's OSS surface; Platform Agents and frontends call it; translated to A2A where the target is a Platform Agent. Stream chunks preserved.
-- **A2A endpoint** — internal + outbound-to-approved-external. External orgs do **not** self-register (§6.1).
-- **MCP gateway** — tool namespacing + OAuth flows against the `MCPServer` registry.
-- **LiteLLM admin API** — `/v1/...` URL-path versioned (§6.13); driven by B13, not by hand.
-- **Callbacks pipeline** — Python hook chain firing at `pre-call`, `post-call`, `success`, `failure`; each hook is a registered class. Registration contract owned here; logic in B2. `[PROPOSED — not in source]` the exact class registration signature / ConfigMap key names beyond "configured in the LiteLLM ConfigMap" (§6.1).
-- **Dry-run surface for the policy simulator (A20)** — the LiteLLM OPA callback exposes a structured dry-run input and emits the same decision shape with `simulated: true`, with no enforcement-path side effects (§6.6, ADR 0038). `[PROPOSED — not in source]` exact dry-run request/response field names (A20/ADR 0038 own the composition; A1 owns the per-layer shape — to reconcile with A20).
+The five logical surfaces (§6.1 line 178), all URL-path versioned `/v1/...` (interface-contract §3.3):
+
+1. **OpenAI-compatible completion/chat API** — what agents call; translated to A2A/MCP as needed.
+2. **MCP brokering surface** — proxied, OPA-gated tool calls to `MCPServer`s.
+3. **A2A brokering surface** — internal + approved-external inter-agent calls; OpenAI→A2A translation.
+4. **Skill-gateway admin surface** — manages `Skill` artifacts.
+5. **Virtual-key admin API** — the B13-only writer surface (issue/revoke/update keys, register MCP servers/peers, model deployments).
+
+- **Callback/hook registration** at pre-call / post-call / on-failure — the B2 handler integration surface (§6.1 line 180). A1 defines the points and their invocation contract; B2 provides handlers. `[PROPOSED — not in source]` exact callback function signatures are not in Canon; they follow upstream LiteLLM's callback interface and are versioned with B2 (do not coin new names here).
+- Platform SDK (B6) targets the OpenAI-compatible API; B6 ships a version-pinned compatibility matrix against the gateway version (interface-contract §3.1).
+- Metrics surface: Prometheus metrics scraped into Mimir; OTel traces to Tempo; LLM-traces/generations to Langfuse (§6.1 lines 205, 220).
 
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
 
-Emitted (each under exactly one closed namespace; **per-event-type names deferred to B12 registry**):
-- `platform.gateway.*` — routing decisions, **provider failover**, **MCP health changes**, **A2A handoffs**.
-- `platform.audit.*` — every request/response incl. MCP calls and A2A handoffs (via audit adapter, ADR 0034).
-- `platform.observability.*` — **budget-exceeded** notification (the v1.0 budget-exceeded → email trigger flow, §6.7).
-- `platform.policy.*` — OPA decision/violation events surfaced from the callback path (decision authored by OPA; A1 is the emit point at the gateway). `[PROPOSED — not in source]` exact event-type names — B12.
-
-Consumed:
-- `platform.capability.changed` (ADR 0013) — emitted by B13; A1's registry is updated by B13 reconcile, not by A1 subscribing. (The SDK consumes the event for agent notification; A1 enforcement is request-time.)
-
-Every event carries CloudEvents `specversion` + per-event-type `schemaVersion` (ADR 0030/0031).
+- **Emitted** (each under exactly one of the closed ten namespaces; §6.1 line 194):
+  - `platform.gateway.*` — routing decisions, provider failover, MCP health changes, A2A handoffs.
+  - `platform.observability.*` — budget/threshold crossings (e.g. budget-exceeded → email user trigger flow, interface-contract §2).
+  - `platform.policy.*` — dynamic-registration accept/deny decisions.
+  - `platform.audit.*` — pure audit emissions, **via the A18 audit adapter** (not direct, not over the broker as system of record; ADR 0034).
+  - `platform.security.*` — `[PROPOSED — not in source]` repeated-authn-failure / policy-bypass-attempt signals at the gateway map to this namespace per interface-contract §2; concrete event types deferred to B12.
+- **Consumed:** A1 does not subscribe to the broker on the synchronous request path; if the broker is down, A1 buffers/drops non-critical events rather than blocking the call (§6.7 line 584). Budget/observability notifications (e.g. budget-exceeded → email) are routed downstream by Triggers (A4) to subscribers, not consumed by A1.
+- Per-event-type **names and schemas** under each namespace are **deferred to B12's schema registry**; each event carries `specversion` + `schemaVersion` (ADR 0030/0031). `[PROPOSED — not in source]` concrete gateway event-type names are not in Canon and must be registered in B12, not coined here.
 
 ### 4.4 Data schemas / connection-secret contracts
 
-- A1 holds no system-of-record state. Virtual-key and budget tracking state is LiteLLM-internal (spend tracking is built-in, §6.6); the **declarative source of truth is the CRDs** (B13), not LiteLLM's store.
-- Provider/MCP/A2A credentials arrive as Kubernetes Secrets via **ESO** (referenced by `credentialsRef` on `MCPServer`); A1 does not mint secrets.
-- Audit records are posted to the audit endpoint via the adapter library (no direct DB writes). `[PROPOSED — not in source]` LiteLLM internal Postgres usage for spend/key state is implied by "tracks spend per virtual key" but the backing store shape is not specified in source — treat as LiteLLM-internal, not a platform connection-secret contract.
+- A1's backing store (key/spend/config) is **Postgres**, provisioned via `XPostgres`; A1 consumes the uniform connection secret shape `host`, `port`, `user`, `password`, `dbname` (interface-contract §4; ADR 0041). XR status is substrate-agnostic (`ready`, `endpoint`, `version`); A1 must not depend on substrate-specific fields.
+- Provider credentials, MCP `credentialsRef` material, and `A2APeer.auth` material are platform-managed secrets delivered via ESO; never exposed to agents (§6.1 line 184; glossary ESO).
+- A1 produces **no** substrate connection secret of its own (it is a consumer).
+- `[PROPOSED — not in source]` the exact column set of LiteLLM's spend/key tables is upstream-internal, not a Canon data schema; treated as opaque backing state behind the `XPostgres` claim.
 
 ## 5. OSS-vs-Custom Decision
 
-- **Upstream project:** LiteLLM (the gateway). **Decision: config + wrap** — install OSS LiteLLM via Helm, configure the callbacks pipeline + registry, wrap with the B13 kopf operator subchart (ADR 0006). Do **not** fork.
-- **Custom code that rides here:** the callbacks pipeline registration surface; B2 supplies callback logic; B13 supplies reconciliation. The OpenAI ↔ A2A translation is expected from LiteLLM OSS; **if OSS does not ship it, the adapter is built in A8** (§14.1 A8), not forked into A1.
-- **Enterprise-feature caveat (§6.6):** basic budget tracking + per-virtual-key budgets are OSS; advanced budget features (alert routing, automated suspensions) **may be enterprise-only — to be confirmed during implementation**. If needed-and-enterprise-only, extend via callbacks. The architectural commitment is **OPA = policy layer, LiteLLM = spend-tracking layer** regardless.
-- **Version pinning** per §9 OSS-limitations mitigation; ADR 0006 binds operator/gateway versions via the subchart.
+- **Upstream project:** **LiteLLM** (the gateway), the Canon-named product (glossary). **Mode: config + wrap**, not fork.
+- Install unmodified at a pinned, tested version via Helm; non-secret config GitOps-managed; secrets via ESO (§6.1 lines 207, 222).
+- **Wrap** with platform deliverables: the B2 callback handlers (registered into A1's hook points), B13 as the sole admin-API writer (ADR 0006), audit-adapter linkage (A18), OTel/Langfuse/Mimir wiring, the `XPostgres` backing-store claim, a Headlamp plugin, and a HolmesGPT toolset.
+- **Custom built net-new is deliberately minimal** in A1: the reconciliation control loop is B13, the callback logic is B2, the policy is B3/B16 — A1 is the *install + surface-exposure + operate* package. This keeps the gateway upgradeable and the custom logic versioned separately (ADR 0006 rationale: kopf chosen for Python ecosystem alignment).
+- **Rationale:** LiteLLM is the chosen multi-provider gateway with native router, virtual keys, MCP/A2A brokering, and a callback model that exactly matches the pre/post/on-failure enforcement points the platform needs (§6.1).
+- `[PROPOSED — not in source]` exact upstream LiteLLM version/chart coordinates are not stated in Canon; selected and pinned at install time and recorded in the runbook.
 
 ## 6. Functional Requirements
 
-- **REQ-A1-01:** LiteLLM SHALL be installed via Helm as a Deployment with `replicas >= 2`.
-- **REQ-A1-02:** The kopf operator (B13) SHALL ship as a **subchart of the LiteLLM Helm chart**, deployed as a single ArgoCD release with lifecycle bound to LiteLLM (ADR 0006).
-- **REQ-A1-03:** The gateway SHALL authenticate every inbound request via virtual-key auth and verify Keycloak Platform JWT claims (`platform_tenants`, `platform_namespaces`, `platform_roles`, `tenant_roles`, `capability_set_refs`).
-- **REQ-A1-04:** The gateway SHALL provide OpenAI-compatible ↔ A2A translation so Platform Agents appear as models to OpenAI-compatible clients, preserving stream chunks end-to-end.
-- **REQ-A1-05:** The A2A endpoint SHALL accept internal Platform-Agent-to-Platform-Agent calls and outbound calls to approved external `A2APeer`s, and SHALL NOT permit external parties to self-register.
-- **REQ-A1-06:** The MCP gateway SHALL broker MCP tool calls against the `MCPServer` registry with tool namespacing and OAuth flows.
-- **REQ-A1-07:** The callbacks pipeline SHALL fire registered callback classes at `pre-call`, `post-call`, `success`, and `failure`, configured via the LiteLLM ConfigMap.
-- **REQ-A1-08:** Configuration changes SHALL take effect via a **Reloader-triggered graceful rolling restart** against the `replicas >= 2` Deployment; A1 SHALL NOT rely on in-process reload (ADR 0035).
-- **REQ-A1-09:** Platform Agents declaring `exposes` (A2A/MCP) SHALL register dynamically at startup, gated by an OPA check on whether the agent may expose that interface in its namespace; the entry SHALL be deregistered on agent termination.
-- **REQ-A1-10:** LLM provider failover SHALL behave: one-provider-available → use it; one-provider-unavailable → error; multiple-all-unavailable → error; multiple-≥1-available → silent failover to next-priority working provider.
-- **REQ-A1-11:** Admission validation SHALL reject an Agent CapabilitySet declaring zero LLM providers.
-- **REQ-A1-12:** On MCP server health degradation, the gateway SHALL emit metrics, audit events, and traces, and surface unhealthy status to the calling agent's error path; A1 SHALL NOT build a synthetic health layer beyond MCP's signals.
-- **REQ-A1-13:** Audit emission for every request/response (incl. MCP and A2A handoffs) SHALL go through the platform audit adapter to the audit endpoint; A1 SHALL NOT write audit directly to Postgres/S3/OpenSearch (ADR 0034).
-- **REQ-A1-14:** All CloudEvents A1 emits SHALL fall under exactly one of the ten top-level namespaces and carry `specversion` + `schemaVersion` (ADR 0031/0030).
-- **REQ-A1-15:** The LiteLLM OPA callback SHALL enforce budgets by consulting OPA per request (given current spend + `BudgetPolicy`), and SHALL act as a restrictor only (never grant beyond RBAC; ADR 0018).
-- **REQ-A1-16:** The gateway SHALL broker the ADR 0020 v1.0 MCP service set (GitHub, Google Drive, Context7, OpenSearch system-mediated + external-credentialed, Postgres, MongoDB, web-search, web-scrape) as registered `MCPServer`s.
-- **REQ-A1-17:** The LiteLLM OPA callback SHALL honor a structured **dry-run** input and emit the same decision shape with `simulated: true` and no enforcement-path side effects, for the policy simulator (A20/ADR 0038).
-- **REQ-A1-18:** The admin HTTP API SHALL be URL-path versioned `/v1/...` with deprecated versions reachable ≥1 platform release after replacement (§6.13).
+- REQ-A1-01: A1 installs LiteLLM via Helm values/manifests in Git at a single pinned, tested upstream version; the pin is recorded and ArgoCD-synced; no non-secret config is applied by hand.
+- REQ-A1-02: All gateway secret material (provider credentials, MCP/A2A credentials) is delivered via ESO and is never exposed to any Platform Agent or returned on any agent-facing surface.
+- REQ-A1-03: A1 exposes exactly the five logical surfaces — OpenAI-compatible API, MCP brokering, A2A brokering, skill-gateway admin, virtual-key admin — each URL-path versioned `/v1/...`.
+- REQ-A1-04: The virtual-key admin API accepts writes **only** from the B13 kopf operator identity; no other caller (including operators by hand) can mutate key/capability state; the gateway is never hand-configured.
+- REQ-A1-05: A1 enforces each `VirtualKey` by binding the Platform-JWT identity to its `capabilitySetRef`, `budgetRef`, `environment`, `allowedModels[]`, and `ttl`; a call outside `allowedModels[]` or past `ttl` is rejected.
+- REQ-A1-06: An OpenAI-compatible request targeting an internal Platform Agent or an approved external `A2APeer` is translated to an A2A invocation; `A2APeer.direction` and `A2APeer.auth` govern reachability and authentication.
+- REQ-A1-07: A tool call to an `MCPServer` is proxied through the gateway, gated by the pre-call OPA decision, recorded, and forwarded using system or per-user credentials per `MCPServer.authMode`; an unapproved (unregistered) MCP server is unreachable.
+- REQ-A1-08: Model routing maps `Agent.modelRef` to one or more provider deployments via LiteLLM's native router with failover/load-balancing; provider credentials remain platform-managed secrets.
+- REQ-A1-09: A1 registers callback/hook points at pre-call (authn/authz, budget check, OPA decision), post-call (audit emission, trace recording, cost accounting), and on-failure (provider failover, error audit); B2 handlers attach at these points.
+- REQ-A1-10: The pre-call OPA decision is **synchronous-blocking and fails closed** (deny) when OPA is unreachable, except where a documented break-glass policy (owned by B3/B16) applies.
+- REQ-A1-11: Audit emission is **durable-async via the A18 audit adapter library**; the audit path does not block the call, and A1 writes no audit record directly to Postgres/S3/OpenSearch.
+- REQ-A1-12: A1 integrates `BudgetPolicy` two-layered (LiteLLM per-key/per-model tracking + policy `scope`/`period`/`limits`/`thresholdActions[]`); a threshold crossing emits `platform.observability.*` and, per `thresholdActions`, blocks further calls or requires approval.
+- REQ-A1-13: When an `Agent` declaring `exposes` (A2A/MCP) is admitted, registration of those surfaces with the gateway is OPA-gated and emits a `platform.policy.*` accept/deny event.
+- REQ-A1-14: A1 emits `platform.gateway.*` for routing/failover/MCP-health/A2A-handoff events; every emitted CloudEvent falls under exactly one of the closed ten namespaces and carries `specversion` + `schemaVersion`; A1 introduces no new top-level namespace.
+- REQ-A1-15: A1 emits OTel traces to Tempo and LLM-traces/generations to Langfuse, both correlated by `trace_id` (three distinct observability planes), and exposes Prometheus metrics scraped into Mimir.
+- REQ-A1-16: A1's backing key/spend/config store is Postgres consumed via an `XPostgres` claim using the uniform connection-secret shape; no gateway code differs between kind and AWS substrate.
+- REQ-A1-17: A1 is stateless-per-request and horizontally scalable with PodDisruptionBudgets and readiness gated on the backing store; loss of the gateway fails closed (all agent model/tool/A2A traffic stops) by design.
+- REQ-A1-18: A1 ships a HolmesGPT gateway toolset exposing routing state, redacted key state, provider health, and budget posture.
+- REQ-A1-19: A1 owns the versioning lifecycle of its `/v1` HTTP surfaces (URL-path versioning; deprecated versions reachable ≥1 platform release after replacement) per interface-contract §3.3 / ADR 0030.
+- REQ-A1-20: A1 delivers per-product docs, an operator runbook, component-failure alert rules, a `GrafanaDashboard` Crossplane XR, a Headlamp plugin, the OPA decision-point integration, and three-layer tests.
 
 ## 7. Non-Functional Requirements
 
-- **Security / multi-tenancy (§6.9):** virtual-key claims bind requests to tenant/namespace; OPA restricts per-decision; RBAC-as-floor (ADR 0018). Cross-tenant A2A blocked at both gateway authz and Envoy egress (defense-in-depth, §6.9). Secrets via ESO only.
-- **Availability:** `replicas >= 2`; rolling restart must be graceful (no dropped in-flight streams beyond unavoidable reconnect). Provider failover keeps agent-visible behavior predictable.
-- **Observability (§6.5):** OTel emission to the collector → Tempo; Langfuse for prompts/costs/evals; Mimir metrics; per-component Grafana dashboard delivered as a Crossplane `GrafanaDashboard` XR.
-- **Streaming:** stream chunks preserved through LibreChat ↔ LiteLLM ↔ Platform Agent for interactive and long-running agents.
-- **Versioning (ADR 0030):** admin HTTP API `/v1/...`; CloudEvent `schemaVersion`; consumed CRDs follow B13 versioning.
-- **Scale:** sized for v1.0 event/request volumes; budget/spend tracking is per-virtual-key.
+- **Security / trust boundary (§6.1 line 211; §6.9):** A1 is the trust boundary between Platform Agents and all external endpoints. Posture is fail-closed, externally policy-governed (OPA), secret-isolated (ESO; provider creds never reach agents), and audit-durable (A18). Multi-tenancy: virtual keys and budgets are per-identity/CapabilitySet; tenant attributes derive from the Platform JWT (`platform_tenants`, `platform_namespaces`, etc., ADR 0029); cross-tenant capability reach is impossible (unapproved capabilities unreachable, §6.8 line 612). Threats catalogued by B22.
+- **Observability (§6.5; ADR 0015):** three planes — audit (compliance, A18), OTel traces (Tempo, technical), LLM-traces (Langfuse, prompt-level) — correlated by `trace_id`. Prometheus metrics → Mimir. Component-failure alerts required (gateway down, backing-store unreachable, OPA-unreachable deny rate, provider-failover rate, budget-threshold rate).
+- **Availability / scale (§6.1 lines 196, 201):** tier-0 hot path for every agent call; stateless-per-request + HA replicas + PDBs; readiness gated on backing Postgres. Fail-closed is the explicit availability/security trade.
+- **Versioning (ADR 0030 / §6.13; interface-contract §3.3):** per-component; A1 owns `/v1` URL-path versioning for all five surfaces and the B13 admin contract; deprecated versions served ≥1 platform release.
+- **Substrate parity (ADR 0041):** identical gateway behaviour on kind vs AWS; only backing Postgres substrate differs via `XPostgres`. No substrate-specific code paths.
+- **Bootstrap tolerance:** A1 is W0 but several enforcement/observability dependencies land later (A7 OPA points, A18 audit endpoint, B13 reconciler, B4 `XPostgres`). Degradation path: synchronous OPA fails closed when absent; audit buffers durably when A18 absent; gateway serves last-reconciled state if B13 is down (eventually consistent, ADR 0006); bootstrap against a direct Postgres until B4 `XPostgres` lands. Each is rewired as the dependency arrives (phased posture mirroring ADR 0012).
 
-## 8. Cross-Cutting Deliverable Checklist (§14.1)
+## 8. Cross-Cutting Deliverable Checklist
 
-| Deliverable | Status |
+| Deliverable (§14.1) | Status |
 |---|---|
-| Helm values / manifests in Git | applicable — LiteLLM chart + B13 subchart |
-| Per-product docs (10.5) | applicable |
-| Operator runbook (10.7) | applicable — incl. provider-failover, rolling-restart, MCP-health triage |
-| Backup / restore | applicable — LiteLLM-internal spend/key state; source of truth is CRDs in Git (rebuild by re-reconcile) |
-| Alert rules | applicable — gateway down, callback failures, provider-all-unavailable, MCP-unhealthy |
-| Grafana dashboard (Crossplane `GrafanaDashboard` XR) | applicable |
-| Headlamp plugin | applicable — A1 owns making the capability/per-agent view work in our env (cross-cutting plugin owned by B5; A1 ensures integration) |
-| OPA/Rego integration | applicable — runtime tool/model authz, budget enforcement, dynamic-registration approval (Rego content in B16) |
-| Audit emission (ADR 0034) | applicable — via adapter; the densest emission point in the platform |
-| Knative trigger flow | applicable — budget-exceeded → email (v1.0); gateway-event triggers |
-| HolmesGPT toolset | applicable — gateway metrics/log queries, MCP-health, provider-status tools |
-| 3-layer tests (Chainsaw / Playwright / PyTest) | applicable |
-| Tutorials & how-tos | applicable — virtual-key issuance, registering an MCP server, A2A peering |
+| Helm values / manifests in Git | Applicable — pinned LiteLLM chart, GitOps non-secret config |
+| Per-product docs (10.5) | Applicable |
+| Operator runbook (10.7) | Applicable — fail-closed behaviour, key-state recovery, provider-failover, backing-store restore |
+| Backup / restore | Applicable — backing Postgres (key/spend/config) restore is a runbook item; the store itself is provisioned via `XPostgres` (B4) |
+| Alert rules | Applicable — gateway down, backing-store unreachable, OPA-unreachable deny spike, provider-failover spike, budget-threshold spike |
+| Grafana dashboard (Crossplane `GrafanaDashboard` XR) | Applicable |
+| Headlamp plugin | Applicable — gateway/key/provider/budget visibility (redacted) |
+| OPA / Rego integration | Applicable — A1 owns the pre-call + dynamic-registration decision **points**; policy content is B3/B16 |
+| Audit emission (ADR 0034) | Applicable — durable-async via A18 adapter; never direct-write |
+| Knative trigger flow | Applicable — `platform.observability.*` budget-exceeded→email flow; `platform.gateway.*`/`platform.policy.*` emit |
+| HolmesGPT toolset | Applicable — routing, redacted key state, provider health, budget posture |
+| 3-layer tests (Chainsaw/Playwright/PyTest) | Applicable — Chainsaw for capability-CRD→gateway effect (with B13 fake), Playwright for Headlamp plugin, PyTest for callback/translation/budget logic |
+| Tutorials & how-tos | Applicable |
 
 ## 9. Acceptance Criteria
 
-- **AC-A1-01** (REQ-A1-01): `kubectl get deploy litellm` shows `replicas >= 2` and all pods Ready. *(Chainsaw)*
-- **AC-A1-02** (REQ-A1-02): Installing the LiteLLM Helm chart yields exactly one ArgoCD release containing both the gateway and the B13 operator pods. *(Chainsaw)*
-- **AC-A1-03** (REQ-A1-03): A request with an invalid/absent virtual key is rejected; a request with a valid key whose JWT lacks the target namespace claim is denied. *(PyTest)*
-- **AC-A1-04** (REQ-A1-04): An OpenAI-format chat-completion request targeting a Platform Agent returns a valid streamed response; stream chunk boundaries are preserved vs the agent's emitted chunks. *(PyTest)*
-- **AC-A1-05** (REQ-A1-05): An internal A2A call between two Platform Agents succeeds; an attempt by an unregistered external endpoint to register itself is rejected. *(PyTest)*
-- **AC-A1-06** (REQ-A1-06): An MCP tool call routed through the gateway resolves to the namespaced tool from the registered `MCPServer`. *(PyTest)*
-- **AC-A1-07** (REQ-A1-07): A registered test callback observes invocations at all four hook points for a single request. *(PyTest)*
-- **AC-A1-08** (REQ-A1-08): Editing the LiteLLM ConfigMap triggers a Reloader rolling restart; pods cycle gracefully and the new config is active; no in-process reload path is used. *(Chainsaw)*
-- **AC-A1-09** (REQ-A1-09): An Agent with `exposes` set and an allowing OPA policy becomes discoverable in the registry after startup; with a denying policy it does not; on termination the entry is removed. *(Chainsaw + PyTest)*
-- **AC-A1-10** (REQ-A1-10): For each of the four failover cases the gateway returns the specified outcome; multi-provider silent failover is invisible to the agent. *(PyTest)*
-- **AC-A1-11** (REQ-A1-11): Admission rejects an Agent whose resolved CapabilitySet has zero LLM providers. *(Chainsaw)*
-- **AC-A1-12** (REQ-A1-12): A simulated MCP outage emits a metric + audit event + trace and surfaces an error to the agent's error path. *(PyTest)*
-- **AC-A1-13** (REQ-A1-13): For a sampled request, an audit record reaches the audit endpoint via the adapter and there is **no** direct gateway write to Postgres/S3/OpenSearch. *(PyTest)*
-- **AC-A1-14** (REQ-A1-14): Every CloudEvent emitted in a test run matches one of the ten namespaces and carries `specversion` + `schemaVersion`. *(PyTest)*
-- **AC-A1-15** (REQ-A1-15): With a `BudgetPolicy` over its limit, the OPA callback denies the next call; the callback never returns allow for an action RBAC would deny. *(PyTest)*
-- **AC-A1-16** (REQ-A1-16): Each ADR 0020 MCP service is reachable as a registered `MCPServer` through the gateway in an integration run. *(PyTest)*
-- **AC-A1-17** (REQ-A1-17): A dry-run OPA-callback request returns a decision with `simulated: true` and produces no audit-enforcement side effect (only the `platform.policy.*` simulator-run audit). *(PyTest)*
-- **AC-A1-18** (REQ-A1-18): The admin API responds under `/v1/...`; a deprecated prior version (when one exists) remains reachable. *(PyTest)*
+- AC-A1-01 (REQ-A1-01): A clean ArgoCD sync installs LiteLLM at the pinned version; no drift exists between Git config and running config; no manual config mutation is required for steady state.
+- AC-A1-02 (REQ-A1-02): No agent-facing API response or log line discloses provider/MCP/A2A credential material; secrets are sourced from ESO-synced secrets only.
+- AC-A1-03 (REQ-A1-03): All five surfaces respond under `/v1/...`; a request to an unversioned path is not served as a stable contract.
+- AC-A1-04 (REQ-A1-04): A virtual-key/capability mutation from the B13 identity succeeds; the identical mutation from any other identity (including a cluster-admin by hand against the admin API) is rejected.
+- AC-A1-05 (REQ-A1-05): A call with a model outside the key's `allowedModels[]` is rejected; a call with an expired `ttl` key is rejected; a valid in-scope call succeeds.
+- AC-A1-06 (REQ-A1-06): An OpenAI-compatible request addressed to an internal Platform Agent and to an approved external `A2APeer` is delivered via A2A; an `A2APeer` with `direction: internal` is unreachable from an external-only context.
+- AC-A1-07 (REQ-A1-07): A tool call to a registered `MCPServer` is proxied, OPA-gated, recorded, and forwarded with the credential mode matching `authMode`; a call to an unregistered MCP server has no reachable path.
+- AC-A1-08 (REQ-A1-08): A request for a `modelRef` with a failing primary provider fails over to a configured secondary; provider credentials never appear on the agent-facing response.
+- AC-A1-09 (REQ-A1-09): With a registered B2 handler, pre-call, post-call, and on-failure hooks each fire exactly once per the corresponding event in a traced request.
+- AC-A1-10 (REQ-A1-10): With OPA made unreachable, a pre-call decision denies (fail-closed) unless a configured break-glass policy applies; the deny is observable.
+- AC-A1-11 (REQ-A1-11): With the A18 audit endpoint down, calls still complete and audit events are durably buffered by the adapter; no audit row is written by A1 directly to Postgres/S3/OpenSearch.
+- AC-A1-12 (REQ-A1-12): Crossing a `BudgetPolicy` threshold emits a `platform.observability.*` event and applies the configured `thresholdAction` (block or require-approval) on the next call.
+- AC-A1-13 (REQ-A1-13): Admitting an `Agent` with `exposes` causes an OPA-gated registration; a denied registration emits a `platform.policy.*` deny event and the surface is not registered.
+- AC-A1-14 (REQ-A1-14): Every CloudEvent A1 emits has a `type` under exactly one of the ten namespaces with non-empty `specversion` + `schemaVersion`; no event uses a coined top-level namespace.
+- AC-A1-15 (REQ-A1-15): A traced call produces correlated spans in Tempo and a generation in Langfuse sharing the same `trace_id`, and gateway metrics appear in Mimir.
+- AC-A1-16 (REQ-A1-16): A1 runs identically against an `XPostgres`-provided connection secret on kind and on AWS; switching substrate changes no gateway code or config beyond the claim.
+- AC-A1-17 (REQ-A1-17): Killing the gateway stops all agent model/tool/A2A traffic (fail-closed verified); HA replicas + PDB keep the surface available across a single-replica disruption.
+- AC-A1-18 (REQ-A1-18): The HolmesGPT gateway toolset answers a routing/provider-health/budget-posture query against live gateway state with key material redacted.
+- AC-A1-19 (REQ-A1-19): A simulated `/v1`→`/v2` surface change keeps `/v1` served for ≥1 platform release with a deprecation notice.
+- AC-A1-20 (REQ-A1-20): Docs, runbook, alert rules, a rendering `GrafanaDashboard` XR, a loading Headlamp plugin, the OPA decision-point wiring, and passing three-layer tests all exist.
 
 ## 10. Risks & Open Questions
 
-- **R1 (high):** Advanced budget features may be enterprise-only (§6.6). *Reconciliation:* commit to OPA-as-policy + callbacks-extension; confirm during implementation. Blast radius high (budget enforcement is platform-wide).
-- **R2 (high):** Does LiteLLM OSS ship OpenAI ↔ A2A translation? If not, the adapter lands in A8 (§14.1 A8). *Open question* — must be settled before A8/A16 build.
-- **R3 (med):** Mandatory audit + OPA-bridge callbacks "ship with LiteLLM (A1)" but logic is B2; if A1 lands before B2/A7, the OPA-bridge callback moves into A7 (§14.2 B2/ADR 0002). Ownership handoff must be explicit to avoid a gap. *[PROPOSED]* the exact callback-registration interface.
-- **R4 (med):** Rolling-restart on config change (ADR 0035) can drop in-flight streams; runbook must define graceful drain. Blast radius med.
-- **R5 (low):** Dry-run decision-shape field names for A20 are `[PROPOSED — not in source]`; reconcile with A20/ADR 0038 before either freezes its contract.
-- **OQ1:** ConfigMap key names / callback class registration signature are not in source → `[PROPOSED — not in source]`.
+- R-A1-1 (high): A1 is the tier-0 fail-closed chokepoint — gateway loss halts all agent traffic. Mitigation: HA replicas + PDBs + readiness on backing store + runbook; the fail-closed trade is intentional (§6.1 line 201). Blast radius: whole platform.
+- R-A1-2 (high): OPA-unreachable fail-closed could mass-deny if OPA (A7) is flaky during bootstrap. Mitigation: documented break-glass policy owned by B3/B16; alert on deny-rate spike; phased bootstrap. `[PROPOSED]` break-glass policy content not in A1's scope.
+- R-A1-3 (med): exact LiteLLM callback signatures are not in Canon — A1/B2 contract risk. Mitigation: pin to upstream callback interface; version A1↔B2 contract; do not coin signatures (`[PROPOSED — not in source]`).
+- R-A1-4 (med): B13 (only admin-API writer) is W1 — gateway state cannot be reconciled until B13 lands. Mitigation: eventually-consistent serving of last state (ADR 0006); bootstrap with a minimal seeded config; no hand-config drift permitted.
+- R-A1-5 (med): `XPostgres` (B4) is W1 while A1 is W0 — backing store may not be claim-provisioned at first install. Mitigation: bootstrap on direct Postgres, rewire onto the claim; uniform connection-secret shape makes the swap config-only.
+- R-A1-6 (med): EgressTarget enforcement is shared between A1 (gateway) and A6 (Envoy) — risk of a gap where one path is governed and the other is not. Mitigation: A1 governs model/tool/A2A egress; A6 governs general egress; B22 threat model must confirm no uncovered egress path. Open question: is any agent egress reachable that bypasses both A1 and A6? — resolve with A6/B22.
+- R-A1-7 (low): per-event-type `platform.gateway.*` names are deferred to B12; A1 must not coin them. `[PROPOSED]` flag carried until B12 registers them.
+- R-A1-8 (low): `platform.security.*` gateway signals (repeated authn failures, policy-bypass attempts) are mapped by namespace only; concrete event types deferred to B12. `[PROPOSED — not in source]`.
+- Open question (low): does the skill-gateway admin surface need its own OPA decision point distinct from MCP/A2A registration? Not specified in source; resolve with B16 once `Skill` flows are exercised.
 
 ## 11. References
 
-- architecture-overview.md §6.1 Gateway architecture (line ~170), §6.8 Capability registries (~632), §6.6 (~436, audit/OPA hook points, budget-through-OPA), §6.7 (~553, budget-exceeded trigger flow), §6.5 (~370, observability), §6.13 (~981, versioning).
-- ADR 0006 (kopf operator subchart), ADR 0001 (ARK), ADR 0031 (CloudEvent taxonomy), ADR 0034 (audit pipeline), ADR 0013 (capability CRDs / `platform.capability.changed`), ADR 0002 (OPA/Gatekeeper), ADR 0018 (RBAC-floor/OPA-restrictor), ADR 0003 (Envoy egress — perimeter invariant), ADR 0035 (dynamic toggle / rolling restart), ADR 0020 (initial MCP services), ADR 0030 (versioning).
-- Related pieces: B13 (kopf operator), B2 (callbacks), A7 (OPA), A18 (audit), A6 (Envoy/sandbox), A20 (policy simulator), A8 (LibreChat).
+- architecture-overview.md §6.1 (The Gateway Layer (LiteLLM), lines 170–225), §6.7 (Eventing, lines 553–595, broker failure/emit behaviour), §6.8 (Capability Registries & Approved Primitives, lines 604–616), §6.9 (Multi-Tenancy & Namespacing, 672+), §6.5 (Observability), §6.13 (Versioning), §14.1 (Workstream A deliverables).
+- ADR 0006 (Python kopf operator for LiteLLM reconciliation — B13 sole admin writer); ADR 0001 (ARK + external enforcement perimeters); ADR 0013 (capability CRD model, via §6.8); ADR 0031 (CloudEvent taxonomy); ADR 0034 (audit pipeline — durable adapter); ADR 0015 (Tempo + Langfuse correlation by trace_id); ADR 0041 (substrate abstraction — `XPostgres`); ADR 0030 (CRD/API versioning); ADR 0029 (Keycloak JWT claim schema); ADR 0002 (OPA/Gatekeeper).
+- interface-contract §1.4 (B13 capability CRDs), §1.6 (`XPostgres`), §2 (CloudEvent taxonomy), §3.1 (Platform SDK), §3.3 (HTTP `/v1` versioning), §4 (connection-secret contract), §5 (audit adapter).
+- glossary (LiteLLM, A2A, MCP, CapabilitySet, Platform JWT, ESO, capability CRDs). Related pieces: B13, B2, B3/B16, A18, A7, A6, B4, B6, A17, A2, A13.
