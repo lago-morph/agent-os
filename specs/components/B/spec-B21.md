@@ -51,8 +51,9 @@ Upstream consumed:
 
 ADR decisions honored:
 - **ADR 0019** — `deep-agents` is the opinionated default the dev experience leads with; `langgraph` supported.
-- **ADR 0033 / dual-mode (§6.3)** — kind is functionally complete without cloud services, so the
-  local kind path is viable; the shared dev cluster mirrors the AWS substrate where needed.
+- **ADR 0033 (initial targets — AWS/EKS + GitHub) + dual-mode (§6.3)** — kind is functionally
+  complete without cloud services (§6.3 dual-mode hosting), so the local kind path is viable; the
+  shared dev cluster mirrors the AWS substrate where needed.
 - **ADR 0011** — three-layer testing (Chainsaw/Playwright/PyTest) orchestrated by the CLI; B21
   documents how a developer runs them locally.
 - **ADR 0040** — within-environment deploy is PR + ArgoCD; promotion across Stages is Kargo (out of scope here).
@@ -155,7 +156,7 @@ blocks exist; the gap is a coherent, supported on-ramp covering both local and s
 - architecture-overview.md §6.11 Identity federation, Flow 3 developer `kubectl` (~L876–885).
 - architecture-overview.md §7.4 Developer iteration via GitOps (~L1219–1226).
 - architecture-overview.md §14.2 Workstream B, B21 row (~L1715); B7 (~L1701); B6 (~L1700); B9 (~L1703).
-- ADR 0019 (LangGraph + Deep Agents default), ADR 0033 (kind + AWS targets / kind functionally complete),
+- ADR 0019 (LangGraph + Deep Agents default), ADR 0033 (initial targets — AWS/EKS + GitHub; kind functionally complete per §6.3),
   ADR 0011 (three-layer testing via CLI), ADR 0040 (Kargo promotion — out of scope), ADR 0028 (identity federation), ADR 0030 (versioning).
 - _meta/interface-contract.md §3.1 (Platform SDK surfaces), §3.2 (agent SDK), §3.3 (CLI versioned surface).
 - _meta/glossary.md (Platform Agent, k8-platform, substrate, ESO, IRSA / Workload Identity).

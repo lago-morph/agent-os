@@ -8,8 +8,8 @@
 
 Some Platform Agents need read access to large pre-existing datasets — reference corpora, shared
 document sets, fixture data — that are impractical to deliver through the RAG / memory call path
-and are better surfaced as a mounted filesystem. §6.3 already contemplates a filesystem-mount
-access pattern for RAG-style structured grep ("structured grep via mount"), and §6.4 notes the
+and are better surfaced as a mounted filesystem. §6.4 already contemplates a filesystem-mount
+access pattern for RAG-style structured access ("structured grep via mount", L368) and notes the
 SDK-API-vs-mount choice is per-agent and use-pattern-driven. B20 supplies the missing piece: a
 **declarative way to map pre-defined Kubernetes PersistentVolumes into Platform Agents**, with the
 namespace, RBAC, and OPA controls that the platform requires of every capability.
