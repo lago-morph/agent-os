@@ -18,7 +18,7 @@ with its component's acceptance gate (ADR 0011, via the `agent-platform` CLI / B
 
 - TASK-01: Adopt C1 conventions + create the tutorials section scaffold + shared tutorial template (prereqs/steps/expected-output/end-state) — produces: tutorial template — depends-on: [C1]
 - TASK-02: Build-your-first-Platform-Agent tutorial (`Agent` CRD → ArgoCD → LibreChat/A2A) + tests + mock-out — produces: tutorial — depends-on: [TASK-01]
-- TASK-03: First-agent-with-Platform-SDK (BYO container) tutorial + tests + mock-out — produces: tutorial — depends-on: [TASK-01]
+- TASK-03: First-agent-with-the-Python-SDK / Platform SDK (BYO container) tutorial + tests + mock-out — produces: tutorial — depends-on: [TASK-01]
 - TASK-04: Add-an-MCP-server (`MCPServer` CR → registry) tutorial + tests + mock-out — produces: tutorial — depends-on: [TASK-01]
 - TASK-05: Compose-synthetic-MCP-from-OpenAPI (`SyntheticMCPServer`) tutorial + tests + mock-out — produces: tutorial — depends-on: [TASK-01]
 - TASK-06: Create-attach-test-a-`Skill` tutorial + tests + mock-out — produces: tutorial — depends-on: [TASK-01]

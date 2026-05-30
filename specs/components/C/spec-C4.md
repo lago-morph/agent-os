@@ -27,7 +27,9 @@ information-oriented corpus.
   - ARK CRD reference (`Agent`, `AgentRun`, `Team`, `Tool`, `Memory`, `Evaluation`, `Query`).
   - Sandbox CRD reference (`Sandbox`, `SandboxTemplate`).
   - Capability CRD reference (`MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`,
-    `CapabilitySet`; also `VirtualKey`, `BudgetPolicy`).
+    `CapabilitySet` — the §10.3 list). `VirtualKey` and `BudgetPolicy` are Canon kopf-reconciled
+    CRDs (interface-contract §1.4) reasonably documented in the same reference, but are
+    `[PROPOSED — not in source]` as members of the §10.3 capability-CRD-reference bullet.
   - Crossplane XR catalog (`MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`,
     `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `XAgentDatabase`, `XPostgres`,
     `XSearchIndex`, `XObjectStore`, `XMongoDocStore`).
