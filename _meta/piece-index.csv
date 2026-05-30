@@ -1,0 +1,120 @@
+id,kind,title,workstream,tier,wave,upstream,downstream,estimate
+A1,COMPONENT,LiteLLM (gateway),A,T0,W0,,A16;A17;A19;A20;B1;B2;B16;B6;B9;B13;B17;B18,XL
+A2,COMPONENT,Langfuse,A,T1,W0,,B1;B6;B9;B10,M
+A3,COMPONENT,Argo Workflows,A,T1,W0,,B19,M
+A4,COMPONENT,Knative Eventing + NATS JetStream broker,A,T0,W0,,A19;B8;B12,L
+A5,COMPONENT,ARK agent operator,A,T0,W1,A6,B16;B7;B9;B10;B17;B18;B20,L
+A6,COMPONENT,agent-sandbox + Envoy egress proxy,A,T0,W0,,A5;A20;B16;B7;B20,XL
+A7,COMPONENT,OPA / Gatekeeper,A,T0,W0,,A17;A18;A20;A23;B2;B3;B19;B20,L
+A8,COMPONENT,LibreChat (locked-down config),A,T1,W0,,B1,L
+A9,COMPONENT,Headlamp install + framework,A,T1,W0,,A21;A22;B1;B19,L
+A10,COMPONENT,Letta memory backend,A,T1,W1,A11,B11,M
+A11,COMPONENT,OpenSearch,A,T0,W0,,A10;A18,M
+A12,COMPONENT,OpenAPI->MCP converter,A,T1,consumer,,,M
+A13,COMPONENT,Tempo + Mimir,A,T1,W0,,,M
+A14,COMPONENT,HolmesGPT (early phase),A,T1,W0,,A16;B10,L
+A15,COMPONENT,Reloader + oauth2-proxy,A,T2,W0,,,S
+A16,COMPONENT,Interactive Access Agent,A,T1,W2,A1;A14,,M
+A17,COMPONENT,Initial MCP services integration,A,T0,W2,A1;A7;B13,,XL
+A18,COMPONENT,Audit endpoint + audit adapter library,A,T0,W1,A11;A7,,L
+A19,COMPONENT,Mattermost adapter,A,T1,W1,A4;A1,,L
+A20,COMPONENT,Policy simulator service,A,T1,W1,A7;A1;A6,A22,L
+A21,COMPONENT,Tenant onboarding reconciler,A,T1,W3,A9;A22,,M
+A22,COMPONENT,Headlamp graphical-editor framework for platform CRDs,A,T0,W2,A9;A20,A21,L
+A23,COMPONENT,Kargo promotion fabric,A,T1,W4,A7;B19,B5,L
+B1,COMPONENT,SSO/auth proxy layer,B,T1,W1,A1;A2;A8;A9,,M
+B2,COMPONENT,LiteLLM custom callbacks,B,T1,W1,A1;A7,,L
+B3,COMPONENT,OPA policy library (framework),B,T0,W1,A7,B16,M
+B4,COMPONENT,Crossplane v2 Compositions,B,T0,W1,,A18;A21;A23;B19;B11,XL
+B5,COMPONENT,Cross-cutting Headlamp plugins,B,T1,W4,A23,B19,L
+B6,COMPONENT,Platform SDK (Python + TypeScript),B,T0,W2,A1;A2,B7;B10;B21,XL
+B7,COMPONENT,Initial agent SDK — LangGraph + Deep Agents,B,T0,W3,B6;A6;A5,B18;B21,L
+B8,COMPONENT,Knative event adapter services,B,T1,W1,A4,B12,M
+B9,COMPONENT,agent-platform CLI,B,T1,W2,A1;A2;A5,B21;B14;B15,L
+B10,COMPONENT,Coach Component (self-retrospection),B,T1,W3,B6;A5;A2;A14,,M
+B11,COMPONENT,Memory backend adapter,B,T1,W1,A10,,M
+B12,COMPONENT,CloudEvent schema registry,B,T0,W2,A4;B8,B19,M
+B13,COMPONENT,Custom Python kopf operator for LiteLLM,B,T0,W1,A1,A17;B16;B17,L
+B14,COMPONENT,agent-platform test framework,B,T1,W3,B9,B15,L
+B15,COMPONENT,CI/CD reference pipeline (GitHub Actions),B,T1,W4,B9;B14,,M
+B16,COMPONENT,Initial OPA policy library content,B,T0,W2,B3;A1;A6;A5;B13,,L
+B17,COMPONENT,Agent profile library,B,T1,W2,B13;A5;A1,B18,M
+B18,COMPONENT,Recommended agent compositions,B,T2,W4,B17;A5;A1;B7,,M
+B19,COMPONENT,Generalized approval system,B,T0,W3,A3;A7;A9;B5;B12,A23,L
+B20,COMPONENT,Persistent volume access for Platform Agents,B,T1,W2,A6;A7;A5,,M
+B21,COMPONENT,Development environment for agents,B,T2,W4,B7;B6;B9,,M
+B22,COMPONENT,Security threat model design specification,B,T0,W0,,,L
+C1,COMPONENT,Documentation portal infrastructure,C,T1,consumer,,,M
+C2,COMPONENT,Diataxis tutorials,C,T1,consumer,,,L
+C3,COMPONENT,Diataxis how-to guides,C,T1,consumer,,,L
+C4,COMPONENT,Diataxis reference,C,T1,consumer,,,L
+C5,COMPONENT,Diataxis explanation,C,T1,consumer,,,M
+C6,COMPONENT,Cross-cutting / integrated runbooks,C,T1,consumer,,,M
+C7,COMPONENT,Maintainer / extender documentation,C,T1,consumer,,,M
+C8,COMPONENT,Knowledge Base RAG indexing pipeline,C,T1,consumer,,,M
+C9,COMPONENT,Docs-on-docs,C,T2,consumer,,,S
+D1,COMPONENT,Operator integrated dashboards,D,T1,consumer,,,M
+D2,COMPONENT,Developer dashboards,D,T1,consumer,,,L
+D3,COMPONENT,Test framework dashboards,D,T2,consumer,,,S
+E1,COMPONENT,Operator training track,E,T2,consumer,,,M
+E2,COMPONENT,Developer training track,E,T2,consumer,,,M
+F1,COMPONENT,Audit retention policy,F,T2,consumer,,,S
+F2,COMPONENT,DR testing,F,T2,consumer,,,M
+F3,COMPONENT,Vendor documentation companion project handoff,F,T2,consumer,,,S
+F4,COMPONENT,Security review,F,T2,consumer,,,M
+F5,COMPONENT,Scale evaluation,F,T2,consumer,,,M
+F6,COMPONENT,Production runbook compilation,F,T2,consumer,,,S
+V6-01,VIEW,Gateway architecture,—,T0,auth,,,S
+V6-02,VIEW,Agent runtime architecture,—,T0,auth,,,S
+V6-03,VIEW,Memory and data architecture,—,T1,auth,,,S
+V6-04,VIEW,The Knowledge Base as a separate primitive,—,T1,auth,,,S
+V6-05,VIEW,Observability architecture,—,T1,auth,,,S
+V6-06,VIEW,Security and policy architecture,—,T0,auth,,,S
+V6-07,VIEW,Eventing architecture (Knative + NATS JetStream),—,T1,auth,,,S
+V6-08,VIEW,Capability registries and approved primitives,—,T1,auth,,,S
+V6-09,VIEW,Multi-tenancy and namespacing,—,T1,auth,,,S
+V6-10,VIEW,Platform self-management with HolmesGPT,—,T1,auth,,,S
+V6-11,VIEW,Identity federation,—,T0,auth,,,S
+V6-12,VIEW,CRD inventory,—,T0,auth,,,S
+V6-13,VIEW,Versioning policy,—,T0,auth,,,S
+ADR-0001,ADR,ARK as the agent operator,—,T1,auth,,,S
+ADR-0002,ADR,OPA + Gatekeeper as the policy engine,—,T1,auth,,,S
+ADR-0003,ADR,Envoy egress proxy as CNI-agnostic egress control,—,T1,auth,,,S
+ADR-0004,ADR,NATS JetStream as the Knative broker backend,—,T1,auth,,,S
+ADR-0005,ADR,Letta as the memory backend,—,T1,auth,,,S
+ADR-0006,ADR,Python kopf operator for LiteLLM reconciliation,—,T0,auth,,,S
+ADR-0007,ADR,LibreChat (configured) as the chat frontend,—,T1,auth,,,S
+ADR-0008,ADR,Material for MkDocs as the documentation portal,—,T2,auth,,,S
+ADR-0009,ADR,OpenSearch as the search and vector store,—,T1,auth,,,S
+ADR-0010,ADR,GitHub Actions only for v1.0 CI/CD,—,T2,auth,,,S
+ADR-0011,ADR,Three-layer testing with CLI orchestration,—,T1,auth,,,S
+ADR-0012,ADR,HolmesGPT as a first-class Platform Agent,—,T1,auth,,,S
+ADR-0013,ADR,Capability CRD model and CapabilitySet layering,—,T0,auth,,,S
+ADR-0014,ADR,Postgres as primary storage; OpenSearch as retrieval optimization only,—,T1,auth,,,S
+ADR-0015,ADR,Tempo + Langfuse correlated by trace_id,—,T1,auth,,,S
+ADR-0016,ADR,Multi-tenancy via Kubernetes namespaces with RBAC + OPA + network enforcement,—,T1,auth,,,S
+ADR-0017,ADR,Generalized approval system via Approval CRD + Argo Workflows + OPA elevation,—,T0,auth,,,S
+ADR-0018,ADR,RBAC-as-floor / OPA-as-restrictor enforcement model platform-wide,—,T1,auth,,,S
+ADR-0019,ADR,LangGraph as the supported v1.0 agent SDK with Langchain Deep Agents as the opinionated default,—,T0,auth,,,S
+ADR-0020,ADR,"Initial MCP services set — GitHub, Google Drive, Context7, OpenSearch, Postgres, MongoDB, Web search + scrape",—,T0,auth,,,S
+ADR-0021,ADR,Dashboards as namespaced Crossplane-composed GrafanaDashboard XRs,—,T1,auth,,,S
+ADR-0022,ADR,Knowledge Base as a separate primitive,—,T1,auth,,,S
+ADR-0023,ADR,Knative broker is in the architecture; sources are environment-specific by design,—,T1,auth,,,S
+ADR-0024,ADR,Vendor documentation acquisition is a separate companion project,—,T2,auth,,,S
+ADR-0025,ADR,Memory access modes per memory store,—,T1,auth,,,S
+ADR-0026,ADR,Independent-cluster-install topology with no v1.0 federation,—,T2,auth,,,S
+ADR-0027,ADR,Threat-model scope — v1.0 stance and B22 prerequisite,—,T1,auth,,,S
+ADR-0028,ADR,Identity federation chain,—,T1,auth,,,S
+ADR-0029,ADR,Required Keycloak JWT claim schema,—,T1,auth,,,S
+ADR-0030,ADR,CRD and API versioning policy with per-component ownership,—,T0,auth,,,S
+ADR-0031,ADR,CloudEvent top-level type taxonomy,—,T0,auth,,,S
+ADR-0032,ADR,CapabilitySet overlay semantics,—,T1,auth,,,S
+ADR-0033,ADR,Initial implementation targets — AWS (EKS) and GitHub,—,T1,auth,,,S
+ADR-0034,ADR,"Audit pipeline — durable adapter, Postgres + S3 system of record, OpenSearch advisory only",—,T0,auth,,,S
+ADR-0035,ADR,Dynamic log-level and trace-granularity toggle with staged restart for non-reloadable services,—,T1,auth,,,S
+ADR-0036,ADR,Two-way Mattermost integration via Knative Eventing as the v1.0 chat-platform pattern,—,T2,auth,,,S
+ADR-0037,ADR,Tenant onboarding via Headlamp + a TenantOnboarding XRD,—,T1,auth,,,S
+ADR-0038,ADR,Policy simulators for OPA and RBAC,—,T1,auth,,,S
+ADR-0039,ADR,Headlamp graphical editors for platform CRDs,—,T1,auth,,,S
+ADR-0040,ADR,Kargo as the v1.0 promotion fabric for GitOps environments,—,T0,auth,,,S
+ADR-0041,ADR,Substrate abstraction via Crossplane Compositions,—,T0,auth,,,S
