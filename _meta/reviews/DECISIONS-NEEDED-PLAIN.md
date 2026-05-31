@@ -2,7 +2,7 @@
 
 **What this document is.** The engineering team has produced a technical decision register listing open issues that need a ruling before (or while) building the agentic execution platform. This document translates that register into plain English. Nothing here is a new analysis — it is a faithful re-statement of the engineers' findings written for a reader who will not look anything up.
 
-**How to read it.** Part 1 covers eight contradictions or blockers that must be resolved before build can proceed safely. Part 2 covers twenty-eight design choices that nobody has made yet — they are not crises, but leaving them open will slow teams down. Part 3 covers smaller housekeeping items.
+**How to read it.** Part 1 covers nine contradictions or blockers that must be resolved before build can proceed safely. Part 2 covers twenty-eight design choices that nobody has made yet — they are not crises, but leaving them open will slow teams down. Part 3 covers smaller housekeeping items.
 
 ---
 
@@ -158,15 +158,15 @@ Both specifications mark TenantOnboarding as `[PROPOSED]` and both hard-mandate 
 
 **Severity: High** — using undefined types in specifications creates silent inconsistency; teams building against them have no authoritative definition to rely on.
 
-**What's going on.** The Crossplane infrastructure abstraction layer (B4) manages infrastructure by defining object types (called XRDs — Crossplane Composite Resource Definitions, which are like templates for infrastructure). The authoritative glossary lists all defined types. Three types — `SearchIndex`, `MongoDocStore`, and `ObjectStore` — are referenced across multiple specifications but do not appear in the glossary. The engineers believe these are "claim forms" (the user-facing names) for the XRDs `XSearchIndex`, `XMongoDocStore`, and `XObjectStore` respectively, but this has not been formally confirmed.
+**What's going on.** The Crossplane v2 infrastructure abstraction layer (B4) manages infrastructure by defining custom object types (XRDs — composite resource definitions, essentially templates for infrastructure). The authoritative glossary is supposed to list every defined type. Three types — `SearchIndex`, `MongoDocStore`, and `ObjectStore` — are referenced across multiple specifications but do not appear in the glossary at all.
 
-Note: in Crossplane, an XRD typically has two names — the cluster-level composite (prefixed with `X`) and the user-facing namespaced claim (without the prefix). So `XSearchIndex` and `SearchIndex` should be the same thing, just used in different contexts. But without an explicit definition, this assumption is unverified.
+Note: chasing these three down surfaced a larger problem — the specs describe them, and Crossplane generally, using **Crossplane v1 terminology and the v1 resource model**, which this platform does not use. That broader issue is written up as **D-11** below. For D-07 itself the narrow point stands: three types are used but never defined.
 
 **What caused the contradiction.** The glossary was not updated when these types were referenced in specifications, leaving a gap between what is officially defined and what is actually used.
 
 **If we don't fix it.** Teams building specifications or code that references these types have no authoritative definition. Implementations may diverge, and the glossary — which is supposed to be the single source of truth — will be wrong.
 
-**Recommended fix.** Add `SearchIndex`, `MongoDocStore`, and `ObjectStore` to the authoritative glossary, explicitly noting them as the claim forms of their corresponding `X`-prefixed XRDs. Alternatively, if these names are incorrect, rename every reference in the specifications to the correct canonical form.
+**Recommended fix.** Add `SearchIndex`, `MongoDocStore`, and `ObjectStore` to the authoritative glossary as the Crossplane v2 composite types they are (or, if the names are wrong, rename every reference to the correct defined type). Handle this as part of the broader Crossplane v2 conformance pass (D-11), so the names are defined with v2 semantics.
 
 - **Pros:** Closes a documentation gap with minimal effort; restores the glossary as a reliable source of truth.
 - **Cons:** Requires a Canon revision to the frozen glossary (controlled change process).
@@ -193,6 +193,29 @@ Note: in Crossplane, an XRD typically has two names — the cluster-level compos
 
 - **Pros:** Resolves three gaps in one coordinated effort; the joint-freeze approach is already used for other cross-component contracts.
 - **Cons:** Requires coordination across three teams; cannot be done unilaterally, so scheduling alignment is needed.
+
+---
+
+### D-11 — The specifications are written against Crossplane v1, but the platform is Crossplane v2
+
+**Severity: High** — the specs describe a resource model the platform will not use, and a foundational decision record currently enshrines the wrong convention.
+
+**What's going on.** Crossplane changed substantially between v1 and v2. In **v1**, you created a namespaced "claim" that wrapped a separate cluster-scoped "composite" (named by convention with an `X` prefix). In **v2**, that two-object dance is gone: composite resources are namespaced directly, and the "claim" concept no longer exists. This platform is explicitly **Crossplane v2** (the index even names the piece "Crossplane v2 Compositions").
+
+But the specs were authored on the **v1** mental model throughout — roughly 270 places across the corpus talk about "claims," the "`X`-prefixed composite vs. namespaced claim" split, and "claim admission." It is baked into foundational specs (the infrastructure layer B4, the policy/admission specs A7 and B16, tenant onboarding A21, the dashboards D1/D2, and more) and — most importantly — **codified in a decision record, ADR-0041, as the official "XR ↔ claim naming convention."** The glossary even documents some types as "claim forms."
+
+**What caused it.** The authors leaned on Crossplane v1 conventions (still the bulk of public documentation) instead of the v2 model, and nothing in the process caught it.
+
+**If we don't fix it.** Specs would steer teams to build a v1-style two-object model that v2 doesn't have; the `X`-prefix naming, the admission rules, and the versioning/conversion-webhook assumptions all need re-expressing in v2 terms. A foundational ADR currently enshrines the wrong convention, so anything built "to spec" inherits the error. (D-07 — the three undefined types — is a symptom of this.)
+
+**Recommended fix.** A coordinated **Crossplane v2 conformance pass**:
+- Revise or supersede ADR-0041 to adopt the v2 resource model (namespaced composite resources; no claims; no required `X`-prefix duality).
+- Sweep the corpus to replace v1 terminology and re-express the admission / naming / versioning logic in v2 terms. This is **not** a blind find-and-replace — some passages describe genuinely v1-specific behavior that needs real re-expression, not a word swap.
+
+- **Pros:** the specs match the platform we are actually building; removes a whole class of latent rework.
+- **Cons:** touches a foundational ADR and ~270 references across many specs; some logic needs rethinking, not renaming — a dedicated effort, not a quick edit.
+
+**This needs your go-ahead** — it is a corpus-wide correction, so it is flagged here rather than done unilaterally.
 
 ---
 
@@ -394,4 +417,4 @@ Three specific cases: (1) The initial OPA policy library content (B16) tests a s
 Several acceptance criteria (approximately 5) state things like "deprecated features must remain supported for N platform releases." If "platform release" has no agreed definition (is it a calendar cadence? a semantic version increment?), these criteria are untestable. Defining the unit is also a prerequisite for the CRD/XRD migration ADR (item 18 in Part 2 above).
 
 **Three object types are referenced but never defined.**
-`SearchIndex`, `MongoDocStore`, and `ObjectStore` appear in specifications platform-wide but are not in the authoritative glossary. They are almost certainly the user-facing "claim forms" of the Crossplane XRDs `XSearchIndex`, `XMongoDocStore`, and `XObjectStore` respectively (in Crossplane, the cluster-level composite type has an `X` prefix; the user-facing version drops it). We need to either formally define them in the glossary as such, or rename every reference in the specifications to the `X`-prefixed canonical form. This duplicates D-07 above but is worth noting here as a housekeeping item, since the fix is a glossary edit.
+`SearchIndex`, `MongoDocStore`, and `ObjectStore` appear in specifications platform-wide but are not in the authoritative glossary. Define them there as Crossplane v2 composite types, or rename references to the correct defined type. This duplicates D-07 above, and should be handled inside the broader Crossplane v2 conformance pass (D-11).
