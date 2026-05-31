@@ -32,7 +32,7 @@ This is a T0 component: it is the authoring chokepoint for the platform's entire
 - **The policy simulator service itself** (aggregator + per-layer dry-run fan-out) — component A20 / ADR 0038. A22 only consumes its aggregator API.
 - **The OPA bundle content / Rego library** — B3 framework, B16 initial content. A22 edits bundles as artifacts; it does not author policy.
 - **CRD schema ownership / reconcilers** — each owning component (kopf B13 for capability CRDs, ARK A5 for `Agent`, Crossplane B4 for XRDs).
-- **Excluded from the v1.0 editor set:** `BudgetPolicy` (deferred per ADR 0039), `Memory`, `XAgentDatabase` (not in ADR 0039's initial list), and read-only CRDs (`AgentRun`, `Sandbox`, `Approval`, `VirtualKey`) which ship read views only.
+- **Excluded from the v1.0 editor set:** `BudgetPolicy` (deferred per ADR 0039), `Memory`, `AgentDatabase` (not in ADR 0039's initial list), and read-only CRDs (`AgentRun`, `Sandbox`, `Approval`, `VirtualKey`) which ship read views only.
 - **ArgoCD apply / reconcile** — the GitOps deployer; A22 stops at opening the PR.
 
 ## 3. Context & Dependencies
@@ -68,7 +68,7 @@ A22 **defines no CRD of its own.** It renders editors for existing Canon CRDs/XR
 
 | Target | Owner / reconciler | Canon key fields rendered |
 |---|---|---|
-| `MCPServer` | kopf (B13) | `endpoint`, `authMode` (system/user-cred), `credentialsRef`, `tags`, `scopes`, `visibility` |
+| `MCPServer` | kopf (B13) | `endpoint`, `authMode` (`system`/`system-mediated`; `user-cred` retired per D-01), `credentialsRef`, `tags`, `scopes`, `visibility` |
 | `A2APeer` | kopf (B13) | `endpoint`, `direction` (internal/external), `auth`, `tags` |
 | `RAGStore` | kopf (B13) | `backend`, `indexes[]`, `contentSourceRefs[]`, `ingestionPipelineRef` |
 | `EgressTarget` | kopf (B13) | `fqdn`, `port`, `scheme`, `allowedMethods` |

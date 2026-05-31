@@ -1,7 +1,7 @@
 # SPEC A7 — OPA / Gatekeeper
 
 > kind: COMPONENT · workstream: A · tier: T0
-> upstream: [] · downstream: [A17, A18, A20, A23, B2, B3, B19, B20] · adrs: [0002, 0018, 0038, 0031, 0034, 0030, 0041, 0017] · views: [6.6]
+> upstream: [] · downstream: [A17, A18, A20, A23, B2, B3, B19, B20] · adrs: [0002, 0018, 0038, 0031, 0034, 0030, 0044, 0017] · views: [6.6]
 > canon-glossary: 6aadcc2a4f383a26 · canon-interface: 54f5ede58e5f8c05
 
 ## 1. Purpose & Problem Statement
@@ -22,7 +22,7 @@ A7 is **T0, contract-owning** — almost every governed component depends on the
 - The **RBAC-as-floor / OPA-as-restrictor** enforcement contract (ADR 0018) — restrict-or-deny only, never grant.
 - **Budget enforcement contract** — OPA consulted with current spend + `BudgetPolicy` (ADR 0006/0002).
 - **Structured dry-run mode** for admission (Gatekeeper audit-mode + dry-run admission) feeding the policy simulator (ADR 0038); dry-run decisions emit the same shape with `simulated: true`.
-- **Substrate-claim admission** — reject any Crossplane claim with no matching Composition for the cluster's `platform.io/environment` label (ADR 0041 + 0002).
+- **Substrate-XR admission** — reject any Crossplane XR with no matching Composition for the cluster's `platform.io/environment` label (ADR 0044 + 0002).
 - Rego treated as code: SHA-pinned bundles, CI unit tests, GitOps-reconciled.
 - The mandatory **OPA-bridge LiteLLM callback** if A7 lands before A1 (§14.2 B2).
 - Audit emission of admission decisions + `platform.policy.*` events.
@@ -60,7 +60,7 @@ A7 is **T0, contract-owning** — almost every governed component depends on the
 - **ADR 0038** — Gatekeeper audit-mode + dry-run admission are data sources for the policy simulator; every decision point exposes a dry-run emitting the same decision shape with `simulated: true`; simulator runs are audited under `platform.policy.*` with no enforcement side effects.
 - **ADR 0031** — OPA decisions / violations / dynamic-registration accept-deny emit under `platform.policy.*`.
 - **ADR 0034** — admission decision audit goes through the platform audit adapter; no direct store writes.
-- **ADR 0041** — Gatekeeper rejects substrate claims with no matching Composition for the cluster's `platform.io/environment` label.
+- **ADR 0044** — Gatekeeper rejects substrate XRs with no matching Composition for the cluster's `platform.io/environment` label.
 - **ADR 0017** — OPA elevates required approval level for `Approval` (can elevate, never lower; never make approvable by someone RBAC would forbid).
 - **ADR 0030** — Gatekeeper Constraint/ConstraintTemplate and any A7 config follow versioning policy.
 
@@ -78,7 +78,7 @@ A7's admission applies to (the §6.6 OPA-decision-points admission set; owners n
 | `Sandbox`, `SandboxTemplate` | agent-sandbox (A6) |
 | `MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, `BudgetPolicy` | kopf operator (B13) |
 | `Approval`, `LogLevel` | B19 / per-component |
-| `MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`, `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `XAgentDatabase`, `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore` (XRs/XRDs) | Crossplane (B4) |
+| `MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`, `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `AgentDatabase`, `Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore` (XRs/XRDs) | Crossplane (B4) |
 
 Platform CRDs owned here: **N/A — A7 installs upstream OPA/Gatekeeper; it introduces no platform CRD. Gatekeeper Constraint/ConstraintTemplate are upstream kinds.**
 
@@ -109,7 +109,7 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 
 - **OPA + Gatekeeper:** OSS. **Decision: config** — install both via Helm; configure Gatekeeper admission for the v1.0 resource set; load Rego bundles (content from B3/B16). No fork.
 - **ADR 0002 linkage:** OPA over Kyverno because OPA's runtime decision capability is required for LiteLLM callbacks regardless of admission choice — one language avoids two toolchains. Accepted gap: **no out-of-the-box image-signature verification** (Kyverno's strength); deferred per backlog §3.9.
-- **Custom code:** the dry-run decision-shape contract, the substrate-claim admission rule (ADR 0041), and the OPA-bridge LiteLLM callback (carried here if A7 precedes A1). Rego content is B3/B16, not A7.
+- **Custom code:** the dry-run decision-shape contract, the substrate-XR admission rule (ADR 0044), and the OPA-bridge LiteLLM callback (carried here if A7 precedes A1). Rego content is B3/B16, not A7.
 
 ## 6. Functional Requirements
 
@@ -119,7 +119,7 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 - **REQ-A7-04:** OPA SHALL provide a single decision API and single policy language (Rego) across all enforcement points (ADR 0002).
 - **REQ-A7-05:** The budget-enforcement contract SHALL evaluate current spend + `BudgetPolicy` and return allow/deny; budgets SHALL be configured through OPA, not LiteLLM's admin UI.
 - **REQ-A7-06:** Each OPA decision point SHALL expose a **structured dry-run** input emitting the same decision shape with `simulated: true` and no enforcement side effects; Gatekeeper audit-mode + dry-run admission SHALL be available as simulator data sources (ADR 0038).
-- **REQ-A7-07:** Gatekeeper SHALL **reject any Crossplane claim with no matching Composition** for the cluster's `platform.io/environment=kind|aws` label (ADR 0041).
+- **REQ-A7-07:** Gatekeeper SHALL **reject any Crossplane XR with no matching Composition** for the cluster's `platform.io/environment=kind|aws` label (ADR 0044).
 - **REQ-A7-08:** Rego bundles SHALL be SHA-pinned, GitOps-reconciled, and unit-tested in CI (ADR 0002).
 - **REQ-A7-09:** Every CR admit/deny SHALL emit an audit event via the platform audit adapter; A7 SHALL NOT write audit directly to any store (ADR 0034).
 - **REQ-A7-10:** OPA decisions / violations / dynamic-registration accept-deny / simulator dry-runs SHALL emit under `platform.policy.*` (ADR 0031).
@@ -181,5 +181,5 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 ## 11. References
 
 - architecture-overview.md §6.6 Security and policy architecture (line ~436 — defense-in-depth, audit/OPA hook points, budgets-through-OPA, self-serve key issuance, policy simulator), §6.5 (~370, observability), §6.13 (~981, versioning), §14.2 (B2/B3/B16 policy split).
-- ADR 0002 (OPA/Gatekeeper), ADR 0018 (RBAC-floor/OPA-restrictor), ADR 0038 (policy simulators), ADR 0031 (CloudEvent taxonomy), ADR 0034 (audit pipeline), ADR 0041 (substrate abstraction — claim admission), ADR 0017 (approval elevation), ADR 0030 (versioning), ADR 0016 (multi-tenancy).
+- ADR 0002 (OPA/Gatekeeper), ADR 0018 (RBAC-floor/OPA-restrictor), ADR 0038 (policy simulators), ADR 0031 (CloudEvent taxonomy), ADR 0034 (audit pipeline), ADR 0044 (substrate abstraction — claim admission), ADR 0017 (approval elevation), ADR 0030 (versioning), ADR 0016 (multi-tenancy).
 - Related pieces: A1 (gateway callbacks), A6 (egress), A18 (audit), A20 (policy simulator), A23 (Kargo), B2 (callbacks), B3 (policy framework), B16 (policy content), B19 (approval), B20 (PV access), B13 (BudgetPolicy→OPA data).

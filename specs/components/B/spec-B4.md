@@ -8,9 +8,9 @@
 
 B4 owns the **substrate-abstraction layer** of the platform: the Crossplane v2 XRDs and
 Compositions that wrap every substrate-asymmetric primitive (Postgres, search/index, object
-store, Mongo-compatible document store) behind a uniform claim shape, plus the higher-level
-XRDs (`AuditLog`, `TenantOnboarding`, `XAgentDatabase`, `GrafanaDashboard`) and the
-agent-facing composed XRs (`MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`). ADR 0041
+store, Mongo-compatible document store) behind a uniform XR schema, plus the higher-level
+XRDs (`AuditLog`, `TenantOnboarding`, `AgentDatabase`, `GrafanaDashboard`) and the
+agent-facing composed XRs (`MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`). ADR 0044
 commits the platform to "one XRD, one Composition per supported substrate (kind + AWS), all
 writing the same connection-secret shape and exposing the same substrate-agnostic status."
 B4 is where that commitment becomes concrete artifacts.

@@ -6,16 +6,16 @@
 
 ## 1. Implementation Strategy
 Install Langfuse unmodified via Helm as a single ArgoCD release, wire its state to the shared
-Postgres through B4's `XPostgres` connection secret, expose its ingestion endpoint as the
+Postgres through B4's `Postgres` connection secret, expose its ingestion endpoint as the
 LLM-grade trace sink, and enforce the ADR 0015 `trace_id` correlation invariant on the receiving
 side. Because A2 is a W0 foundation piece with no hard upstreams, build proceeds against fakes for
-not-yet-landed consumers (B6/B10) and a local Postgres fixture standing in for `XPostgres`. Deliver
+not-yet-landed consumers (B6/B10) and a local Postgres fixture standing in for `Postgres`. Deliver
 the standard §14.1 set: dashboard XR, alerts, OPA admission, audit emission of admin actions,
 observability self-instrumentation, a HolmesGPT lookup tool, three-layer tests, and docs.
 
 ## 2. Ordered Task List
 - **TASK-01:** Author Helm values + ArgoCD application for Langfuse — produces: install manifests — depends-on: [].
-- **TASK-02:** Wire Langfuse to `XPostgres` connection secret (host/port/user/password/dbname) — produces: store wiring — depends-on: [TASK-01].
+- **TASK-02:** Wire Langfuse to `Postgres` connection secret (host/port/user/password/dbname) — produces: store wiring — depends-on: [TASK-01].
 - **TASK-03:** Configure ingestion endpoint + key issuance for SDK/gateway emitters — produces: ingest config — depends-on: [TASK-01].
 - **TASK-04:** Implement/verify `trace_id`-preserving ingest (no rewrite) + Tempo join contract — produces: correlation contract test — depends-on: [TASK-03].
 - **TASK-05:** Configure Grafana/Tempo→Langfuse deep-link targets — produces: deep-link config — depends-on: [TASK-04].
@@ -28,7 +28,7 @@ observability self-instrumentation, a HolmesGPT lookup tool, three-layer tests, 
 
 ## 3. Dependency Map
 ### 3.1 Upstream pieces that must ship first (HARD)
-- None (W0). Soft/foundation: B4 `XPostgres` connection secret (fake with a local Postgres until B4 lands).
+- None (W0). Soft/foundation: B4 `Postgres` connection secret (fake with a local Postgres until B4 lands).
 ### 3.2 Downstream pieces blocked on this
 - B1 (SSO in front of Langfuse), B6 (SDK OTel emission target), B9 (CLI trace links), B10 (Coach trace observation).
 ### 3.3 Continuous (non-blocking) inputs
@@ -43,7 +43,7 @@ observability self-instrumentation, a HolmesGPT lookup tool, three-layer tests, 
 - **Chainsaw:** AC-A2-01 (install/Ready), AC-A2-07 (LogLevel rolling restart), AC-A2-09 (XR + alert).
 - **Playwright:** AC-A2-06 (deep link), AC-A2-08 (SSO + claim scoping).
 - **PyTest:** AC-A2-02, -03, -04, -05, -10 (store, ingest, trace_id correlation, payload filtering, HolmesGPT tool).
-- **Fixtures/fakes:** local Postgres standing in for `XPostgres`; fake emitter posting spans with a fixed `trace_id`; stub Tempo span for the join assertion; mock oauth2-proxy/Keycloak for SSO.
+- **Fixtures/fakes:** local Postgres standing in for `Postgres`; fake emitter posting spans with a fixed `trace_id`; stub Tempo span for the join assertion; mock oauth2-proxy/Keycloak for SSO.
 
 ## 6. PR / Branch Mapping
 ### 6.1 Stack position — base branch = `wave/0`.

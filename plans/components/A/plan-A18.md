@@ -6,7 +6,7 @@
 
 ## 1. Implementation Strategy
 
-A18 is the most-depended-on audit surface, so the **adapter interface is frozen first** (interface-contract §5) and published before any other component emits — every emission point (LiteLLM, Gatekeeper, Envoy, Knative, ARK, agent-sandbox, ESO, ArgoCD, LibreChat, Headlamp, approval, Coach, HolmesGPT, B13) links against it. Build adapter-contract-first → audit endpoint + `audit_events` migrations (the in-flight system of record) → async OpenSearch advisory indexer (must be droppable without breaking ingestion) → the AWS-only S3 batch CronJob (aggregate → verify exists+bytes+checksum → only-then-delete) → the `AuditLog` Crossplane composition that provisions the whole pipeline across substrates (kind produces no archive by design). The fail-closed-on-Postgres / survive-OpenSearch-down / retain-and-retry-on-S3-verify-fail behaviors are the core correctness tests. Mock B4's `XPostgres`/`XObjectStore`/`XSearchIndex` and the `LogLevel` reconciler until they land.
+A18 is the most-depended-on audit surface, so the **adapter interface is frozen first** (interface-contract §5) and published before any other component emits — every emission point (LiteLLM, Gatekeeper, Envoy, Knative, ARK, agent-sandbox, ESO, ArgoCD, LibreChat, Headlamp, approval, Coach, HolmesGPT, B13) links against it. Build adapter-contract-first → audit endpoint + `audit_events` migrations (the in-flight system of record) → async OpenSearch advisory indexer (must be droppable without breaking ingestion) → the AWS-only S3 batch CronJob (aggregate → verify exists+bytes+checksum → only-then-delete) → the `AuditLog` Crossplane composition that provisions the whole pipeline across substrates (kind produces no archive by design). The fail-closed-on-Postgres / survive-OpenSearch-down / retain-and-retry-on-S3-verify-fail behaviors are the core correctness tests. Mock B4's `Postgres`/`ObjectStore`/`SearchIndex` and the `LogLevel` reconciler until they land.
 
 ## 2. Ordered Task List
 
@@ -15,8 +15,8 @@ A18 is the most-depended-on audit surface, so the **adapter interface is frozen 
 - **TASK-03:** `audit_events` schema + versioned migrations — produces: migration set — depends-on: [TASK-01].
 - **TASK-04:** Audit endpoint Deployment (ingest route, write Postgres, honor own `LogLevel`) — produces: endpoint service — depends-on: [TASK-02, TASK-03]. (Mock `LogLevel` reconciler.)
 - **TASK-05:** Async OpenSearch advisory indexer (non-blocking; rebuildable) — produces: indexer service — depends-on: [TASK-04] (A11 available).
-- **TASK-06:** S3 batch CronJob (AWS only): aggregate → write immutable object → verify exists+bytes+checksum → delete rows; retain+retry on failure — produces: batch job — depends-on: [TASK-04]. (Mock `XObjectStore`.)
-- **TASK-07:** `AuditLog` Crossplane composition (compose `XPostgres` + `XObjectStore`; provision indexer, CronJob (AWS), endpoint; kind no-archive path) — produces: `AuditLog` XRD/composition — depends-on: [TASK-04, TASK-05, TASK-06] (B4 XRDs). 
+- **TASK-06:** S3 batch CronJob (AWS only): aggregate → write immutable object → verify exists+bytes+checksum → delete rows; retain+retry on failure — produces: batch job — depends-on: [TASK-04]. (Mock `ObjectStore`.)
+- **TASK-07:** `AuditLog` Crossplane composition (compose `Postgres` + `ObjectStore`; provision indexer, CronJob (AWS), endpoint; kind no-archive path) — produces: `AuditLog` XRD/composition — depends-on: [TASK-04, TASK-05, TASK-06] (B4 XRDs). 
 - **TASK-08:** Envoy egress wiring for endpoint→S3 / endpoint→managed-OpenSearch (ADR 0003) — produces: egress config — depends-on: [TASK-05, TASK-06].
 - **TASK-09:** OPA Rego — `AuditLog` admission + endpoint access; A18 self-audit of privileged actions — produces: A18 Rego + self-audit — depends-on: [TASK-04] (B3 contract).
 - **TASK-10:** Cross-cutting — `GrafanaDashboard` XR (ingest rate, in-flight size, batch lag, verify failures, indexer lag), alerts, runbook (Postgres-down, S3-verify-backlog, OpenSearch-rebuild, LogLevel-raise), HolmesGPT audit-query tool — depends-on: [TASK-07, TASK-09].
@@ -28,7 +28,7 @@ A18 is the most-depended-on audit surface, so the **adapter interface is frozen 
 ### 3.1 Upstream that must ship first (HARD)
 - **A11 (OpenSearch)** — advisory indexer target (kind in-cluster / AWS-managed).
 - **A7 (OPA/Gatekeeper)** — `AuditLog` admission + endpoint access policy.
-- **B4 (Crossplane Compositions)** — `XPostgres`/`XObjectStore`/`XSearchIndex` the `AuditLog` XRD composes. `[PROPOSED]` hard dep (not in CSV upstream). Mockable until landed.
+- **B4 (Crossplane Compositions)** — `Postgres`/`ObjectStore`/`SearchIndex` the `AuditLog` XRD composes. `[PROPOSED]` hard dep (not in CSV upstream). Mockable until landed.
 
 ### 3.2 Downstream blocked on this
 - None in CSV, but **every audit-emitting component** (§6.6 list) links the adapter — A18's adapter contract gates all of them. ADR 0035 `LogLevel` consumers.
@@ -45,7 +45,7 @@ A18 is the most-depended-on audit surface, so the **adapter interface is frozen 
 - **Chainsaw (operator/CRD):** AC-A18-08 (single `AuditLog` claim provisions pipeline, kind+AWS), -04 (kind no-S3/no-CronJob), -12 (`AuditLog` admission rejects malformed), -13 (migrations idempotent).
 - **PyTest (logic):** AC-A18-01 (no direct store writes), -02 (row written), -03 (batch verify-then-delete + verify-fail-retain), -05 (OpenSearch-down ingest succeeds + rebuild), -06 (Postgres-down fail-closed), -07 (LogLevel raise no redeploy), -09 (envelope fields), -10 (version/deprecation).
 - **Playwright (UI/e2e):** Headlamp audit-inspection view over the advisory index.
-- **Fakes/fixtures:** mock `XPostgres`/`XObjectStore`/`XSearchIndex` (B4), mock `LogLevel` reconciler, a stoppable OpenSearch + Postgres for failure-mode tests. AWS-only S3-verify-then-delete needs a cloud integration fixture (kind cannot exercise the archive path — ADR 0023/0034 caveat).
+- **Fakes/fixtures:** mock `Postgres`/`ObjectStore`/`SearchIndex` (B4), mock `LogLevel` reconciler, a stoppable OpenSearch + Postgres for failure-mode tests. AWS-only S3-verify-then-delete needs a cloud integration fixture (kind cannot exercise the archive path — ADR 0023/0034 caveat).
 
 ## 6. PR / Branch Mapping
 ### 6.1 Stack position — base branch = `wave/1` (contains A11, A7 specs A18 builds on).

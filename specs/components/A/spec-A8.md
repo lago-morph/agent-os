@@ -56,7 +56,7 @@ itself stays unmodified either way.
 
 **Upstream consumed:** none declared in piece-index (W0). Functionally A8 binds to LiteLLM (A1) as
 its model gateway, Keycloak (baseline), the `Memory` CRD (ARK A5), and shared Postgres (B4
-`XPostgres`) — these are foundation/baseline surfaces it configures against, with mock-out per the
+`Postgres`) — these are foundation/baseline surfaces it configures against, with mock-out per the
 §10 documentation-before-implementation process where a dependency has not landed.
 
 **Downstream consumers:**
@@ -84,7 +84,7 @@ its model gateway, Keycloak (baseline), the `Memory` CRD (ARK A5), and shared Po
   0025). May produce an `Approval` (B19/Argo-owned) on the scan-then-allow path —
   `requestingAgent`, `actionType`, `actionAttributes`, `defaultLevel`, `evidenceRefs[]`,
   `decision`, `decidedBy`, `decidedAt`.
-- Consumes `XPostgres` connection secret for LibreChat state.
+- Consumes `Postgres` connection secret for LibreChat state.
 
 ### 4.2 APIs / SDK surfaces
 - **LibreChat ↔ LiteLLM** over OpenAI-compatible HTTP; LiteLLM translates to A2A so Platform
@@ -100,8 +100,8 @@ its model gateway, Keycloak (baseline), the `Memory` CRD (ARK A5), and shared Po
   `[PROPOSED — not in source: specific event names deferred to B12.]`
 
 ### 4.4 Data schemas / connection-secret contracts
-- LibreChat-resident state (conversations, accounts) uses the **`XPostgres` uniform connection
-  secret** (host/port/user/password/dbname; ADR 0041) and inherits backup/PITR/DR posture (§7.2).
+- LibreChat-resident state (conversations, accounts) uses the **`Postgres` uniform connection
+  secret** (host/port/user/password/dbname; ADR 0044) and inherits backup/PITR/DR posture (§7.2).
 - Upload payloads land in the `Memory` CRD's backing store per ADR 0025; the memory access path is
   ARK-owned.
 
@@ -136,7 +136,7 @@ its model gateway, Keycloak (baseline), the `Memory` CRD (ARK A5), and shared Po
   unmodified) **iff** LiteLLM does not provide the translation in OSS at install; the need is
   confirmed during implementation and documented either way.
 - **REQ-A8-09:** A8 SHALL store LibreChat-resident state (conversations, accounts) in the shared
-  Postgres via the `XPostgres` connection secret, inheriting its backup/PITR/DR posture.
+  Postgres via the `Postgres` connection secret, inheriting its backup/PITR/DR posture.
 - **REQ-A8-10:** A8 SHALL emit conversation events as audit records via the platform audit adapter
   (ADR 0034) — never writing audit stores directly.
 

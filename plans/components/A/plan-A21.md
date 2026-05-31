@@ -21,7 +21,7 @@ Build the `TenantOnboarding` XRD + Composition as declarative Crossplane artifac
 - **TASK-09:** Cross-cutting — alerts, `GrafanaDashboard` XR, runbook, HolmesGPT tenant-list tool, per-product docs — depends-on: [TASK-05, TASK-06, TASK-07].
 - **TASK-10:** 3-layer tests (Chainsaw reconcile + offboarding, Playwright editor, PyTest claim-mapping logic) mapping all ACs — depends-on: [TASK-05, TASK-06, TASK-07].
 - **TASK-11:** Tutorials & how-tos ("Onboard a tenant") — depends-on: [TASK-09].
-- **TASK-12:** XRD versioning machinery — `v1alpha1`→`v1` path + conversion webhook (ADR 0030/0041) — produces: version path — depends-on: [TASK-01].
+- **TASK-12:** XRD versioning machinery — `v1alpha1`→`v1` path + conversion webhook (ADR 0030/0044) — produces: version path — depends-on: [TASK-01].
 
 ## 3. Dependency Map
 

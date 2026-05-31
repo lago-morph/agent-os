@@ -25,7 +25,7 @@ ADR 0015), and they carry non-unit test run metrics/logs/traces via OTel per ADR
 - Mimir Helm install + values (long-term metrics store fed from Prometheus).
 - Wiring Tempo behind the OTel collector and Mimir behind Prometheus (collector + Prometheus are
   k8-platform baseline; A13 provides the backend targets).
-- Object/block storage backing for Tempo and Mimir via the `XObjectStore` substrate XRD (B4) where
+- Object/block storage backing for Tempo and Mimir via the `ObjectStore` substrate XRD (B4) where
   required `[PROPOSED — not in source: exact storage backing per backend is design-time]`.
 - The **Grafana→Langfuse deep-link** correlation contract on the Tempo side (ADR 0015): Tempo spans
   carry the `trace_id` that joins to Langfuse; A13 supplies the link config (the dashboards
@@ -43,7 +43,7 @@ ADR 0015), and they carry non-unit test run metrics/logs/traces via OTel per ADR
 - Emitting `trace_id` into spans — **agent SDK (B7) and LiteLLM (A1)** (load-bearing per ADR 0015);
   A13 only stores/correlates.
 - Audit records — **audit endpoint + adapter (A18)**; Tempo/Mimir are not audit sinks.
-- Object-store provisioning Composition — **Crossplane (B4)** (`XObjectStore`).
+- Object-store provisioning Composition — **Crossplane (B4)** (`ObjectStore`).
 - SLI/SLO definitions, error budgets, alert→remediation loops — **deferred to future enhancements**
   (§6.5 scope note); A13 provides the collection/storage path, not the policy on top.
 - Per-component dashboards' content — owned by each component / Workstream D; A13 ships its own.
@@ -51,7 +51,7 @@ ADR 0015), and they carry non-unit test run metrics/logs/traces via OTel per ADR
 ## 3. Context & Dependencies
 
 **Upstream consumed:** none (W0 foundation). Binds to the baseline OTel collector, Prometheus, and
-Grafana, and to B4's `XObjectStore` for backing storage (foundation band).
+Grafana, and to B4's `ObjectStore` for backing storage (foundation band).
 
 **Downstream consumers:** none declared in piece-index. Functionally every component that emits OTel
 traces/metrics and HolmesGPT (A14, dotted toolset edge `A13 -.-> A14`) consume A13's backends — a
@@ -73,7 +73,7 @@ continuous runtime relationship, not a build edge.
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 - A13 defines **no platform CRD**. It **consumes**:
-  - `XObjectStore` (XRD, B4) — `bucketName`, `lifecycle`, `connectionSecretRef`, `substrateClass`
+  - `ObjectStore` (XRD, B4) — `bucketName`, `lifecycle`, `connectionSecretRef`, `substrateClass`
     — for Tempo/Mimir block/object storage (capability-parity caveat: kind path may lack archive
     lifecycle).
   - `LogLevel` (ADR 0035) — `componentSelector`, `level`, `traceGranularity`, `scope`, `expiresAt`
@@ -93,8 +93,8 @@ continuous runtime relationship, not a build edge.
 - **Consumed:** none required for core function.
 
 ### 4.4 Data schemas / connection-secret contracts
-- Tempo/Mimir storage consumes the **`XObjectStore` uniform connection secret**
-  (host/port/user/password/dbname or per-primitive equivalent; ADR 0041 canonical shape).
+- Tempo/Mimir storage consumes the **`ObjectStore` uniform connection secret**
+  (host/port/user/password/dbname or per-primitive equivalent; ADR 0044 canonical shape).
 - Trace/metric schemas are the **upstream product schemas**; the only platform-owned invariant is
   the `trace_id` match with Langfuse (ADR 0015) and OTel semantic-convention compliance for spans.
 
@@ -114,7 +114,7 @@ continuous runtime relationship, not a build edge.
   releases.
 - **REQ-A13-02:** A13 SHALL configure Tempo to receive general OTel spans from the baseline OTel
   collector and Mimir to receive metrics via Prometheus remote-write.
-- **REQ-A13-03:** A13 SHALL back Tempo and Mimir storage with the `XObjectStore` XRD where required,
+- **REQ-A13-03:** A13 SHALL back Tempo and Mimir storage with the `ObjectStore` XRD where required,
   consuming the uniform connection secret.
 - **REQ-A13-04:** A13 SHALL store the emitter-supplied `trace_id` in Tempo unchanged, preserving
   correlation with Langfuse (ADR 0015) — A13 SHALL NOT rewrite `trace_id`.
@@ -146,7 +146,7 @@ continuous runtime relationship, not a build edge.
 - Helm/manifests — **applicable** (Tempo + Mimir).
 - Per-product docs (10.5) — **applicable**.
 - Runbook (10.7) + backup/restore — **applicable** (object-store-backed; backup/restore covers the
-  `XObjectStore` data; kind path may lack archive lifecycle per the parity caveat).
+  `ObjectStore` data; kind path may lack archive lifecycle per the parity caveat).
 - Alerts — **applicable** (ingest/store/query failures for both backends).
 - Grafana dashboard (Crossplane XR) — **applicable** (Tempo + Mimir health/usage dashboards).
 - Headlamp plugin — **N/A as A13-owned editor** — observability is consumed via Grafana; no A13 row
@@ -163,7 +163,7 @@ continuous runtime relationship, not a build edge.
 - **AC-A13-01 (REQ-A13-01):** ArgoCD sync brings Tempo and Mimir to Ready. *(Chainsaw)*
 - **AC-A13-02 (REQ-A13-02):** A span sent to the OTel collector lands in Tempo; a metric scraped by
   Prometheus is queryable in Mimir. *(PyTest)*
-- **AC-A13-03 (REQ-A13-03):** Tempo/Mimir connect using only the `XObjectStore` connection-secret
+- **AC-A13-03 (REQ-A13-03):** Tempo/Mimir connect using only the `ObjectStore` connection-secret
   fields; data survives a pod restart. *(PyTest)*
 - **AC-A13-04 (REQ-A13-04):** A span emitted with `trace_id=X` is stored in Tempo under `trace_id=X`
   and is joinable to a Langfuse trace with the same `trace_id`. *(PyTest)*
@@ -186,8 +186,8 @@ continuous runtime relationship, not a build edge.
   breaks the Tempo↔Langfuse join (ADR 0015 consequence); out of A13's control, covered by SDK tests.
 - **R2 (low):** Per-tenant partitioning of traces/metrics is `[PROPOSED — not in source]`; blast
   radius limited to query scoping (floor is RBAC/OPA).
-- **R3 (low):** Storage backing per backend (`XObjectStore` vs local) is `[PROPOSED]`; kind parity
-  caveat (no archive lifecycle) may reduce retention on kind by design (ADR 0041).
+- **R3 (low):** Storage backing per backend (`ObjectStore` vs local) is `[PROPOSED]`; kind parity
+  caveat (no archive lifecycle) may reduce retention on kind by design (ADR 0044).
 - **R4 (low):** Retention durations deferred to F1; A13 ships the path, not the policy. No blast
   radius for v1.0 install.
 
@@ -197,7 +197,7 @@ continuous runtime relationship, not a build edge.
   notes — A13 in early); §14.1 (A13 row, line ~1679).
 - ADR 0015 (Tempo + Langfuse correlated by `trace_id`); ADR 0035 (log/trace toggle); ADR 0011
   (three-layer testing — OTel publication); ADR 0034 (audit — A13 not a sink); ADR 0031
-  (CloudEvents); ADR 0030 (versioning); ADR 0041 (`XObjectStore` connection-secret shape).
+  (CloudEvents); ADR 0030 (versioning); ADR 0044 (`ObjectStore` connection-secret shape).
 - View V6-05 (Observability architecture).
 - Related pieces: A2 (Langfuse correlation), A1/B7 (`trace_id` emitters), A14 (HolmesGPT toolset
-  consumer), B4 (`XObjectStore`/`GrafanaDashboard`), A18 (audit — distinct path).
+  consumer), B4 (`ObjectStore`/`GrafanaDashboard`), A18 (audit — distinct path).

@@ -95,7 +95,7 @@ Owner: ARK install = A5 (interface-contract §1.2). All namespaced (glossary: no
 ### 4.4 Data schemas / connection-secret contracts
 
 - ARK persists no platform-of-record data of its own beyond Kubernetes resource state; agent state/checkpoints live in Postgres via Letta/Memory (§6.3), not in ARK.
-- N/A — no substrate connection-secret is produced by A5 (connection-secret contract per ADR 0041 applies to B4 substrate XRDs, not to ARK).
+- N/A — no substrate connection-secret is produced by A5 (connection-secret contract per ADR 0044 applies to B4 substrate XRDs, not to ARK).
 
 ## 5. OSS-vs-Custom Decision
 

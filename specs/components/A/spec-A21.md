@@ -1,7 +1,7 @@
 # SPEC A21 — Tenant onboarding reconciler
 
 > kind: COMPONENT · workstream: A · tier: T1
-> upstream: [A9, A22] · downstream: [] · adrs: [0037, 0028, 0029, 0016, 0013, 0039, 0041, 0030, 0034] · views: [6.9, 6.11, 6.12]
+> upstream: [A9, A22] · downstream: [] · adrs: [0037, 0028, 0029, 0016, 0013, 0039, 0044, 0030, 0034] · views: [6.9, 6.11, 6.12]
 > canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
 
 ## 1. Purpose & Problem Statement
@@ -51,7 +51,7 @@ CapabilitySets are intentionally **not coupled** to onboarding (ADR 0013, ADR 00
 - **ADR 0016** — multi-tenancy via namespaces with RBAC + OPA + network enforcement; the namespace is the tenancy boundary.
 - **ADR 0013** — identity/capability decoupling.
 - **ADR 0039 / A22** — the editor is a schema-driven Headlamp editor, PR-only.
-- **ADR 0041** — XRD/Composition versioning + uniform contract apply identically to this XRD (conversion webhooks + deprecation windows).
+- **ADR 0044** — XRD/Composition versioning + uniform contract apply identically to this XRD (conversion webhooks + deprecation windows).
 - **ADR 0030** — per-component CRD/XRD versioning, owned by the reconciler owner (Crossplane B4 for XRs).
 - **ADR 0034** — onboarding/offboarding actions emit audit through the platform adapter.
 
@@ -70,13 +70,13 @@ CapabilitySets are intentionally **not coupled** to onboarding (ADR 0013, ADR 00
 
 - Field sets beyond the four above are **not specified in source**; any addition (e.g. labels, SA role bindings detail) is `[PROPOSED — not in source]`.
 - **Quotas, role-catalog fields are deliberately absent** (deferred, ADR 0037) — do not invent.
-- Versioning per ADR 0030/0041: `v1alpha1`→`v1`; breaking changes via new `vN` group + conversion webhook; owner = Crossplane B4.
+- Versioning per ADR 0030/0044: `v1alpha1`→`v1`; breaking changes via new `vN` group + conversion webhook; owner = Crossplane B4.
 - **Composition outputs (source-stated):** tenant namespace(s) labelled with platform tenancy metadata; templated default ServiceAccounts; cluster-OIDC-side claim mapper record. (No connection secret — this XRD provisions no substrate primitive; see §4.4.)
 
 ### 4.2 APIs / SDK surfaces
 
 - **Headlamp editor (provided)** — the `TenantOnboarding` graphical editor; a Headlamp plugin built on A22 widgets. Not an HTTP API. Submits PRs (GitHub, ADR 0033).
-- **Crossplane claim/XR API (consumed)** — the namespaced `TenantOnboarding` claim is authored in Git and reconciled by Crossplane (B4). XR ↔ claim naming per ADR 0041 (the user-facing form is the namespaced claim).
+- **Crossplane XR API (consumed)** — the namespace-scoped `TenantOnboarding` XR is authored in Git and reconciled by Crossplane (B4). Per ADR 0044 (Crossplane v2) there is no claim layer — the user-facing form *is* the namespace-scoped XR.
 - No custom HTTP service of A21's own; §6.13 URL-path versioning N/A.
 
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
@@ -111,7 +111,7 @@ Per-event-type names deferred to B12 (interface-contract §2); A21 commits to na
 - **REQ-A21-09:** Deleting a `TenantOnboarding` resource SHALL reconcile namespace teardown and ServiceAccount cleanup, archive the tenant's audit references, and notify the operator via the standard Headlamp suggestion-card / Mattermost channel (ADR 0037).
 - **REQ-A21-10:** Offboarding SHALL NOT delete CapabilitySets the tenant referenced (decoupled in both directions) and SHALL NOT delete archived audit data (retained per the deferred retention policy) (ADR 0037).
 - **REQ-A21-11:** Onboarding and offboarding actions SHALL emit structured audit events through the platform audit adapter (ADR 0034) and tenant lifecycle events under `platform.tenant.*` (ADR 0031).
-- **REQ-A21-12:** XRD versioning SHALL follow ADR 0030/0041 (`v1alpha1`→`v1`, new `vN` group + conversion webhook for breaking changes, owner Crossplane B4).
+- **REQ-A21-12:** XRD versioning SHALL follow ADR 0030/0044 (`v1alpha1`→`v1`, new `vN` group + conversion webhook for breaking changes, owner Crossplane B4).
 
 ## 7. Non-Functional Requirements
 
@@ -119,7 +119,7 @@ Per-event-type names deferred to B12 (interface-contract §2); A21 commits to na
 - **Observability (§6.5):** Onboarding/offboarding fully audited; Grafana dashboard surfaces tenant count + recent onboarding/offboarding; `LogLevel` (ADR 0035) toggles reconcile verbosity per-tenant.
 - **GitOps integrity:** Tenant state is a Git-tracked artifact (ADR 0037); no out-of-band `kubectl`/Keycloak-admin path is sanctioned. Rollback = revert the PR / Crossplane reconcile, not manual cleanup.
 - **Scale:** A tenant may map to multiple namespaces (`namespaces[]`); the composition must handle multi-namespace tenants idempotently.
-- **Versioning (ADR 0030/0041):** XRD evolves per-component; quotas/roles compose on later without breaking existing tenants (additive, ADR 0037 defers).
+- **Versioning (ADR 0030/0044):** XRD evolves per-component; quotas/roles compose on later without breaking existing tenants (additive, ADR 0037 defers).
 - **Symmetry:** Offboarding must be the auditable inverse of onboarding; archived audit references survive tenant deletion until the deferred retention policy expires them.
 
 ## 8. Cross-Cutting Deliverable Checklist
@@ -167,6 +167,6 @@ Per §14.1:
 ## 11. References
 
 - architecture-overview.md §6.9 (multi-tenancy, claims, tenant onboarding flow, lines 720–772); §6.11 (identity federation, lines 837–851+); §6.12 (CRD inventory — `TenantOnboarding` row, line 972); §14.1 A21 (line 1687); §14.2 B4 (line 1698).
-- ADR 0037 (Tenant onboarding via Headlamp + `TenantOnboarding` XRD — primary). ADR 0028 (identity federation chain — cluster-OIDC-side mapper only). ADR 0029 (Keycloak claim schema). ADR 0016 (multi-tenancy via namespaces). ADR 0013 (capability/identity decoupling). ADR 0039 / A22 (Headlamp editor). ADR 0041 (XRD/Composition contract + versioning). ADR 0030 (versioning). ADR 0034 (audit emission). ADR 0018 (RBAC-as-floor for default SAs).
+- ADR 0037 (Tenant onboarding via Headlamp + `TenantOnboarding` XRD — primary). ADR 0028 (identity federation chain — cluster-OIDC-side mapper only). ADR 0029 (Keycloak claim schema). ADR 0016 (multi-tenancy via namespaces). ADR 0013 (capability/identity decoupling). ADR 0039 / A22 (Headlamp editor). ADR 0044 (XRD/Composition contract + versioning). ADR 0030 (versioning). ADR 0034 (audit emission). ADR 0018 (RBAC-as-floor for default SAs).
 - Related pieces: A9 (Headlamp framework), A22 (editor framework), B4 (Crossplane Compositions), B13 (CapabilitySet — decoupled), B1 (SSO/Keycloak config), F1 (audit retention).
 - _meta/interface-contract.md §1.6 (`TenantOnboarding` XRD fields), §2 (`platform.tenant.*` / `platform.audit.*`), §4 (connection-secret — N/A here).

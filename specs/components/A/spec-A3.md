@@ -38,7 +38,7 @@ workflow on a working engine.
 - The `Approval` CRD, OPA elevation, decision CloudEvent emission, approval-queue UI —
   **B19 (B19-core W3 / B19-ui W4)**; A3 only provides the workflow engine it runs on.
 - Agent execution itself — **ARK (A5)**; Argo orchestrates, it does not run agents directly.
-- Sandbox pause/resume + checkpointing — **agent-sandbox (A6)** + Postgres (B4 `XPostgres`).
+- Sandbox pause/resume + checkpointing — **agent-sandbox (A6)** + Postgres (B4 `Postgres`).
 - GitOps sync — **ArgoCD** (baseline / referenced); A3 is *Argo Workflows*, a distinct product.
 - Promotion across environments — **Kargo (A23)**.
 
@@ -88,7 +88,7 @@ workflow on a working engine.
 - Per-event-type names/schemas owned by **B12**.
 
 ### 4.4 Data schemas / connection-secret contracts
-- Long-running workflow checkpoints land in **Postgres** (§7.2) via `XPostgres` connection secret
+- Long-running workflow checkpoints land in **Postgres** (§7.2) via `Postgres` connection secret
   (host/port/user/password/dbname) where A3 needs persistence `[PROPOSED — not in source: Argo's
   own persistence/archive backing is design-time]`.
 - No platform-owned data schema introduced.
@@ -192,4 +192,4 @@ workflow on a working engine.
   ADR 0035 (log/trace toggle); ADR 0034 (audit); ADR 0030 (versioning).
 - View V6-07 (Eventing architecture).
 - Related pieces: B19 (approval system), B8 (workflow adapter), A6 (sandbox pause/resume),
-  A5 (ARK), B4 (XPostgres/GrafanaDashboard), A4 (Knative broker).
+  A5 (ARK), B4 (Postgres/GrafanaDashboard), A4 (Knative broker).

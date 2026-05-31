@@ -17,7 +17,7 @@ A10's scope is the install + configure + operate package (Helm, docs, runbook, d
 ### 2.1 In scope
 
 - Letta install (Helm values/manifests) at a pinned tested version, namespace-scoped per the multi-tenancy mitigation (ADR 0005 consequence; §9).
-- Wiring Letta state persistence to managed Postgres (in-cluster CloudNativePG on kind / RDS on AWS via the `XPostgres` substrate, §6.3, ADR 0014/0033/0041).
+- Wiring Letta state persistence to managed Postgres (in-cluster CloudNativePG on kind / RDS on AWS via the `Postgres` substrate, §6.3, ADR 0014/0033/0044).
 - Wiring Letta retrieval indexes to OpenSearch (A11) such that they remain reproducible from Postgres / object storage (OpenSearch never a system of record for memory — §6.3, ADR 0009/0014).
 - Honoring the three `MemoryStore` access modes (private / namespace-shared / RBAC-OPA) declared on the XR (ADR 0025) — Letta-backed service must surface the same access semantics regardless of backend.
 - Consumption path: Letta is reachable **only** through ARK's `Memory` CRD and the Platform SDK `memory.*` API; A10 exposes no direct agent-facing Letta endpoint.
@@ -30,7 +30,7 @@ A10's scope is the install + configure + operate package (Helm, docs, runbook, d
 ### 2.2 Out of scope (and where it lives instead)
 
 - The `Memory` CRD reconciler — **A5** (ARK). A10 supplies the backend the `Memory` binding resolves to.
-- The `MemoryStore` XR + its Compositions and the `XPostgres`/`XSearchIndex` substrate XRDs — **B4** (Crossplane). A10 consumes the provisioned backends.
+- The `MemoryStore` XR + its Compositions and the `Postgres`/`SearchIndex` substrate XRDs — **B4** (Crossplane). A10 consumes the provisioned backends.
 - The Platform SDK `memory.*` / `rag.*` API surface — **B6**.
 - The Letta-specific call wrapper (memory backend adapter) — **B11** (the named downstream).
 - OpenSearch install/operation — **A11** (upstream).
@@ -43,7 +43,7 @@ A10's scope is the install + configure + operate package (Helm, docs, runbook, d
 - **A11** (OpenSearch) — Letta's retrieval-optimization indexes live in OpenSearch; A10 cannot wire retrieval until A11 exists. (OpenSearch is advisory/retrieval only; primary memory state is Postgres.)
 
 **Upstream consumed (effective, via Canon even though CSV lists only A11):**
-- Managed Postgres via B4 `XPostgres` substrate (§6.3) — Letta's system of record. `[PROPOSED — not in source]` the CSV upstream column lists only A11; the Postgres dependency is stated in §6.3/ADR 0005 and is treated as a HARD runtime dependency here, satisfied by B4. Flagged because it is not in the CSV edge set.
+- Managed Postgres via B4 `Postgres` substrate (§6.3) — Letta's system of record. `[PROPOSED — not in source]` the CSV upstream column lists only A11; the Postgres dependency is stated in §6.3/ADR 0005 and is treated as a HARD runtime dependency here, satisfied by B4. Flagged because it is not in the CSV edge set.
 - A5 (ARK `Memory` CRD), B6 (SDK), B11 (adapter) — the declarative + call path; consumed as they land.
 
 **Downstream consumers:** **B11** (memory backend adapter wraps Letta calls).
@@ -52,7 +52,7 @@ A10's scope is the install + configure + operate package (Helm, docs, runbook, d
 - **ADR 0005** — Letta is THE memory backend; consumed only through `Memory` CRD + `memory.*` API; state in managed Postgres; OpenSearch indexes reproducible; provisioned via `MemoryStore` XR; namespace-scoped instances mitigate Letta multi-tenancy gaps; SDK keeps a pinned compatibility matrix against Letta.
 - **ADR 0025** — `MemoryStore.accessMode` ∈ {private, namespace-shared, RBAC/OPA-controlled}; backend choice does not change access semantics; private/namespace-shared enforced structurally; RBAC/OPA mode follows RBAC-as-floor / OPA-as-restrictor (ADR 0018); audit attributes events to agent identity + store mode.
 - **ADR 0014 / 0009** — Postgres primary; OpenSearch retrieval-optimization only, reproducible from primary.
-- **ADR 0041** — substrate abstraction via Crossplane; uniform connection-secret; substrate-agnostic status.
+- **ADR 0044** — substrate abstraction via Crossplane; uniform connection-secret; substrate-agnostic status.
 - **ADR 0030 / 0031 / 0034** — versioning, CloudEvent taxonomy, audit adapter (as for all A components).
 
 ## 4. Interfaces & Contracts
@@ -65,8 +65,8 @@ A10 **owns no CRD/XRD**; it consumes ones owned elsewhere:
 |---|---|---|
 | `Memory` | A5 (ARK) | `memoryStoreRef` |
 | `MemoryStore` (XR) | B4 (Crossplane) | `accessMode` (private / namespace-shared / RBAC-OPA), `backendType` |
-| `XPostgres` (XRD) | B4 | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass` |
-| `XSearchIndex` (XRD) | B4 | `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass` |
+| `Postgres` (XRD) | B4 | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass` |
+| `SearchIndex` (XRD) | B4 | `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass` |
 
 A10 configures Letta to consume the connection secrets these XRDs write; it does not extend their schemas. `[PROPOSED — not in source]` `MemoryStore.backendType` value naming Letta is not enumerated in Canon; A10 uses whatever value B4 assigns and does not coin it.
 
@@ -83,7 +83,7 @@ A10 configures Letta to consume the connection secrets these XRDs write; it does
 
 ### 4.4 Data schemas / connection-secret contracts
 
-- Letta consumes the **uniform connection secret** (`host`, `port`, `user`, `password`, `dbname` or per-primitive equivalent) written by the `XPostgres` and `XSearchIndex` Compositions (interface-contract §4; ADR 0041) — A10 branches on neither substrate.
+- Letta consumes the **uniform connection secret** (`host`, `port`, `user`, `password`, `dbname` or per-primitive equivalent) written by the `Postgres` and `SearchIndex` Compositions (interface-contract §4; ADR 0044) — A10 branches on neither substrate.
 - Letta state schema in Postgres is an upstream-owned detail; A10 does not redefine it. The architectural invariant A10 must uphold: **everything Letta puts in OpenSearch is reproducible from Postgres or object storage** (§6.3).
 
 ## 5. OSS-vs-Custom Decision
@@ -96,8 +96,8 @@ A10 configures Letta to consume the connection secrets these XRDs write; it does
 ## 6. Functional Requirements
 
 - REQ-A10-01: A10 installs Letta via Helm at a single pinned tested version, namespace-scoped, ArgoCD-synced.
-- REQ-A10-02: Letta persists its state to managed Postgres consumed via the `XPostgres` connection secret; on kind it uses in-cluster CloudNativePG and on AWS RDS, without A10 branching on substrate.
-- REQ-A10-03: Any retrieval index Letta maintains in OpenSearch (via `XSearchIndex`) is reproducible from Postgres/object storage; OpenSearch is never the memory system of record.
+- REQ-A10-02: Letta persists its state to managed Postgres consumed via the `Postgres` connection secret; on kind it uses in-cluster CloudNativePG and on AWS RDS, without A10 branching on substrate.
+- REQ-A10-03: Any retrieval index Letta maintains in OpenSearch (via `SearchIndex`) is reproducible from Postgres/object storage; OpenSearch is never the memory system of record.
 - REQ-A10-04: Letta is reachable by agents **only** through the `Memory` CRD binding (A5) and the Platform SDK `memory.*` path (B6/B11); no direct agent-facing Letta endpoint is exposed.
 - REQ-A10-05: A `Memory` referencing a `MemoryStore` with `accessMode: private` permits reads only by the writing Platform Agent; `namespace-shared` permits reads by any Platform Agent in the same namespace; `RBAC/OPA-controlled` follows RBAC-as-floor / OPA-as-restrictor.
 - REQ-A10-06: Memory read and write actions emit structured audit events attributing the agent identity and the store's declared access mode, through the audit adapter library.
@@ -137,7 +137,7 @@ A10 configures Letta to consume the connection secrets these XRDs write; it does
 ## 9. Acceptance Criteria
 
 - AC-A10-01 (REQ-A10-01): ArgoCD sync installs Letta at the pinned version, namespace-scoped; pods become ready.
-- AC-A10-02 (REQ-A10-02): On both kind and AWS, Letta starts against the `XPostgres` connection secret with no substrate-specific config in Letta values.
+- AC-A10-02 (REQ-A10-02): On both kind and AWS, Letta starts against the `Postgres` connection secret with no substrate-specific config in Letta values.
 - AC-A10-03 (REQ-A10-03): Deleting and rebuilding the OpenSearch memory index reconstructs it from Postgres/object storage with no memory loss.
 - AC-A10-04 (REQ-A10-04): No route reaches Letta from an agent pod except through the `memory.*`/adapter path; a direct connection attempt fails.
 - AC-A10-05 (REQ-A10-05): For each access mode, the cross-agent and cross-namespace read matrix matches the spec (private denies non-writer; namespace-shared allows same-ns; RBAC/OPA denies beyond floor and allows within).
@@ -152,7 +152,7 @@ A10 configures Letta to consume the connection secrets these XRDs write; it does
 ## 10. Risks & Open Questions
 
 - R-A10-1 (med): Letta multi-tenancy gaps (ADR 0005/§9). Mitigation: namespace-scoped instances + `Memory` CRD wrapping. Flag into B22.
-- R-A10-2 (med): the Postgres runtime dependency is not in the CSV upstream edge set but is stated in §6.3/ADR 0005. `[PROPOSED]` treated as HARD via B4 `XPostgres`; confirm with B4 sequencing.
+- R-A10-2 (med): the Postgres runtime dependency is not in the CSV upstream edge set but is stated in §6.3/ADR 0005. `[PROPOSED]` treated as HARD via B4 `Postgres`; confirm with B4 sequencing.
 - R-A10-3 (low): `MemoryStore.backendType` value for Letta not in Canon. `[PROPOSED]`; use B4-assigned value.
 - R-A10-4 (med): RBAC/OPA access-mode enforcement semantics for memory reads/writes are deferred (ADR 0025 / architecture-backlog §4). Open question: how is per-request OPA invoked on a memory read — at the SDK/adapter, at Letta, or both? Resolve with B11/B16. Blast radius med (affects cross-namespace sharing correctness).
 - R-A10-5 (low): OpenSearch reproducibility must be enforced/tested, not assumed; a non-reproducible index would violate the §6.3 invariant.
@@ -160,6 +160,6 @@ A10 configures Letta to consume the connection secrets these XRDs write; it does
 ## 11. References
 
 - architecture-overview.md §6.3 (memory & data, lines 294–347), §6.4 (KB access patterns, 349–368), §6.5 (observability), §6.6 (audit/OPA points), §6.7 (eventing), §6.9 (multi-tenancy), §6.13 (versioning), §9 (OSS limitations), §14.1 (deliverables, A10 row 1676).
-- ADR 0005 (Letta backend); ADR 0025 (memory access modes); ADR 0014 (Postgres primary / OpenSearch retrieval); ADR 0009 (OpenSearch); ADR 0041 (substrate abstraction); ADR 0018 (RBAC-floor/OPA-restrictor); ADR 0030/0031/0034.
-- interface-contract §1.6 (`MemoryStore`, `XPostgres`, `XSearchIndex`), §4 (connection-secret), §2 (CloudEvents), §6 (deferred gaps).
+- ADR 0005 (Letta backend); ADR 0025 (memory access modes); ADR 0014 (Postgres primary / OpenSearch retrieval); ADR 0009 (OpenSearch); ADR 0044 (substrate abstraction); ADR 0018 (RBAC-floor/OPA-restrictor); ADR 0030/0031/0034.
+- interface-contract §1.6 (`MemoryStore`, `Postgres`, `SearchIndex`), §4 (connection-secret), §2 (CloudEvents), §6 (deferred gaps).
 - glossary (Letta, MemoryStore, OpenSearch, connection secret). Related: A5, A11, B4, B6, B11, B16.
