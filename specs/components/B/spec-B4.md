@@ -104,7 +104,7 @@ interface-contract §1.6. Anything else is tagged `[PROPOSED — not in source]`
 
 **Substrate XRDs (one Composition per substrate — kind + AWS):**
 
-| XRD (XR ↔ claim) | Key fields (source) | kind Composition | AWS Composition |
+| XR | Key fields (source) | kind Composition | AWS Composition |
 |---|---|---|---|
 | `Postgres` ↔ `Postgres` | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass` | CloudNativePG `Cluster` | Crossplane `RDSInstance` |
 | `SearchIndex` ↔ `SearchIndex` | `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass` | in-cluster OpenSearch operator | AWS-managed OpenSearch (Crossplane MR) |
@@ -117,7 +117,7 @@ interface-contract §1.6. Anything else is tagged `[PROPOSED — not in source]`
 
 **Higher-level XRDs (compose substrate primitives):**
 
-| XRD (XR ↔ claim) | Key fields (source) | Composes |
+| XR | Key fields (source) | Composes |
 |---|---|---|
 | `AuditLog` ↔ `AuditLog` (XR `AuditLog`) | `postgresRef`, `s3BucketRef`, `indexerRef`, `batchScheduleSpec`, `endpointReplicas` | `Postgres` + `ObjectStore` + indexer + (AWS) batch CronJob + endpoint Deployment |
 | `AgentDatabase` ↔ `AgentDatabase` | `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef` | `Postgres` **or** `MongoDocStore` per `engine` |

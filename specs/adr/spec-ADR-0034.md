@@ -59,7 +59,7 @@ ADR decisions honored:
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 - **`AuditLog` (XRD)**, namespaced. Source-stated fields: `postgresRef`, `s3BucketRef`, `indexerRef`,
-  `batchScheduleSpec`, `endpointReplicas`. (XRD kind: `XAuditLog`, created as a namespaced XR directly in the tenant namespace per Crossplane v2.) One XR provisions: Postgres
+  `batchScheduleSpec`, `endpointReplicas`. (XRD kind: `AuditLog`, created as a namespaced XR directly in the tenant namespace per Crossplane v2.) One XR provisions: Postgres
   backing store, S3 bucket + lifecycle (AWS only), OpenSearch indexer config, the ~5-minute batch
   CronJob (AWS only), and the audit endpoint Deployment. Composes `Postgres` (system of record on
   kind and AWS) and `ObjectStore` (S3 archive on AWS; MinIO or no-op on kind). XRD versioning
