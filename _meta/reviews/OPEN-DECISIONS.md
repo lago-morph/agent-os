@@ -2,6 +2,8 @@
 
 The decisions already made are in `DECISIONS-LOG.md`. This document covers only what is **still open**, in plain English, with enough detail to decide. For each: **what it is · why it matters · the options · my recommendation · what I need from you.**
 
+> **STATUS — updated 2026-05-31:** Five of the six below are now **DECIDED** (recorded in `DECISIONS-LOG.md`): #1 policy bundle, #2 memory store (design-time abstraction owned by the memory adapter), #3 quota schema (native CPU/memory, extensible typed list, presence required / value may be `unlimited`), #5 `system` & `system-mediated` meanings, #6 egress baseline. **Only #4 (Crossplane v1→v2 pass) remains** — its *approach* is decided (supersede ADR-0041 → new ADR → move old to `adr/superseded/`, then sweep); it needs the **go to launch**. Sections below are kept as the rationale of record.
+
 ---
 
 ## 1. The policy bundle — who controls the rules, and how they ship
