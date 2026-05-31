@@ -32,7 +32,7 @@ B7,COMPONENT,Initial agent SDK — LangGraph + Deep Agents,B,T0,W3,B6;A6;A5,B18;
 B8,COMPONENT,Knative event adapter services,B,T1,W1,A4,B12,M
 B9,COMPONENT,agent-platform CLI,B,T1,W2,A1;A2;A5,B21;B14;B15,L
 B10,COMPONENT,Coach Component (self-retrospection),B,T1,W3,B6;A5;A2;A14,,M
-B11,COMPONENT,Memory backend adapter,B,T1,W1,A10,,M
+B11,COMPONENT,Memory backend adapter,B,T1,W1,A10;B4,,M
 B12,COMPONENT,CloudEvent schema registry,B,T0,W2,A4;B8,B19,M
 B13,COMPONENT,Custom Python kopf operator for LiteLLM,B,T0,W1,A1,A17;B16;B17,L
 B14,COMPONENT,agent-platform test framework,B,T1,W3,B9,B15,L
