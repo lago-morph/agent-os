@@ -13,6 +13,7 @@ Enforcement/verification map. ADR 0002 is enforced by component A7 (OPA/Gatekeep
 - TASK-03: Specify per-kind Gatekeeper admission-deny conformance for the §4.1 surface — produces: Chainsaw suite (A7/B16) — depends-on: [TASK-01]
 - TASK-04: Specify the runtime-decision conformance (LiteLLM/Envoy/Headlamp resolve via OPA) — produces: e2e + trace check (B2/A6/A9) — depends-on: [TASK-01]
 - TASK-05: Specify the Rego-as-code gate (SHA-pin + unit tests + RBAC-floor conformance) — produces: CI gate spec (B3/B16, ADR 0030) — depends-on: [TASK-01]
+- TASK-06: Specify policy-bundle governance checks — security-team PR approval for the global/cross-tenant bundle (#24), cryptographic signature verified at load (#25), staged audit→enforce rollout via Kargo (#26) — produces: CI/policy checks (A7/B16/A23) — depends-on: [TASK-01]
 
 ## 3. Dependency Map
 ### 3.1 Upstream that must ship first (HARD)
@@ -29,6 +30,7 @@ TASK-02, TASK-03, TASK-04, TASK-05 fan out independently after TASK-01.
 - AC-01/02/03 → Chainsaw (admission webhook inventory + per-kind deny).
 - AC-04 → Playwright + PyTest (Headlamp gate e2e; LiteLLM/Envoy OPA-query trace assertion).
 - AC-05/06/07 → PyTest (bundle SHA-pin drift, Rego unit-test gate, RBAC-floor conformance).
+- AC-08/09/10 → policy-bundle governance: security-team-approval-on-PR for the global/cross-tenant bundle (#24), signature verification at load (#25), and staged audit→enforce rollout promoted via Kargo (#26).
 Fixtures: stub LiteLLM callback + Envoy until A1/A6 land; canned Rego bundle for gate tests.
 
 ## 6. PR / Branch Mapping

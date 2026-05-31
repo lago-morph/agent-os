@@ -146,8 +146,8 @@ Per §14.1:
 
 ## 9. Acceptance Criteria
 
-- **AC-A21-01** (REQ-A21-01): A `TenantOnboarding` claim accepts `tenantId`, `namespaces[]`, `defaultServiceAccounts[]`, `clusterOIDCClaimMapping` and is rejected if applied cluster-scoped (namespaced only).
-- **AC-A21-02** (REQ-A21-02): Reconciling a claim with two entries in `namespaces[]` creates both namespaces, each carrying the platform tenancy-metadata labels.
+- **AC-A21-01** (REQ-A21-01): A `TenantOnboarding` XR accepts `tenantId`, `namespaces[]`, `defaultServiceAccounts[]`, `clusterOIDCClaimMapping` and is rejected if applied cluster-scoped (namespaced only).
+- **AC-A21-02** (REQ-A21-02): Reconciling an XR with two entries in `namespaces[]` creates both namespaces, each carrying the platform tenancy-metadata labels.
 - **AC-A21-03** (REQ-A21-03): Reconcile creates each ServiceAccount in `defaultServiceAccounts[]`, federated to the cluster OIDC issuer.
 - **AC-A21-04** (REQ-A21-04): Reconcile records the cluster-OIDC-side claim mapper from `clusterOIDCClaimMapping`; no upstream-IdP mapper is created.
 - **AC-A21-05** (REQ-A21-05): Onboarding a tenant creates zero CapabilitySets; the tenant exists and is usable for namespace-scoped operations without one.

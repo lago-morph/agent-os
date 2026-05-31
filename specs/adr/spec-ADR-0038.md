@@ -93,6 +93,8 @@ the HolmesGPT skill is custom. Those calls live in the A20 / A22 / A14 SPECs.
 - REQ-ADR-0038-06: A simulator call MUST NOT enter the enforcement path — it MUST NEVER cause a real admission, runtime, or egress decision.
 - REQ-ADR-0038-07: Simulator runs MUST be audited under the `platform.policy.*` taxonomy.
 - REQ-ADR-0038-08: The simulator MUST be a point-query "what would happen for this case" surface only; it MUST NOT claim to be formal verification, enumerate the policy space, or replace the ADR 0027 security review.
+- REQ-ADR-0038-09: A candidate policy bundle's cryptographic signature MUST verify (ADR 0002, #25) before its simulation result is accepted by the promotion gate; an unsigned or signature-invalid bundle MUST NOT be promotable.
+- REQ-ADR-0038-10: The simulate→audit-mode→enforce sequence MUST be staged: after simulation a new/changed bundle runs in audit mode first and flips to enforce only after review, via the Kargo-promoted transition (ADR 0002 #26, ADR 0040).
 
 ## 7. Non-Functional Requirements
 - Security (§6.6): the simulator reasons about "OPA bypass" / "capability escape" (ADR 0027) before an incident; it is read-only and side-effect-free by REQ-06.
@@ -115,6 +117,8 @@ HolmesGPT skill (A14) carry their deliverables in their own SPECs. Conformance i
 - AC-ADR-0038-05: Honored when an approval-bearing action returns its resolved required level and no `Approval` resource is created by the simulation. (→ REQ-05)
 - AC-ADR-0038-06: Honored when a simulator run is shown to produce no real admission/runtime/egress decision (side-effect-free). (→ REQ-06)
 - AC-ADR-0038-07: Honored when every simulator run appears as an audit event under `platform.policy.*`. (→ REQ-07)
+- AC-ADR-0038-08: Honored when a bundle with no/invalid signature is rejected by the promotion gate even if its simulation passed, and a validly signed simulated bundle is promotable. (→ REQ-09)
+- AC-ADR-0038-09: Honored when a newly simulated bundle is shown entering audit mode first and flipping to enforce only after review via the Kargo-promoted transition. (→ REQ-10)
 
 ## 10. Risks & Open Questions
 - (med) The simulator's accuracy depends on every decision-point component exposing a faithful dry-run (REQ-02); a stale or divergent dry-run path silently misleads — per-component dry-run fidelity is an A20-coordinated concern.

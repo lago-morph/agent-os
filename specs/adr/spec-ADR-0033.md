@@ -55,8 +55,8 @@ ADR decisions honored:
 ## 4. Interfaces & Contracts
 
 ### 4.1 CRDs / XRDs
-This ADR imposes no new CRD/XRD. It consumes the substrate XRDs defined by ADR 0044 (`XPostgres`,
-`XSearchIndex`, `XObjectStore`, `XMongoDocStore`) which carry `substrateClass` and a
+This ADR imposes no new CRD/XRD. It consumes the substrate XRDs defined by ADR 0044 (`Postgres`,
+`SearchIndex`, `ObjectStore`, `MongoDocStore`) which carry `substrateClass` and a
 `connectionSecretRef`. The cluster substrate-selection label is `platform.io/environment` with
 values `kind` | `aws`.
 

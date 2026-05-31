@@ -5,20 +5,20 @@
 > upstream-pieces: [A11, B4] · downstream-pieces: [A10, A18, B11, C8, F2]
 
 ## 1. Implementation Strategy
-Enforcement/verification map. ADR 0014 is a platform invariant enforced by every stateful component's write path plus the rebuild-path contract. Primary enforcers: **B4** (provides `XPostgres`/`XSearchIndex` Compositions writing the uniform connection-secret), **A18** (audit pipeline keeps Postgres+S3 as SoR, OpenSearch advisory), **A11** (OpenSearch operated as the derived retrieval layer), with **A10** (Letta), **C8** (KB indexing), and **F2** (DR testing) each demonstrating a documented rebuild path. Conformance is tested by a system-of-record inventory (no OpenSearch-only data), a rebuild/reindex drill from primaries, a DR drill via Postgres restore + reindex, and a write-path audit asserting every stateful component writes a primary first.
+Enforcement/verification map. ADR 0014 is a platform invariant enforced by every stateful component's write path plus the rebuild-path contract. Primary enforcers: **B4** (provides `Postgres`/`SearchIndex` Compositions writing the uniform connection-secret), **A18** (audit pipeline keeps Postgres+S3 as SoR, OpenSearch advisory), **A11** (OpenSearch operated as the derived retrieval layer), with **A10** (Letta), **C8** (KB indexing), and **F2** (DR testing) each demonstrating a documented rebuild path. Conformance is tested by a system-of-record inventory (no OpenSearch-only data), a rebuild/reindex drill from primaries, a DR drill via Postgres restore + reindex, and a write-path audit asserting every stateful component writes a primary first.
 
 ## 2. Ordered Task List
 - TASK-01: Map each REQ to its enforcing component piece ID — produces: enforcement matrix — depends-on: []
 - TASK-02: Build the SoR inventory + per-index rebuild-source catalogue — produces: index/rebuild catalogue — depends-on: [TASK-01]
 - TASK-03: Verify audit pipeline keeps Postgres+S3 SoR / OpenSearch advisory (ADR 0034 cross-check) — produces: A18 conformance note — depends-on: [TASK-01]
-- TASK-04: Verify uniform connection-secret parity across kind/AWS `XPostgres` Compositions — produces: B4 secret-parity note — depends-on: [TASK-01]
+- TASK-04: Verify uniform connection-secret parity across kind/AWS `Postgres` Compositions — produces: B4 secret-parity note — depends-on: [TASK-01]
 - TASK-05: Define reindex-from-primaries conformance drill — produces: PyTest+Chainsaw set — depends-on: [TASK-02]
 - TASK-06: Define DR drill (Postgres restore + reindex, no OpenSearch backup) — produces: F2 trace — depends-on: [TASK-02]
 - TASK-07: Define write-path audit (every stateful component writes a primary first) — produces: review/CI lint — depends-on: [TASK-02]
 
 ## 3. Dependency Map
 ### 3.1 Upstream pieces that must ship first (HARD)
-- A11 (OpenSearch as the derived layer), B4 (`XPostgres`/`XSearchIndex` primaries).
+- A11 (OpenSearch as the derived layer), B4 (`Postgres`/`SearchIndex` primaries).
 ### 3.2 Downstream pieces blocked on this
 - A10 (Letta derived indexes), A18 (audit SoR), C8 (KB indexing), F2 (DR testing).
 ### 3.3 Continuous (non-blocking) inputs

@@ -10,7 +10,7 @@ order. The structural root is **B4** (W1) — the `TenantOnboarding` XRD that pr
 default ServiceAccounts, and the cluster-OIDC claim mapping. **A21** (W3) drives the Headlamp +
 GitOps onboarding flow over that XRD. **B1** (W1) scopes UI sessions to the Platform JWT claims, and
 the policy enforcement (A7 admission + B16 OPA content, W0/W2) realizes the three-layer
-visibility model. The namespace-as-tenancy-boundary and claim-consumption invariants (SPEC §6) are
+visibility model. The namespace-as-tenancy-boundary and XR-API invariants (SPEC §6) are
 verified end-to-end against a running two-tenant cluster, not per-component.
 
 ## 2. Ordered Task List
@@ -44,8 +44,8 @@ Maps SPEC §9 ACs to layers; realized by B4/A21/B1/A7/B16 deliverables, verified
   blocked by Envoy network policy.
 - AC-V6-09-04 → **PyTest**: OPA-denied dynamic registration yields no discoverable A2A/MCP exposing.
 - AC-V6-09-05 → **Chainsaw**: cross-namespace CapabilitySet without OPA publication rejected.
-- AC-V6-09-06 → **Chainsaw**: apply `TenantOnboarding` claim; assert namespace(s) + ServiceAccounts
-  wired to cluster OIDC + claim-to-tenant binding.
+- AC-V6-09-06 → **Chainsaw**: apply `TenantOnboarding` XR; assert namespace(s) + ServiceAccounts
+  wired to cluster OIDC + tenant onboarding binding.
 - AC-V6-09-07 → **Chainsaw**: onboard tenant with zero CapabilitySets; remove a CapabilitySet without
   re-onboarding.
 Fixtures: fake Keycloak JWT minter (claim schema); fake LiteLLM admin API + Envoy allowlist until

@@ -21,6 +21,8 @@ audit are verified distinctly.
 - TASK-05: Verify approval-bearing action returns resolved level and creates no `Approval` — produces: Chainsaw/PyTest no-side-effect test — depends-on: [TASK-01]
 - TASK-06: Verify a simulator run causes no real admission/runtime/egress decision — produces: side-effect-freedom test — depends-on: [TASK-01]
 - TASK-07: Verify each simulator run emits `platform.policy.*` audit — produces: PyTest audit test — depends-on: [TASK-01]
+- TASK-08: Verify a bundle with no/invalid signature is rejected by the promotion gate even if simulation passed; a validly signed simulated bundle is promotable (AC-08, #25) — produces: gate test — depends-on: [TASK-01]
+- TASK-09: Verify staged rollout — a newly simulated bundle enters audit mode first and flips to enforce only after review via the Kargo-promoted transition (AC-09, #26) — produces: integration test — depends-on: [TASK-01]
 
 ## 3. Dependency Map
 ### 3.1 Upstream pieces that must ship first (HARD)
@@ -41,6 +43,7 @@ TASK-01 and TASK-02 run concurrently. After TASK-01: TASK-03, TASK-04, TASK-05, 
 - AC-05 → Chainsaw/PyTest no-`Approval`-created (TASK-05).
 - AC-06 → side-effect-freedom (TASK-06).
 - AC-07 → PyTest `platform.policy.*` audit presence (TASK-07).
+- AC-08, AC-09 → bundle-signing verification at the promotion gate (TASK-08) and staged audit→enforce rollout via Kargo (TASK-09).
 
 ## 6. PR / Branch Mapping
 ### 6.1 Stack position — base branch = `wave/authoring`

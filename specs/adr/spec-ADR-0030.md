@@ -48,7 +48,7 @@ All v1.0 platform CRDs/XRDs are namespaced (glossary invariant). Each uses Kuber
 - agent-sandbox-reconciled (`Sandbox`, `SandboxTemplate`) — owner **A6**.
 - kopf-operator-reconciled (`MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, `BudgetPolicy`) — owner **B13**.
 - `Approval` — owner **B19** (Argo Workflow); `LogLevel` — per-component.
-- Crossplane XRs/XRDs (`MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`, `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `XAgentDatabase`, `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`) — owner **B4**.
+- Crossplane XRs/XRDs (`MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`, `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `AgentDatabase`, `Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore`) — owner **B4**.
 
 Breaking-change obligation per CRD/XRD: introduce a new `vN` API group; provide a conversion webhook; deprecate `vN-1` for ≥1 minor platform release before removal; the reconciler author plans webhook delivery, certificate rotation, and stored-version migration as part of the change. XRDs follow this identically (ADR 0044), including both substrate Compositions when an XR schema changes.
 

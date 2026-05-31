@@ -35,7 +35,7 @@ invariants*, not the per-CRD field design.
 - Per-CRD **field schema design** — the owning component spec + the realizing view (capability CRDs →
   V6-08, tenancy → V6-09, data/substrate → V6-03, observability → V6-05, approval → §7.5/B19).
 - **Versioning policy mechanics** (conversion webhooks, deprecation windows) — **V6-13 / ADR 0030**.
-- Substrate Composition behaviour + connection-secret shape — **ADR 0041 / V6-03**.
+- Substrate Composition behaviour + connection-secret shape — **ADR 0044 / V6-03**.
 - The CloudEvent taxonomy (not CRDs) — **V6-07 / ADR 0031**.
 - `Tool` and `Query` field sets — **defer to ARK** (component A5).
 

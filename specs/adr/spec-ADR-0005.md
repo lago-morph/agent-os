@@ -39,7 +39,7 @@ Platform SDK `memory.*` (B6) is the **only** path Platform Agents use to reach L
 `MemoryStore` lifecycle (created/started/paused/resumed/completed/failed/deleted) under `platform.lifecycle.*`. Per-event-type names deferred to B12.
 
 ### 4.4 Data schemas / connection-secret contracts
-Letta state lives in managed Postgres (via the substrate `XPostgres` connection-secret shape: `host`, `port`, `user`, `password`, `dbname`). OpenSearch indexes Letta maintains are reproducible from Postgres/object storage and are never a system of record.
+Letta state lives in managed Postgres (via the substrate `Postgres` connection-secret shape: `host`, `port`, `user`, `password`, `dbname`). OpenSearch indexes Letta maintains are reproducible from Postgres/object storage and are never a system of record.
 
 ## 5. OSS-vs-Custom Decision
 Upstream project: **Letta** (fully OSS), installed as a memory service behind `Memory` CRD; B11 is a thin custom adapter. Mode: install + wrap (B11 adapter) + pin. Rationale per ADR 0005: fully-OSS posture (self-host, no vendor dependency) and OS-style tiered memory model. Rejected: Mem0, Zep/Graphiti, Cognee, LangMem (collective rationale, backlog §2.9). Multi-tenancy gaps mitigated by wrapping behind `Memory` CRD + namespace-scoped instances.

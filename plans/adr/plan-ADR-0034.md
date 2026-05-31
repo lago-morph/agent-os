@@ -27,7 +27,7 @@ egress (ADR 0003) are honored by reusing those mechanisms, not re-inventing them
 
 ## 3. Dependency Map
 ### 3.1 Upstream pieces that must ship first (HARD)
-- B4 — Crossplane Compositions (`XPostgres`, `XObjectStore` that `AuditLog` composes).
+- B4 — Crossplane Compositions (`Postgres`, `ObjectStore` that `AuditLog` composes).
 - A11 — OpenSearch (advisory fanout target).
 - A7 — OPA/Gatekeeper (admits the XR only on matching substrate Composition).
 ### 3.2 Downstream pieces blocked on this

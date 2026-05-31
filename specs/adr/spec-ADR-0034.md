@@ -33,13 +33,13 @@ the authoritative store, and keeps OpenSearch a rebuildable index that can fail 
 ### 2.2 Out of scope (and where it lives instead)
 - Audit **retention durations, redaction rules, lifecycle specifics** — deferred to Workstream F (component F1) per architecture-backlog §1.13.
 - Per-event-type audit **schemas** under `platform.audit.*` — owned by component B12 (schema registry).
-- The substrate XRDs (`XPostgres`, `XObjectStore`) the `AuditLog` XRD composes — owned by ADR 0044 / B4.
+- The substrate XRDs (`Postgres`, `ObjectStore`) the `AuditLog` XRD composes — owned by ADR 0044 / B4.
 - The dynamic-toggle mechanism itself — owned by ADR 0035.
 - The audit-endpoint component build and adapter-library build — owned by component A18.
 
 ## 3. Context & Dependencies
 
-Upstream consumed: B4 (Crossplane Compositions) supplies `XPostgres` + `XObjectStore` that the
+Upstream consumed: B4 (Crossplane Compositions) supplies `Postgres` + `ObjectStore` that the
 `AuditLog` XRD composes; A11 (OpenSearch) is the advisory fanout target; A7 (OPA/Gatekeeper) admits
 the XR only when a Composition matches the cluster's substrate label (ADR 0044). Downstream
 consumers: A18 (builds the adapter library + audit endpoint), B4 (owns the `AuditLog` Composition),
@@ -50,7 +50,7 @@ ADR decisions honored:
 - **ADR 0034** (this): single adapter; no direct writes; Postgres+S3 SoR; OpenSearch advisory; `AuditLog` XRD provisions the pipeline.
 - **ADR 0031**: audit events carry a `type` under `platform.audit.*`.
 - **ADR 0035**: the audit endpoint owns its own dynamic `LogLevel` toggle.
-- **ADR 0044**: `AuditLog` is a canonical substrate-abstraction instance composing `XPostgres` + `XObjectStore`; kind may produce "no archive" (graceful degradation).
+- **ADR 0044**: `AuditLog` is a canonical substrate-abstraction instance composing `Postgres` + `ObjectStore`; kind may produce "no archive" (graceful degradation).
 - **ADR 0040**: Kargo promotes the `AuditLog` XR uniformly across substrates.
 - **ADR 0014 / ADR 0033**: Postgres dual-mode (RDS on AWS, in-cluster on kind); kind functionally complete without cloud services.
 - **ADR 0003**: audit-endpoint egress to S3 and managed OpenSearch goes through the Envoy egress proxy.
@@ -61,8 +61,8 @@ ADR decisions honored:
 - **`AuditLog` (XRD)**, namespaced. Source-stated fields: `postgresRef`, `s3BucketRef`, `indexerRef`,
   `batchScheduleSpec`, `endpointReplicas`. (XRD kind: `XAuditLog`, created as a namespaced XR directly in the tenant namespace per Crossplane v2.) One XR provisions: Postgres
   backing store, S3 bucket + lifecycle (AWS only), OpenSearch indexer config, the ~5-minute batch
-  CronJob (AWS only), and the audit endpoint Deployment. Composes `XPostgres` (system of record on
-  kind and AWS) and `XObjectStore` (S3 archive on AWS; MinIO or no-op on kind). XRD versioning
+  CronJob (AWS only), and the audit endpoint Deployment. Composes `Postgres` (system of record on
+  kind and AWS) and `ObjectStore` (S3 archive on AWS; MinIO or no-op on kind). XRD versioning
   follows ADR 0030 (conversion webhooks + deprecation windows on both Compositions, per ADR 0044).
 
 ### 4.2 APIs / SDK surfaces

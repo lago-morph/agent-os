@@ -13,8 +13,8 @@ The problem the decision solves: a fixed initial set lets ESO plumbing, OPA admi
 ### 2.1 In scope
 - The fixed v1.0 MCP set, each as a namespaced `MCPServer` CRD reconciled by B13 into the LiteLLM registry.
 - Three credential modes as first-class: system-credential, user-credential (LiteLLM-brokered OAuth), system-mediated (OpenSearch against the platform's own instance).
-- Per-agent/tenant/user database provisioning fronted by the **`XAgentDatabase`** XRD, composing `XPostgres` / `XMongoDocStore` per substrate (ADR 0044); RBAC + OPA decide assignment.
-- OpenSearch MCP system-mediated mode reusing `XSearchIndex`.
+- Per-agent/tenant/user database provisioning fronted by the **`AgentDatabase`** XRD, composing `Postgres` / `MongoDocStore` per substrate (ADR 0044); RBAC + OPA decide assignment.
+- OpenSearch MCP system-mediated mode reusing `SearchIndex`.
 - Generic web-search/web-scrape servers with policy enforced at the MCP-server-access layer (OPA), endpoints kept simple internally.
 - ESO-sourced secrets; no gateway-side bypass — adding a service means landing a new `MCPServer` CRD + ESO/OPA wiring.
 - Firecrawl removed; commercial fallback deferred.
@@ -23,29 +23,29 @@ The problem the decision solves: a fixed initial set lets ESO plumbing, OPA admi
 - A17 implementation (install, registration, wiring) — component **A17** SPEC.
 - Per-service auth flows, scopes, secret shapes, revocation, budget enforcement, per-XRD field schemas, search/scrape OPA bundle contents — design-time (architecture-backlog §1.11).
 - MCP-server health-check details — deferred (architecture-backlog §1.9).
-- `XAgentDatabase` / `XPostgres` / `XMongoDocStore` / `XSearchIndex` Composition builds — component **B4** / ADR 0044.
+- `AgentDatabase` / `Postgres` / `MongoDocStore` / `SearchIndex` Composition builds — component **B4** / ADR 0044.
 - kopf operator — component **B13** / ADR 0013; LiteLLM broker — **A1**.
 - Commercial fallback (Firecrawl, Google Search API) — future-enhancements.
 
 ## 3. Context & Dependencies
-Upstream consumed: **A17** (initial MCP services integration) implements the set; **A1** LiteLLM (single broker for MCP credentials/OAuth, shared callback chain); **B13** kopf operator (reconciles `MCPServer` CRDs). Downstream consumers / conformers: **A7** OPA (admission + access gating), **B4** Crossplane (`XAgentDatabase`/`XPostgres`/`XMongoDocStore`/`XSearchIndex`), **A11** OpenSearch (system-mediated target), **A16** Interactive Access Agent, **A14** HolmesGPT, **B10** Coach (compose against the set via CapabilitySet).
+Upstream consumed: **A17** (initial MCP services integration) implements the set; **A1** LiteLLM (single broker for MCP credentials/OAuth, shared callback chain); **B13** kopf operator (reconciles `MCPServer` CRDs). Downstream consumers / conformers: **A7** OPA (admission + access gating), **B4** Crossplane (`AgentDatabase`/`Postgres`/`MongoDocStore`/`SearchIndex`), **A11** OpenSearch (system-mediated target), **A16** Interactive Access Agent, **A14** HolmesGPT, **B10** Coach (compose against the set via CapabilitySet).
 
 ADR decisions honored:
-- **ADR 0020** (this) — the fixed initial set; three credential modes; `XAgentDatabase` fronting Postgres/MongoDB; web services policed at the access layer; Firecrawl removed.
+- **ADR 0020** (this) — the fixed initial set; three credential modes; `AgentDatabase` fronting Postgres/MongoDB; web services policed at the access layer; Firecrawl removed.
 - **ADR 0013** — each service is an `MCPServer` CRD; access via CapabilitySet inclusion + OPA; B13 reconciles; no bypass.
 - **ADR 0009** — OpenSearch hosting (in-cluster kind / AWS-managed).
 - **ADR 0014** — RBAC + OPA decide database assignment at admission/request time, not hard-coded in the MCPServer spec.
 - **ADR 0018** — RBAC-floor / OPA-restrictor governs database assignment and search/scrape access.
-- **ADR 0021** — `XAgentDatabase` follows the Crossplane v2 XR composition pattern.
+- **ADR 0021** — `AgentDatabase` follows the Crossplane v2 XR composition pattern.
 - **ADR 0033** — set sized for the v1.0 initial implementation targets; dual-hosting story.
 - **ADR 0038** — search/scrape OPA bundle is a primary policy-simulator target before rollout.
-- **ADR 0040 / 0044** — Kargo promotes `XAgentDatabase`/`XSearchIndex` XRs uniformly; substrate-abstraction pattern composes `XPostgres`/`XMongoDocStore`.
+- **ADR 0040 / 0044** — Kargo promotes `AgentDatabase`/`SearchIndex` XRs uniformly; substrate-abstraction pattern composes `Postgres`/`MongoDocStore`.
 
 ## 4. Interfaces & Contracts
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 - `MCPServer` (namespaced, B13) — one per service: `endpoint`, `authMode` (system / user-cred / system-mediated), `credentialsRef` (ESO), `tags`, `scopes`, `visibility`.
-- `XAgentDatabase` (XRD, namespaced XR created directly in the tenant namespace per Crossplane v2, B4) — `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef`. Composes `XPostgres` (CloudNativePG kind / RDS AWS) or `XMongoDocStore` (Bitnami kind / DocumentDB-or-self-managed AWS).
-- `XSearchIndex` (XRD, B4) — reused by OpenSearch MCP system-mediated mode; `connectionSecretRef`, `substrateClass`.
+- `AgentDatabase` (XRD, namespaced XR created directly in the tenant namespace per Crossplane v2, B4) — `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef`. Composes `Postgres` (CloudNativePG kind / RDS AWS) or `MongoDocStore` (Bitnami kind / DocumentDB-or-self-managed AWS).
+- `SearchIndex` (XRD, B4) — reused by OpenSearch MCP system-mediated mode; `connectionSecretRef`, `substrateClass`.
 - `CapabilitySet` (B13) — includes the `MCPServer` refs that grant agents access.
 
 ### 4.2 APIs / SDK surfaces
@@ -56,7 +56,7 @@ ADR decisions honored:
 - MCPServer registry add/update/delete under `platform.capability.*`; MCP health changes / routing under `platform.gateway.*`; access decisions under `platform.policy.*`; MCP calls emit audit under `platform.audit.*`. No new top-level namespace.
 
 ### 4.4 Data schemas / connection-secret contracts
-- `XAgentDatabase`-provisioned databases write the uniform connection-secret shape (`host`, `port`, `user`, `password`, `dbname`) per ADR 0044, identical across substrates.
+- `AgentDatabase`-provisioned databases write the uniform connection-secret shape (`host`, `port`, `user`, `password`, `dbname`) per ADR 0044, identical across substrates.
 - ESO supplies MCP-service credentials referenced by `MCPServer.credentialsRef`; per-service secret shapes are design-time — `[PROPOSED — not in source]` (architecture-backlog §1.11).
 
 ## 5. OSS-vs-Custom Decision
@@ -65,8 +65,8 @@ N/A — ADR. (Enforcement note: GitHub / Google Drive / **Context7** MCP servers
 ## 6. Functional Requirements
 - REQ-ADR-0020-01: The v1.0 initial MCP set MUST be exactly {GitHub, Google Drive, Context7, OpenSearch, Postgres, MongoDB, web-search, web-scrape}, each registered as a namespaced `MCPServer` CRD reconciled by B13 into the LiteLLM registry; Firecrawl MUST NOT be in the set.
 - REQ-ADR-0020-02: GitHub and Google Drive MUST ship both system-credential mode (platform-managed shared identity) and user-credential mode (LiteLLM brokers the user's own OAuth); this two-mode shape sets the pattern any later delegated-auth MCP service follows.
-- REQ-ADR-0020-03: OpenSearch MUST ship a system-mediated mode against the platform's own OpenSearch (reusing `XSearchIndex`) plus an agent/tenant/user-credentialed mode for externally operated instances.
-- REQ-ADR-0020-04: Postgres and MongoDB per-agent/tenant/user database provisioning MUST be wrapped by the `XAgentDatabase` XRD that creates the database, role, and grants, composing `XPostgres` or `XMongoDocStore` per substrate (kind/AWS) with one uniform XR schema.
+- REQ-ADR-0020-03: OpenSearch MUST ship a system-mediated mode against the platform's own OpenSearch (reusing `SearchIndex`) plus an agent/tenant/user-credentialed mode for externally operated instances.
+- REQ-ADR-0020-04: Postgres and MongoDB per-agent/tenant/user database provisioning MUST be wrapped by the `AgentDatabase` XRD that creates the database, role, and grants, composing `Postgres` or `MongoDocStore` per substrate (kind/AWS) with one uniform XR schema.
 - REQ-ADR-0020-05: RBAC + OPA MUST decide which agent/tenant/user resolves to which provisioned database at admission and request time; assignment MUST NOT be hard-coded in the `MCPServer` spec.
 - REQ-ADR-0020-06: Generic web-search / web-scrape endpoints MUST stay simple internally; access control MUST be enforced at the MCP-server-access layer where OPA can block specific queries, domains, or scrape targets.
 - REQ-ADR-0020-07: LiteLLM MUST be the single broker for MCP credentials and OAuth flows; all services MUST share the gateway's audit/OPA/Langfuse callback chain.
@@ -77,7 +77,7 @@ N/A — ADR. (Enforcement note: GitHub / Google Drive / **Context7** MCP servers
 ## 7. Non-Functional Requirements
 - Security/tenancy: three credential modes are first-class and load-bearing; database assignment and web access are RBAC-floored / OPA-restricted (ADR 0018); the search/scrape OPA bundle is a primary policy-simulator target (ADR 0038) since false-positives degrade capability and false-negatives leak egress.
 - Observability (§6.5): all MCP calls share the LiteLLM callback chain for audit, OPA, and Langfuse instrumentation; MCP health uses only what the protocol exposes (no synthetic health layer; surfacing deferred, architecture-backlog §1.9).
-- Scale/substrate: `XAgentDatabase` is the first XR pattern minting *runtime* per-agent state; Kargo promotes these XRs uniformly across substrates (ADR 0040).
+- Scale/substrate: `AgentDatabase` is the first XR pattern minting *runtime* per-agent state; Kargo promotes these XRs uniformly across substrates (ADR 0040).
 - Versioning (ADR 0030): `MCPServer` (B13-owned) and the XRDs (B4-owned) versioned with conversion webhooks.
 
 ## 8. Cross-Cutting Deliverable Checklist
@@ -86,8 +86,8 @@ N/A — ADR (verification map in the PLAN). The §14.1 set is owned by enforcing
 ## 9. Acceptance Criteria
 - AC-ADR-0020-01: Honored when all eight services exist as reconciled `MCPServer` CRDs in the LiteLLM registry and no Firecrawl `MCPServer` is present. (REQ-01)
 - AC-ADR-0020-02: Honored when GitHub/Google Drive each operate in both system-credential and user-credential (brokered OAuth) modes. (REQ-02)
-- AC-ADR-0020-03: Honored when the OpenSearch MCP reaches the platform's own instance in system-mediated mode (via `XSearchIndex`) and an external instance in credentialed mode. (REQ-03)
-- AC-ADR-0020-04: Honored when an `XAgentDatabase` XR provisions a per-scope database+role+grants composing `XPostgres`/`XMongoDocStore`, with the same XR schema on kind and AWS. (REQ-04)
+- AC-ADR-0020-03: Honored when the OpenSearch MCP reaches the platform's own instance in system-mediated mode (via `SearchIndex`) and an external instance in credentialed mode. (REQ-03)
+- AC-ADR-0020-04: Honored when an `AgentDatabase` XR provisions a per-scope database+role+grants composing `Postgres`/`MongoDocStore`, with the same XR schema on kind and AWS. (REQ-04)
 - AC-ADR-0020-05: Honored when database assignment is denied/permitted by RBAC+OPA at admission/request, not by a static MCPServer field. (REQ-05)
 - AC-ADR-0020-06: Honored when OPA at the access layer blocks a disallowed search query / scrape target while the endpoint itself stays policy-free. (REQ-06)
 - AC-ADR-0020-07: Honored when every MCP call routes through LiteLLM and produces audit/OPA/Langfuse records via the shared callback chain. (REQ-07)
@@ -99,7 +99,7 @@ N/A — ADR (verification map in the PLAN). The §14.1 set is owned by enforcing
 - OQ-1 (high): Per-service auth flows, scopes, secret shapes, revocation, budget enforcement, per-XRD field schemas, and search/scrape OPA bundle contents are all design-time (architecture-backlog §1.11); many ACs are partial until A17/B4 design lands. `[PROPOSED]`
 - R-1 (med): Self-hosted scraping can be blocked by upstream sites (IP-block/rate-limit); the commercial-fallback path is deferred to future-enhancements, not landed.
 - OQ-2 (low): MCP health-check surfacing is deferred (architecture-backlog §1.9); LiteLLM uses only protocol-native signals. `[PROPOSED]`
-- R-2 (low): `XAgentDatabase` is the first XR minting runtime per-agent state — the precedent matters for later per-agent resources; blast radius bounded by the substrate-abstraction contract (ADR 0044).
+- R-2 (low): `AgentDatabase` is the first XR minting runtime per-agent state — the precedent matters for later per-agent resources; blast radius bounded by the substrate-abstraction contract (ADR 0044).
 
 ## 11. References
 - ADR 0020 (`adr/0020-initial-mcp-services.md`) — the decision enforced here.
