@@ -1,7 +1,11 @@
 # ADR 0041: Substrate abstraction via Crossplane Compositions
 
-- **Status**: Accepted
+- **Status**: Superseded by ADR-0044
 - **Date**: 2026-05-10
+- **Superseded-by**: [ADR 0044 — Crossplane v2 resource model](0044-crossplane-v2-resource-model.md)
+
+> ⚠️ This ADR describes the Crossplane v1 two-layer model (claims + cluster-scoped composites).
+> The platform adopted **Crossplane v2** (namespace-scoped composites, no claims). See ADR 0044.
 
 ## Context
 
