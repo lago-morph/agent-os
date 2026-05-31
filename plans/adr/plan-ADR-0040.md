@@ -15,7 +15,7 @@ sequence. ADR 0040 fixes Kargo as the v1.0 promotion fabric (single-cluster, one
 growing dev→staging→prod), a single mainline with `envs/<stage>/` path overlays (no per-environment
 branches), the Warehouse → Stage flow with a per-Stage verification (smoke) step, the `Approval` CRD
 as Kargo's human gate (composition — neither subsumes the other), OPA-gated promotion actions,
-Keycloak OIDC for the UI + controller, uniform Crossplane claim shapes across substrates, and
+Keycloak OIDC for the UI + controller, uniform Crossplane XR schemas across substrates, and
 recovery by **re-promoting a previous Warehouse commit** (not git-revert; history stays append-only).
 The decision is **enforced by component pieces, not by the ADR**. The four enforcer pieces named in
 the brief are **A23** (the Kargo install component: Helm values, GitOps wiring, per-Stage
@@ -23,7 +23,7 @@ verification configs, single-Stage→multi-Stage phasing, Keycloak OIDC, audit e
 promotion test), **B19** (the `Approval` CRD + Argo Workflow human gate Kargo composes with), **B5**
 (the cross-cutting Kargo Headlamp plugin + per-Stage deep-links), and **B9** (the `agent-platform`
 CLI that orchestrates the three-layer tests, including the two-kind promotion test). Supporting
-enforcers: A7/B16 (OPA promotion-action policies), B4/ADR-0041 (uniform claim shapes), A18
+enforcers: A7/B16 (OPA promotion-action policies), B4/ADR-0044 (uniform XR schemas), A18
 (promotion-action audit), A9 (Headlamp deep-link host). The load-bearing question is conformance,
 verified per §5 against the SPEC's eleven ACs.
 
@@ -39,7 +39,7 @@ build lives in A23/B5/B19). Ordered so the verification critical path is visible
 - `TASK-05: Verify approval-gated Stage creates an `Approval` CRD and proceeds only on the reported decision (A23 + B19) — produces: AC-05 evidence — depends-on: [TASK-03]`
 - `TASK-06: Verify OPA promotion-action policy (time-of-day window) blocks/allows a promotion (A7 + B16) — produces: AC-06 evidence — depends-on: []`
 - `TASK-07: Verify Keycloak OIDC authenticates UI (human) + cluster-OIDC workload identity (controller) (A23) — produces: AC-07 evidence — depends-on: []`
-- `TASK-08: Verify same claim shape promotes across kind→AWS with no Kargo-visible substrate difference (B4, cross-cuts ADR-0041) — produces: AC-08 evidence — depends-on: []`
+- `TASK-08: Verify same XR schema promotes across kind→AWS with no Kargo-visible substrate difference (B4, cross-cuts ADR-0044) — produces: AC-08 evidence — depends-on: []`
 - `TASK-09: Verify recovery by promoting a previous Warehouse commit; no git-revert; history append-only (A23) — produces: AC-09 evidence — depends-on: [TASK-03]`
 - `TASK-10: Verify every promotion action emits an audit event via the platform adapter (A23 + A18) — produces: AC-10 evidence — depends-on: [TASK-03]`
 - `TASK-11: Verify a two-kind (dev+staging) setup exercises promotion mechanics in CI without AWS (B9 CLI + B14) — produces: AC-11 evidence — depends-on: []`
@@ -50,7 +50,7 @@ build lives in A23/B5/B19). Ordered so the verification critical path is visible
 ### 3.1 Upstream pieces that must ship first (HARD) — id + what is consumed
 - **A7** (OPA/Gatekeeper) — promotion-action gating engine (who/what/where/when incl. time-of-day); consumed for REQ-06. Policy content is B16.
 - **B19** (Generalized approval system; **B19-core** lands W3) — `Approval` CRD + Argo Workflow that reports the decision back to Kargo; consumed for REQ-05.
-- **B4** (Crossplane v2 Compositions) — uniform claim shapes that absorb substrate asymmetry; consumed for REQ-08.
+- **B4** (Crossplane v2 Compositions) — uniform XR schemas that absorb substrate asymmetry; consumed for REQ-08.
 - **A9** (Headlamp install + framework) — deep-link host for the Kargo UI per Stage; consumed by §4.2 deep-links.
 
 ### 3.2 Downstream pieces blocked on this — ids
@@ -84,7 +84,7 @@ Map of AC → layer → enforcing piece:
 | AC-05 | approval-gated Stage creates `Approval`; proceeds on reported decision | Chainsaw (`Approval` CRD) | A23 + B19-core |
 | AC-06 | OPA time-of-day policy blocks/allows promotion | PyTest/conftest (Rego) + Chainsaw (admission) | A7 + B16 |
 | AC-07 | Keycloak OIDC for UI + cluster-OIDC workload identity for controller | Playwright (UI login) + PyTest (controller auth) | A23 + B5 |
-| AC-08 | same claim shape across kind→AWS, no Kargo-visible diff | Chainsaw (claim parity) | B4 (cross-cuts ADR-0041) |
+| AC-08 | same XR schema across kind→AWS, no Kargo-visible diff | Chainsaw (XR parity) | B4 (cross-cuts ADR-0044) |
 | AC-09 | recovery by re-promoting a previous Warehouse commit; git append-only | Chainsaw + PyTest (no git-revert) | A23 |
 | AC-10 | every promotion action appears as an audit event | PyTest (audit adapter integration) | A23 + A18 |
 | AC-11 | two-kind (dev+staging) promotion mechanics in CI, AWS-free | PyTest/integration (two-kind harness) | B9 CLI + B14 |

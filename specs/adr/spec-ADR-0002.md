@@ -12,6 +12,7 @@ ADR 0002 fixes a single policy decision engine — OPA, with Gatekeeper as its K
 - OPA as the decision engine; Gatekeeper as the only admission path.
 - The obligation that every policy enforcement point (admission, gateway callback, egress, Headlamp, approvals, virtual-key issuance) evaluates against OPA.
 - Rego bundles in Git, ArgoCD-reconciled, SHA-pinned, CI unit-tested.
+- Policy-bundle governance: the platform security team owns the global/cross-tenant OPA bundle (tenants propose via PR, a security reviewer approves) (#24); bundles are cryptographically signed and verified at load (#25); a new/changed bundle runs in audit mode first and flips to enforce only after review, promoted via Kargo (#26).
 
 ### 2.2 Out of scope (and where it lives instead)
 - Rego library framework — B3; initial content — B16.
@@ -48,6 +49,9 @@ Upstream projects: **OPA** (engine) + **Gatekeeper** (admission). Mode: install 
 - REQ-ADR-0002-05: Rego unit tests MUST run as a required CI check.
 - REQ-ADR-0002-06: No second policy engine/language may be introduced for the governed surface.
 - REQ-ADR-0002-07: The OPA-as-restrictor invariant (ADR 0018) MUST hold — OPA may further restrict but never grant beyond the RBAC floor.
+- REQ-ADR-0002-08: The global / cross-tenant OPA policy bundle MUST be owned by the platform security team; tenants MUST propose changes via PR, and a security reviewer MUST approve before merge (#24).
+- REQ-ADR-0002-09: Policy bundles MUST be cryptographically signed and their signature MUST be verified at load time; an unsigned or signature-invalid bundle MUST NOT load (#25).
+- REQ-ADR-0002-10: A new or changed policy bundle MUST run in audit mode first and flip to enforce only after review, with the audit→enforce transition promoted via Kargo (ADR 0040) (#26).
 
 ## 7. Non-Functional Requirements
 - Security/tenancy: single decision API is the defense-in-depth backbone (admission + gateway + egress + UI + approvals).
@@ -66,6 +70,9 @@ Decision honored when:
 - AC-ADR-0002-05: Rego unit tests are a required check; a failing policy test blocks merge. (REQ-05)
 - AC-ADR-0002-06: A repo scan finds no Kyverno/second-engine policy artifacts for the governed surface. (REQ-06)
 - AC-ADR-0002-07: An OPA policy attempting to grant beyond RBAC is rejected by the restrictor conformance test. (REQ-07)
+- AC-ADR-0002-08: A tenant-proposed change to the global/cross-tenant bundle merges only after a platform-security-team reviewer approves the PR; an unapproved change is blocked. (REQ-08)
+- AC-ADR-0002-09: A bundle with no signature or an invalid signature is refused at load time; a validly signed bundle loads. (REQ-09)
+- AC-ADR-0002-10: A new/changed bundle is shown running in audit mode first and only flips to enforce after review via a Kargo-promoted transition. (REQ-10)
 
 ## 10. Risks & Open Questions
 - Image-signature verification gap (blast radius: med) — accepted for v1.0; reconciled per ADR 0002, revisit trigger backlog §3.9.

@@ -2,7 +2,7 @@
 
 > kind: COMPONENT · workstream: B · tier: T1
 > upstream: [A6, A7, A5] · downstream: [] · adrs: [0016, 0018, 0002, 0003, 0030, 0025] · views: [6.3, 6.9, 6.2]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
 
@@ -38,8 +38,8 @@ policy-gated capability rather than an out-of-band sandbox edit.
 - GitOps packaging so mappings reconcile from Git like every other platform declaration.
 
 ### 2.2 Out of scope
-- Provisioning the underlying storage / PVs themselves — substrate XRDs (`XObjectStore`,
-  `XPostgres`, etc.) are owned by **B4**; B20 maps **pre-defined** PVs, it does not create them.
+- Provisioning the underlying storage / PVs themselves — substrate XRDs (`ObjectStore`,
+  `Postgres`, etc.) are owned by **B4**; B20 maps **pre-defined** PVs, it does not create them.
 - The RAG / memory call-path access to data — **B6** (Platform SDK `rag.*`/`memory.*`),
   **A10/B11** (memory), `RAGStore` (B13/A17). B20 is the filesystem-mount alternative, not RAG.
 - Memory-store access modes (`private` / `namespace-shared` / RBAC-OPA) on `MemoryStore` —
@@ -103,7 +103,7 @@ the agent via the normal pod filesystem; the Platform SDK (B6) is not extended b
 
 ### 4.4 Data schemas / connection-secret contracts
 N/A — B20 maps **pre-defined PVs**; it provisions no backend and writes no connection secret. The
-volume's own backing store (if Crossplane-composed) follows the ADR 0041 connection-secret
+volume's own backing store (if Crossplane-composed) follows the ADR 0044 connection-secret
 contract owned by B4 — out of scope here.
 
 ## 5. OSS-vs-Custom Decision

@@ -2,9 +2,11 @@
 
 > kind: COMPONENT · workstream: B · tier: T2
 > upstream: [B17, A5, A1, B7] · downstream: [] · adrs: [0013, 0019, 0032, 0022, 0030] · views: [6.2, 6.8, 6.4]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+The audit-adapter interface and `audit_events` schema are **frozen** (D-05): a freeze-gate MUST pass before any component emits audit events. Emission by any B-component is gated on this freeze-gate.
 
 B17 ships a library of layerable `CapabilitySet` profiles, but a profile is not a runnable
 agent. Teams still need worked, end-to-end examples showing how to assemble an actual Platform
@@ -74,7 +76,7 @@ B18 emits none directly. A reconciled composition's lifecycle (created/started/�
 
 ### 4.4 Data schemas / connection-secret contracts
 N/A — compositions reference capabilities and (optionally) `memoryRefs[]` by name; they own no
-backend and write no connection secret. Backends behind referenced stores use the ADR 0041
+backend and write no connection secret. Backends behind referenced stores use the ADR 0044
 connection-secret contract owned by B4.
 
 ## 5. OSS-vs-Custom Decision

@@ -57,12 +57,12 @@ All namespaced; versioning per ADR 0030; `LogLevel` versioning per-component, XR
 - **Audit adapter library (A18)** — the single Python library every component links to emit audit; posts to the audit endpoint; no direct store writes.
 - OTel collector ingest — the shared collection path for agent pods, LiteLLM, Envoy, ARK, UIs.
 
-### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
+### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031; single owner per namespace, QN-03)
 Emitted by the observability slice (per-event-type names deferred to B12 registry):
-- `platform.audit.*` — all audit emission, into the Postgres + S3 system of record with OpenSearch advisory fanout (ADR 0034).
-- `platform.observability.*` — threshold crossings and alert routing (e.g. budget-exceeded notifications, SLA-style alerts).
+- `platform.audit.*` (owner **A18**, audit endpoint) — all audit emission, into the Postgres + S3 system of record with OpenSearch advisory fanout (ADR 0034).
+- `platform.observability.*` (single owner **A13**, Tempo + Mimir) — threshold crossings and alert routing (e.g. budget-exceeded notifications, SLA-style alerts); AlertManager publishes alerts here.
 Consumed:
-- `platform.observability.*` — by alert-routing trigger flows (e.g. budget-exceeded → email user, defined in V6-07).
+- `platform.observability.*` — by alert-routing trigger flows (e.g. budget-exceeded → email user, defined in V6-07). HolmesGPT consumes alerts **via the bus** and pulls metrics from Mimir **directly** (data stream, not bus events); there is no direct AlertManager → HolmesGPT trigger.
 
 ### 4.4 Data schemas / connection-secret contracts
 - Audit system of record = Postgres `audit_events` table; on AWS a ~5-min batch CronJob writes verified immutable S3 objects then deletes Postgres rows; on kind Postgres alone is authoritative (ADR 0034).

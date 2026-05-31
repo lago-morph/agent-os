@@ -2,9 +2,11 @@
 
 > kind: COMPONENT · workstream: B · tier: T1
 > upstream: [B13, A5, A1] · downstream: [B18] · adrs: [0013, 0019, 0032, 0022, 0030] · views: [6.8, 6.2, 6.4]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+B17 is the curated profile/template library. Agent "templates" layer via the **`CapabilitySet` overlay model** (ADR 0013/0032: add-if-not-there / replace-if-there) with per-Agent overrides; no new template/override mechanism is introduced — the `CapabilitySet` overlay model already covers this. Egress allowlists ride this model via `egressTargets[]` in `CapabilitySet`; L7 egress enforcement is provided by Envoy (A3 install, A6 sandbox) per D-08. Any default egress a profile declares is a **minimum baseline (a floor)**, extensible per agent — never a closed ceiling/allowlist.
 
 The platform models every unit of agent access — MCP servers, A2A peers, RAG stores, egress
 targets, skills, OPA policy refs, LLM providers — as `CapabilitySet` CRDs that compose via a
@@ -102,7 +104,7 @@ emission is owned by B13, not B17.
 
 ### 4.4 Data schemas / connection-secret contracts
 N/A — profiles reference capability CRDs by name only; they hold no data backends and write no
-connection secrets. (Backends behind referenced `RAGStore`s use the ADR 0041 connection-secret
+connection secrets. (Backends behind referenced `RAGStore`s use the ADR 0044 connection-secret
 contract, owned by B4.)
 
 ## 5. OSS-vs-Custom Decision

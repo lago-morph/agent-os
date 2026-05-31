@@ -30,13 +30,13 @@ The architecture-level invariant (backlog §6) is that every API surface carries
 ## 3. Context & Dependencies
 
 Upstream consumed: none — this is the cross-cutting versioning policy every surface obeys.
-Downstream consumers (the owning components, per the ADR's own enumeration): **B13** (capability/key/budget CRDs), **A5** (ARK CRDs), **A6** (sandbox CRDs), **B4** (Crossplane XRs/XRDs), **B19** (`Approval`), **B6** (SDK), **B9** (CLI), **B12** (CloudEvent registry), **B17/B18** (agent A2A/MCP interfaces). Also binds **ADR 0029**'s cluster-OIDC mapper bundles (versioned in lockstep with the claim schema) and **ADR 0041**'s XRD/Composition changes (conversion webhooks + deprecation windows on both Compositions when a claim shape changes).
+Downstream consumers (the owning components, per the ADR's own enumeration): **B13** (capability/key/budget CRDs), **A5** (ARK CRDs), **A6** (sandbox CRDs), **B4** (Crossplane XRs/XRDs), **B19** (`Approval`), **B6** (SDK), **B9** (CLI), **B12** (CloudEvent registry), **B17/B18** (agent A2A/MCP interfaces). Also binds **ADR 0029**'s cluster-OIDC mapper bundles (versioned in lockstep with the claim schema) and **ADR 0044**'s XRD/Composition changes (conversion webhooks + deprecation windows on both Compositions when an XR schema changes).
 
 ADR decisions honored:
 - **ADR 0030** (this) — per-surface versioning model; per-component ownership; no central lockstep.
 - **ADR 0031** — CloudEvent breaking changes ship as new event types under the same top-level taxonomy; old types flow until subscribers migrate.
 - **ADR 0029** — a JWT claim-schema change is breaking and versions through this discipline; the cluster-OIDC mapper bundles version in lockstep, pinned to the schema version.
-- **ADR 0041** — XRDs/Compositions version identically to CRDs: conversion webhooks + deprecation windows on both substrate Compositions when a claim shape changes.
+- **ADR 0044** — XRDs/Compositions version identically to CRDs: conversion webhooks + deprecation windows on both substrate Compositions when an XR schema changes.
 - **ADR 0013** — the `CapabilitySet`/capability CRD shapes (owned by B13) version under this policy.
 - **ADR 0019** — `Agent.sdk` accepted values evolve under ARK's (A5) CRD versioning.
 
@@ -50,7 +50,7 @@ All v1.0 platform CRDs/XRDs are namespaced (glossary invariant). Each uses Kuber
 - `Approval` — owner **B19** (Argo Workflow); `LogLevel` — per-component.
 - Crossplane XRs/XRDs (`MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`, `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `XAgentDatabase`, `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`) — owner **B4**.
 
-Breaking-change obligation per CRD/XRD: introduce a new `vN` API group; provide a conversion webhook; deprecate `vN-1` for ≥1 minor platform release before removal; the reconciler author plans webhook delivery, certificate rotation, and stored-version migration as part of the change. XRDs follow this identically (ADR 0041), including both substrate Compositions when a claim shape changes.
+Breaking-change obligation per CRD/XRD: introduce a new `vN` API group; provide a conversion webhook; deprecate `vN-1` for ≥1 minor platform release before removal; the reconciler author plans webhook delivery, certificate rotation, and stored-version migration as part of the change. XRDs follow this identically (ADR 0044), including both substrate Compositions when an XR schema changes.
 
 ### 4.2 APIs / SDK surfaces
 - **Platform SDK** (owner B6, Python + TypeScript) — semantic versioning; ships a version-pinned compatibility matrix against gateway/ARK/Letta versions. Named surfaces: `memory.*`, `rag.*`, OTel emission, A2A registration helpers (interface-contract §3.1).
@@ -62,7 +62,7 @@ Breaking-change obligation per CRD/XRD: introduce a new `vN` API group; provide 
 - Every CloudEvent carries CloudEvents-native `specversion` plus a per-event-type `schemaVersion` (interface-contract §2). Backward-compatible additions bump minor; breaking changes **mint a new event type** under the same closed top-level taxonomy (ADR 0031) rather than break subscribers; old types continue to flow until subscribers migrate. The B12 registry owns per-event-type schemas.
 
 ### 4.4 Data schemas / connection-secret contracts
-- The uniform connection-secret shape (`host`, `port`, `user`, `password`, `dbname`, ADR 0041) is a contract surface that versions with the owning XRDs (B4); a breaking change to a connection-secret shape follows the conversion-webhook + deprecation-window discipline on both substrate Compositions.
+- The uniform connection-secret shape (`host`, `port`, `user`, `password`, `dbname`, ADR 0044) is a contract surface that versions with the owning XRDs (B4); a breaking change to a connection-secret shape follows the conversion-webhook + deprecation-window discipline on both substrate Compositions.
 
 ## 5. OSS-vs-Custom Decision
 N/A — ADR. (Enforcement note: the policy rides native versioning mechanisms — Kubernetes API-group versioning + conversion webhooks, CloudEvents `specversion`, semantic versioning, URL-path versioning. No new tooling is mandated; compatibility-matrix maintenance tooling is deferred per backlog §1.18.)
@@ -72,7 +72,7 @@ N/A — ADR. (Enforcement note: the policy rides native versioning mechanisms �
 - REQ-ADR-0030-02: CRDs/XRDs MUST use Kubernetes API versioning (`v1alpha1`/`v1beta1`/`v1`); a breaking change MUST introduce a new `vN` API group WITH a conversion webhook.
 - REQ-ADR-0030-03: For any CRD/XRD breaking change, `vN-1` MUST remain deprecated for at least one minor platform release before removal.
 - REQ-ADR-0030-04: Reconciler authors MUST plan conversion-webhook delivery, certificate rotation, and stored-version migration as part of any CRD/XRD breaking change.
-- REQ-ADR-0030-05: XRDs MUST version identically to CRDs (ADR 0041) — conversion webhooks and deprecation windows on BOTH substrate Compositions when a claim shape changes.
+- REQ-ADR-0030-05: XRDs MUST version identically to CRDs (ADR 0044) — conversion webhooks and deprecation windows on BOTH substrate Compositions when an XR schema changes.
 - REQ-ADR-0030-06: Every CloudEvent MUST carry `specversion` + a per-event-type `schemaVersion`; backward-compatible additions MUST bump minor; breaking changes MUST mint a NEW event type under the same taxonomy and MUST NOT break existing subscribers (old types keep flowing until subscribers migrate).
 - REQ-ADR-0030-07: The Platform SDK and `agent-platform` CLI MUST use semantic versioning; the SDK MUST ship a version-pinned compatibility matrix against gateway/ARK/Letta versions.
 - REQ-ADR-0030-08: HTTP APIs of custom services MUST use URL-path versioning (`/v1/...`); a deprecated version MUST remain reachable for at least one platform release after its replacement ships.
@@ -93,7 +93,7 @@ N/A — ADR (verification map lives in the PLAN). The §14.1 set — per-product
 - AC-ADR-0030-01: Honored when every shipped surface declares an explicit version and no CI/release artifact enforces a lockstep platform-wide version. (REQ-01)
 - AC-ADR-0030-02: Honored when a CRD/XRD breaking change is realized as a new `vN` API group with a working conversion webhook converting `vN-1` resources. (REQ-02/04)
 - AC-ADR-0030-03: Honored when a removed CRD/XRD version was deprecated for ≥1 minor platform release before removal (deprecation recorded, not abrupt). (REQ-03)
-- AC-ADR-0030-04: Honored when an XRD claim-shape change ships conversion webhooks + deprecation windows on both the kind and AWS Compositions. (REQ-05)
+- AC-ADR-0030-04: Honored when an XRD schema change ships conversion webhooks + deprecation windows on both the kind and AWS Compositions. (REQ-05)
 - AC-ADR-0030-05: Honored when a breaking CloudEvent change appears as a new event type while the old type still flows to unmigrated subscribers, each carrying `specversion` + `schemaVersion`. (REQ-06)
 - AC-ADR-0030-06: Honored when the SDK and CLI follow semver and the SDK ships a compatibility matrix pinning gateway/ARK/Letta versions. (REQ-07)
 - AC-ADR-0030-07: Honored when a replaced HTTP API keeps `/vN-1/...` reachable for ≥1 platform release after `/vN/...` ships. (REQ-08)
@@ -113,4 +113,4 @@ N/A — ADR (verification map lives in the PLAN). The §14.1 set — per-product
 - architecture-backlog.md §1.18 (versioning specifics per surface; platform-release calendar), §6 (invariant).
 - interface-contract.md §1.1 (versioning policy applies to every CRD/XRD), §2 (event versioning), §3 (SDK/CLI/A2A/MCP/HTTP surfaces), §4 (connection-secret).
 - Owning components: B13, A5, A6, B4, B19, B6, B9, B12, B17, B18.
-- ADR 0031 (CloudEvent taxonomy), 0029 (JWT claim schema), 0041 (substrate XRDs), 0013 (CapabilitySet), 0019 (Agent.sdk values).
+- ADR 0031 (CloudEvent taxonomy), 0029 (JWT claim schema), 0044 (substrate XRDs), 0013 (CapabilitySet), 0019 (Agent.sdk values).

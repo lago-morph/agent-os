@@ -132,7 +132,7 @@ The five logical surfaces (§6.1 line 178), all URL-path versioned `/v1/...` (in
 
 - **Upstream project:** **LiteLLM** (the gateway), the Canon-named product (glossary). **Mode: config + wrap**, not fork.
 - Install unmodified at a pinned, tested version via Helm; non-secret config GitOps-managed; secrets via ESO (§6.1 lines 207, 222).
-- **Wrap** with platform deliverables: the B2 callback handlers (registered into A1's hook points), B13 as the sole admin-API writer (ADR 0006), audit-adapter linkage (A18), OTel/Langfuse/Mimir wiring, the `Postgres` backing-store claim, a Headlamp plugin, and a HolmesGPT toolset.
+- **Wrap** with platform deliverables: the B2 callback handlers (registered into A1's hook points), B13 as the sole admin-API writer (ADR 0006), audit-adapter linkage (A18), OTel/Langfuse/Mimir wiring, the `Postgres` backing-store XR, a Headlamp plugin, and a HolmesGPT toolset.
 - **Custom built net-new is deliberately minimal** in A1: the reconciliation control loop is B13, the callback logic is B2, the policy is B3/B16 — A1 is the *install + surface-exposure + operate* package. This keeps the gateway upgradeable and the custom logic versioned separately (ADR 0006 rationale: kopf chosen for Python ecosystem alignment).
 - **Rationale:** LiteLLM is the chosen multi-provider gateway with native router, virtual keys, MCP/A2A brokering, and a callback model that exactly matches the pre/post/on-failure enforcement points the platform needs (§6.1).
 - `[PROPOSED — not in source]` exact upstream LiteLLM version/chart coordinates are not stated in Canon; selected and pinned at install time and recorded in the runbook.
@@ -154,7 +154,7 @@ The five logical surfaces (§6.1 line 178), all URL-path versioned `/v1/...` (in
 - REQ-A1-13: When an `Agent` declaring `exposes` (A2A/MCP) is admitted, registration of those surfaces with the gateway is OPA-gated and emits a `platform.policy.*` accept/deny event.
 - REQ-A1-14: A1 emits `platform.gateway.*` for routing/failover/MCP-health/A2A-handoff events; every emitted CloudEvent falls under exactly one of the closed ten namespaces and carries `specversion` + `schemaVersion`; A1 introduces no new top-level namespace.
 - REQ-A1-15: A1 emits OTel traces to Tempo and LLM-traces/generations to Langfuse, both correlated by `trace_id` (three distinct observability planes), and exposes Prometheus metrics scraped into Mimir.
-- REQ-A1-16: A1's backing key/spend/config store is Postgres consumed via an `Postgres` claim using the uniform connection-secret shape; no gateway code differs between kind and AWS substrate.
+- REQ-A1-16: A1's backing key/spend/config store is Postgres consumed via a `Postgres` XR using the uniform connection-secret shape; no gateway code differs between kind and AWS substrate.
 - REQ-A1-17: A1 is stateless-per-request and horizontally scalable with PodDisruptionBudgets and readiness gated on the backing store; loss of the gateway fails closed (all agent model/tool/A2A traffic stops) by design.
 - REQ-A1-18: A1 ships a HolmesGPT gateway toolset exposing routing state, redacted key state, provider health, and budget posture.
 - REQ-A1-19: A1 owns the versioning lifecycle of its `/v1` HTTP surfaces (URL-path versioning; deprecated versions reachable ≥1 platform release after replacement) per interface-contract §3.3 / ADR 0030.
@@ -204,7 +204,7 @@ The five logical surfaces (§6.1 line 178), all URL-path versioned `/v1/...` (in
 - AC-A1-13 (REQ-A1-13): Admitting an `Agent` with `exposes` causes an OPA-gated registration; a denied registration emits a `platform.policy.*` deny event and the surface is not registered.
 - AC-A1-14 (REQ-A1-14): Every CloudEvent A1 emits has a `type` under exactly one of the ten namespaces with non-empty `specversion` + `schemaVersion`; no event uses a coined top-level namespace.
 - AC-A1-15 (REQ-A1-15): A traced call produces correlated spans in Tempo and a generation in Langfuse sharing the same `trace_id`, and gateway metrics appear in Mimir.
-- AC-A1-16 (REQ-A1-16): A1 runs identically against an `Postgres`-provided connection secret on kind and on AWS; switching substrate changes no gateway code or config beyond the claim.
+- AC-A1-16 (REQ-A1-16): A1 runs identically against a `Postgres`-provided connection secret on kind and on AWS; switching substrate changes no gateway code or config beyond the XR.
 - AC-A1-17 (REQ-A1-17): Killing the gateway stops all agent model/tool/A2A traffic (fail-closed verified); HA replicas + PDB keep the surface available across a single-replica disruption.
 - AC-A1-18 (REQ-A1-18): The HolmesGPT gateway toolset answers a routing/provider-health/budget-posture query against live gateway state with key material redacted.
 - AC-A1-19 (REQ-A1-19): A simulated `/v1`→`/v2` surface change keeps `/v1` served for ≥1 platform release with a deprecation notice.
@@ -216,7 +216,7 @@ The five logical surfaces (§6.1 line 178), all URL-path versioned `/v1/...` (in
 - R-A1-2 (high): OPA-unreachable fail-closed could mass-deny if OPA (A7) is flaky during bootstrap. Mitigation: documented break-glass policy owned by B3/B16; alert on deny-rate spike; phased bootstrap. `[PROPOSED]` break-glass policy content not in A1's scope.
 - R-A1-3 (med): exact LiteLLM callback signatures are not in Canon — A1/B2 contract risk. Mitigation: pin to upstream callback interface; version A1↔B2 contract; do not coin signatures (`[PROPOSED — not in source]`).
 - R-A1-4 (med): B13 (only admin-API writer) is W1 — gateway state cannot be reconciled until B13 lands. Mitigation: eventually-consistent serving of last state (ADR 0006); bootstrap with a minimal seeded config; no hand-config drift permitted.
-- R-A1-5 (med): `Postgres` (B4) is W1 while A1 is W0 — backing store may not be claim-provisioned at first install. Mitigation: bootstrap on direct Postgres, rewire onto the claim; uniform connection-secret shape makes the swap config-only.
+- R-A1-5 (med): `Postgres` (B4) is W1 while A1 is W0 — backing store may not be XR-provisioned at first install. Mitigation: bootstrap on direct Postgres, rewire onto the XR; uniform connection-secret shape makes the swap config-only.
 - R-A1-6 (med): EgressTarget enforcement is shared between A1 (gateway) and A6 (Envoy) — risk of a gap where one path is governed and the other is not. Mitigation: A1 governs model/tool/A2A egress; A6 governs general egress; B22 threat model must confirm no uncovered egress path. Open question: is any agent egress reachable that bypasses both A1 and A6? — resolve with A6/B22.
 - R-A1-7 (low): per-event-type `platform.gateway.*` names are deferred to B12; A1 must not coin them. `[PROPOSED]` flag carried until B12 registers them.
 - R-A1-8 (low): `platform.security.*` gateway signals (repeated authn failures, policy-bypass attempts) are mapped by namespace only; concrete event types deferred to B12. `[PROPOSED — not in source]`.

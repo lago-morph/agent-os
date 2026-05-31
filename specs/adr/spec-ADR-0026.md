@@ -53,7 +53,7 @@ N/A — ADR 0026 introduces no CRD/XRD. It constrains scope: all v1.0 platform C
 - The CloudEvent broker/mesh is per-cluster; there is no cross-cluster event mesh. The taxonomy (ADR 0031) is uniform per install but events do not route between clusters. `platform.tenant.*` cross-tenant events stay within a single cluster's broker.
 
 ### 4.4 Data schemas / connection-secret contracts
-- One audit pipeline per cluster (ADR 0034). Connection secrets (ADR 0041 uniform shape) are per-cluster; no shared data substrate spans clusters. Memory, knowledge base, and registries are not shared across clusters in v1.0.
+- One audit pipeline per cluster (ADR 0034). Connection secrets (ADR 0044 uniform shape) are per-cluster; no shared data substrate spans clusters. Memory, knowledge base, and registries are not shared across clusters in v1.0.
 
 ## 5. OSS-vs-Custom Decision
 N/A — ADR. (Enforcement note: the topology is realized by per-cluster installs of existing components — **ArgoCD** reconciling each cluster, **Keycloak** one realm per install, **Kargo** (A23) for promotion. No federation control plane is built. SPIFFE/SPIRE is explicitly NOT adopted in v1.0.)

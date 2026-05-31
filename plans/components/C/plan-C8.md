@@ -24,7 +24,7 @@ fields (`indexes[]`, `contentSourceRefs[]`, `ingestionPipelineRef`) without inve
 - **TASK-05:** Implement the rebuild-from-primary path (full reindex from Git, on-demand) (ADR 0014) — produces: rebuild path — depends-on: [TASK-03].
 - **TASK-06:** Wire the trigger delivery — GitHub Actions docs step (ADR 0010/0033) and/or Knative flow (ADR 0031) — produces: trigger wiring — depends-on: [TASK-01, TASK-03].
 - **TASK-07:** Emit audit (adapter, ADR 0034) + result/lag events under one Canon `platform.*` namespace (ADR 0031); expose ingestion-lag metric for D2/runbook — produces: audit + event + metric wiring — depends-on: [TASK-03].
-- **TASK-08:** Consume any object-store/search-index via substrate XRD connection-secret (ADR 0041) — produces: substrate wiring — depends-on: [TASK-03].
+- **TASK-08:** Consume any object-store/search-index via substrate XRD connection-secret (ADR 0044) — produces: substrate wiring — depends-on: [TASK-03].
 - **TASK-09:** Pipeline runbook (ingestion lag) + three-layer tests; joint F3 conventions-conformance check — produces: runbook + tests — depends-on: [TASK-04, TASK-05, TASK-06, TASK-07].
 
 ## 3. Dependency Map

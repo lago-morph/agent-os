@@ -90,6 +90,9 @@ continuous runtime relationship, not a build edge.
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
 - **Emitted:** `platform.observability.*` for threshold crossings / backend health
   `[PROPOSED — not in source: specific event names deferred to B12]`.
+- **Namespace ownership (QN-03):** A13 (Tempo + Mimir) is the **single owner of the `platform.observability` namespace** — A13 authors and registers its schema in B12 (the event catalogue). External consumers (HolmesGPT, dashboards) take an explicit dependency on A13 as the owner and do not co-own it.
+- **AlertManager / HolmesGPT (bus-mediated):** AlertManager (baseline kube-prometheus-stack, not A13) alarms off both Mimir metrics AND Loki logs and publishes its alerts onto the **event bus under `platform.observability`** (schema owned by A13); **HolmesGPT consumes those alerts via the bus — there is no direct `AlertManager → HolmesGPT` wire**. Separately, HolmesGPT pulls **metrics from Mimir directly** as a data stream for doing its job; that direct query is **not** events and does **not** ride the bus.
+- **Cross-cutting security emission (QN-03):** for any security-relevant signal A13 detects (e.g. a security-classified AlertManager alert), A13 MUST handle it locally AND additionally emit under `platform.security` (schema owned by A7). Where A13 emits audit events, emission is gated on the audit-adapter freeze-gate (D-05).
 - **Consumed:** none required for core function.
 
 ### 4.4 Data schemas / connection-secret contracts

@@ -64,7 +64,8 @@ N/A — A20 defines no CRD/XRD. It is a stateless aggregator service plus a Head
 - HTTP API URL-path-versioned `/v1/...` (interface-contract §3.3).
 
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
-- **Emits `platform.policy.*`** — every simulator run/dry-run decision is recorded under this namespace via the A18 adapter (§6.6: "Simulator runs ARE audited under `platform.policy.*`"), so the policy-edit history is itself observable — **but never enters the enforcement path**.
+- **Emits `platform.policy.*`** — every simulator run/dry-run decision is recorded under this namespace via the A18 adapter (§6.6: "Simulator runs ARE audited under `platform.policy.*`"), so the policy-edit history is itself observable — **but never enters the enforcement path**. The `platform.policy` schema is **owned by A7** (QN-03); A20 is a dependent emitter, not an owner, and audit emission is gated on the audit-adapter freeze-gate (D-05).
+- **OPA decision-document format (D-03):** A20 is a **consumer** of the OPA decision-document format, which is **owned by B3** — A20 composes/renders B3's per-layer decision documents and does not own or define the format. (A7 runs the engine; A1/A6 are likewise consumers.)
 - Consumes none directly (it is request/response-driven). Per-event-type schemas → **B12**; `[PROPOSED — not in source]` for concrete event names; A20 commits only to the namespace.
 
 ### 4.4 Data schemas / connection-secret contracts

@@ -2,9 +2,11 @@
 
 > kind: COMPONENT · workstream: B · tier: T0
 > upstream: [A3, A7, A9, B5, B12] · downstream: [A23] · adrs: [0017, 0018, 0034, 0031, 0030, 0038, 0040, 0012] · views: [7.5, 6.6]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+B19 **owns the `platform.approval` event namespace** (D-02 / QN-03): it authors the `platform.approval.*` CloudEvent schemas and registers them in the event catalogue (B12). Consumers (promotion pipeline, dashboard, and any other approval-event consumer) take an explicit dependency on B19 for these schemas and never co-own the namespace. Approval decisions are recorded in the audit log; audit emission is gated on the audit-adapter freeze-gate (D-05). Any security-relevant event B19 detects (e.g. approval-gate bypass or tampering) MUST also be emitted under `platform.security` (schema owned by A7), in addition to local handling.
 
 B19 is the platform's **one generalized approval mechanism**: a human gate any Platform Agent (or
 external system like Kargo) can wire into without rebuilding machinery. ADR 0017 reverses the
@@ -197,7 +199,7 @@ per-use-case flows.
 - Alerts — **applicable** (approvals pending past timeout, elevation evaluation failures).
   `[PROPOSED — not in source]`.
 - Grafana dashboard (Crossplane XR) — **applicable** — approval-queue depth / decision-latency
-  dashboard authored as a `GrafanaDashboard` claim.
+  dashboard authored as a `GrafanaDashboard` XR.
 - Headlamp plugin — **deferred to B19-ui / B5 (W4)** — the approval-queue UI ships with B5;
   B19-core defines the enqueue contract only.
 - OPA/Rego integration — **applicable (integration)** — consults `approval.elevation` (Rego in B16);
@@ -232,7 +234,7 @@ per-use-case flows.
   through the Argo Workflow (contract test with an A23 fake). (→ REQ-B19-08)
 - **AC-B19-09:** No M-of-N / delegation / escalation / routing code path exists; a single resolved
   level governs who may decide. (→ REQ-B19-09)
-- **AC-B19-10:** An `Approval` CRD claim-shape change ships a new `vN` with conversion and ≥1-release
+- **AC-B19-10:** An `Approval` CRD XR schema change ships a new `vN` with conversion and ≥1-release
   deprecation. (→ REQ-B19-10)
 - **AC-B19-11:** The full create→elevate→enqueue→decide(via Argo resume API)→emit cycle passes with
   **no Headlamp UI present**, proving the W3/W4 split. (→ REQ-B19-11)

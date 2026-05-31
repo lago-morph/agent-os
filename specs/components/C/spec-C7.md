@@ -1,7 +1,7 @@
 # SPEC C7 — Maintainer / extender documentation for all custom code  [PROPOSED]
 
 > kind: COMPONENT · workstream: C · tier: T1
-> upstream: [C1] · downstream: [C8] · adrs: [0008, 0006, 0019, 0030, 0041] · views: [6.4]
+> upstream: [C1] · downstream: [C8] · adrs: [0008, 0006, 0019, 0030, 0044] · views: [6.4]
 > canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
 
 ## 1. Purpose & Problem Statement
@@ -72,7 +72,7 @@ ADR decisions honored:
   (`deep-agents`); maintainer docs for B7 use these Canon SDK names.
 - **ADR 0030** — API reference for custom code follows the versioning policy: per-component CRD/XRD
   API versions, SDK semver + compatibility matrix, URL-path-versioned custom HTTP APIs.
-- **ADR 0041** — Crossplane Compositions' maintainer docs document the XRD contract (uniform
+- **ADR 0044** — Crossplane Compositions' maintainer docs document the XRD contract (uniform
   connection-secret shape, substrate-agnostic XR status, one Composition per substrate).
 
 ## 4. Interfaces & Contracts
@@ -80,7 +80,7 @@ ADR decisions honored:
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 N/A — C7 defines no CRD/XRD. Its API-reference content **documents** Canon CRDs/XRDs owned by
 their reconciler components (e.g. `MCPServer`/`CapabilitySet`/`VirtualKey` for the B13 kopf
-operator; `XPostgres`/`AuditLog` for B4 Compositions) using verbatim Canon field names from
+operator; `Postgres`/`AuditLog` for B4 Compositions) using verbatim Canon field names from
 `_meta/interface-contract.md`; it owns none and invents no fields.
 
 ### 4.2 APIs / SDK surfaces
@@ -99,7 +99,7 @@ schemas; C7 invents no event types.
 ### 4.4 Data schemas / connection-secret contracts
 N/A — C7 holds no data backend / writes no connection secret. Crossplane-Composition maintainer
 docs **document** the uniform connection-secret contract (`host`, `port`, `user`, `password`,
-`dbname`; ADR 0041) as authored by B4; C7 reproduces it, does not define it. The only C7-owned
+`dbname`; ADR 0044) as authored by B4; C7 reproduces it, does not define it. The only C7-owned
 contract is the Markdown corpus shape C8 ingests (co-owned with C8).
 
 ## 5. OSS-vs-Custom Decision
@@ -131,7 +131,7 @@ custom code, re-indexable into the Knowledge Base. No tooling decision is owned 
 - REQ-C7-09: The agent-base-image maintainer doc SHALL cover both `langgraph` and `deep-agents`
   SDK values (ADR 0019).
 - REQ-C7-10: The Crossplane-Composition maintainer doc SHALL document the uniform connection-secret
-  contract and one-Composition-per-substrate pattern (ADR 0041), referencing B4 as owner.
+  contract and one-Composition-per-substrate pattern (ADR 0044), referencing B4 as owner.
 
 ## 7. Non-Functional Requirements
 - Security: maintainer docs SHALL NOT embed secrets/credentials; secret-handling guidance points
@@ -199,7 +199,7 @@ custom code, re-indexable into the Knowledge Base. No tooling decision is owned 
   list (B-series, ~L1700–1716).
 - architecture-overview.md §6.4 Knowledge Base (`platform-knowledge-base` RAGStore).
 - ADR 0008 (Material for MkDocs), ADR 0006 (kopf operator as LiteLLM subchart), ADR 0019 (LangGraph
-  + Deep Agents SDK values), ADR 0030 (versioning policy), ADR 0041 (substrate abstraction /
+  + Deep Agents SDK values), ADR 0030 (versioning policy), ADR 0044 (substrate abstraction /
   connection-secret contract).
 - _meta/glossary.md (custom components, SDK Canon names, CRD/XRD kinds).
 - _meta/interface-contract.md §1 (CRDs/XRDs), §3 (SDK surfaces), §4 (connection-secret), §6 (gaps).

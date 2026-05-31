@@ -44,7 +44,7 @@ Install Kargo (config/wrap, no fork) single-cluster with a single Stage, wire it
 
 ## 5. Test Strategy
 
-- **Chainsaw (operator/CRD):** AC-A23-03 (Warehouse), AC-A23-04 (verification gate), AC-A23-05 (Approval composition + report-back), AC-A23-09 (substrate-transparent claim promotion), AC-A23-11 (two-kind dev→staging promotion).
+- **Chainsaw (operator/CRD):** AC-A23-03 (Warehouse), AC-A23-04 (verification gate), AC-A23-05 (Approval composition + report-back), AC-A23-09 (substrate-transparent XR promotion), AC-A23-11 (two-kind dev→staging promotion).
 - **Playwright (UI/e2e):** AC-A23-07 (Keycloak OIDC login), AC-A23-12 (Headlamp deep-link per Stage) — coordinated with B5's plugin.
 - **PyTest (logic):** AC-A23-06 (OPA promotion-action gating incl. time-of-day), AC-A23-10 (audit emission), AC-A23-08 (recovery promote-previous-commit logic), AC-A23-13 (post-Warehouse gate ordering), AC-A23-14 (overlay = sizing/replicas only assertion).
 - **Config-level:** AC-A23-01 (single Stage + additive second Stage), AC-A23-02 (path overlay mutation, no branch).

@@ -2,7 +2,7 @@
 
 > kind: COMPONENT · workstream: B · tier: T0
 > upstream: [A1, A2] · downstream: [B7, B10, B21] · adrs: [0013, 0019, 0030, 0031, 0034, 0015, 0025] · views: [6.2, 6.3, 6.5, 6.13]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
 
@@ -128,7 +128,7 @@ B6 **is** an SDK surface. interface-contract §3.1 names only the four surface g
 
 ### 4.4 Data schemas / connection-secret contracts
 N/A — B6 holds no datastore and writes no connection secret. It reaches Letta/RAG **through
-LiteLLM and the SDK**, not via direct DB connection; substrate connection secrets (ADR 0041) are
+LiteLLM and the SDK**, not via direct DB connection; substrate connection secrets (ADR 0044) are
 consumed by the backing services (A10, RAGStore backends), not by the SDK.
 
 ## 5. OSS-vs-Custom Decision

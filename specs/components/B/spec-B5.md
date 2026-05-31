@@ -23,7 +23,7 @@ Per the B19 → A23 → B5 cycle resolution (waves.md), B19 is split: **B19-core
 
 ### 2.2 Out of scope (and where it lives instead)
 - **Headlamp install + framework** (common libraries, shared widgets, auth handoff) — Component **A9**. B5 consumes it.
-- **Graphical-editor framework + the per-CRD editor set** (`MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `Agent`, `TenantOnboarding`, `AuditLog`, `LogLevel`, `GrafanaDashboard`) — Component **A22** (ADR 0039). B5's inspector/admin plugins reuse these editors; B5 does not re-author them. (`BudgetPolicy`, `Memory`, `XAgentDatabase` editors are excluded from A22's v1.0 set — §14.1 A22 — so the virtual-key/capability plugins surface those read-only or via raw view.)
+- **Graphical-editor framework + the per-CRD editor set** (`MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `Agent`, `TenantOnboarding`, `AuditLog`, `LogLevel`, `GrafanaDashboard`) — Component **A22** (ADR 0039). B5's inspector/admin plugins reuse these editors; B5 does not re-author them. (`BudgetPolicy`, `Memory`, `AgentDatabase` editors are excluded from A22's v1.0 set — §14.1 A22 — so the virtual-key/capability plugins surface those read-only or via raw view.)
 - **B19-core** — the `Approval` CRD, OPA elevation logic, Argo Workflow integration, decision CloudEvent emission — Component **B19** (W3). B5 ships only the approval-queue **UI** (B19-ui).
 - **Kargo install** + Stages + Warehouse + verification configs — Component **A23** (ADR 0040). B5 ships only its Headlamp plugin.
 - **Per-component plugins** owned by their own components (e.g., A20 policy-simulator panel, A21 tenant-onboarding editor, OPA policy-review plugin if owned by A7) — not B5 unless explicitly cross-cutting.
@@ -82,7 +82,7 @@ N/A (owns none) — B5 **reads / drives** existing CRDs: `Approval` (B19), the c
 - **REQ-B5-06:** Approve/reject and promote actions MUST be authorized by OPA (RBAC-as-floor / OPA-as-restrictor) before the plugin issues them; the approval-queue UI MUST only show requests to approvers at or above the resolved level (§7.5, ADR 0018).
 - **REQ-B5-07:** Plugin-driven actions (key issuance, approve/reject, force-register/deregister, promote) MUST emit audit events via the platform audit adapter (ADR 0034); the UI MUST NOT write audit directly.
 - **REQ-B5-08:** Edit-capable plugins MUST build on the A22 editor framework (schema-driven forms, validation, policy-simulator preview, GitOps-diff) rather than re-implementing editing (ADR 0039).
-- **REQ-B5-09:** The virtual-key/capability plugins MUST handle CRDs whose A22 editors are excluded from the v1.0 set (`BudgetPolicy`, `Memory`, `XAgentDatabase`) by surfacing them read-only / via raw view (§14.1 A22).
+- **REQ-B5-09:** The virtual-key/capability plugins MUST handle CRDs whose A22 editors are excluded from the v1.0 set (`BudgetPolicy`, `Memory`, `AgentDatabase`) by surfacing them read-only / via raw view (§14.1 A22).
 - **REQ-B5-10:** The Kargo plugin and the approval-queue UI MUST co-land in W4 per the B19-core/B19-ui split; B5 MUST NOT re-implement B19-core (`Approval` CRD, OPA elevation, Argo integration, decision events) — it consumes them (waves.md).
 - **REQ-B5-11:** The capability inspector MUST support the §6.9 admin-override force-register / force-deregister of dynamic A2A/MCP exposings through the plugin (§6.9).
 - **REQ-B5-12:** Plugins MUST respect each consumed CRD's per-component API version and degrade gracefully across version skew (ADR 0030).
@@ -120,7 +120,7 @@ N/A (owns none) — B5 **reads / drives** existing CRDs: `Approval` (B19), the c
 - **AC-B5-06** (REQ-B5-06): An OPA-denied approve/reject or promote is blocked by the plugin; the queue never surfaces a request below the approver's resolved level. (Playwright/PyTest)
 - **AC-B5-07** (REQ-B5-07): Key issuance, approve/reject, force-register, and promote each emit an audit event via the adapter; no direct audit write. (Chainsaw/PyTest)
 - **AC-B5-08** (REQ-B5-08): An edit-capable plugin renders the A22 schema-driven form with policy-simulator preview, not a bespoke editor. (Playwright)
-- **AC-B5-09** (REQ-B5-09): `BudgetPolicy`/`Memory`/`XAgentDatabase` appear read-only / raw (no A22 editor) without error. (Playwright)
+- **AC-B5-09** (REQ-B5-09): `BudgetPolicy`/`Memory`/`AgentDatabase` appear read-only / raw (no A22 editor) without error. (Playwright)
 - **AC-B5-10** (REQ-B5-10): B5 contains no `Approval` reconciler / OPA-elevation / Argo-integration code (those are B19-core); the queue UI only drives the existing workflow. (code review / PyTest)
 - **AC-B5-11** (REQ-B5-11): An admin force-registers and force-deregisters a dynamic A2A/MCP exposing via the inspector, audited. (Playwright/Chainsaw)
 - **AC-B5-12** (REQ-B5-12): The plugins operate against a CRD served at its current API version and warn (not crash) on an unexpected version. (PyTest)

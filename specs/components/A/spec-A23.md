@@ -8,7 +8,7 @@
 
 v1.0 starts on a single dev cluster (initially kind), scales to dev+staging, then dev+staging+prod as the platform reaches pilot use. ArgoCD is the within-environment GitOps deployer and pre-merge GitHub Actions checks (ADR 0010) catch syntax/schema/policy problems before merge — but neither addresses **promotion**: "what's deployed in dev right now and how it gets to staging" is otherwise buried in branch-and-path conventions and ad-hoc human handoff, with audit trails reconstructed from git-log archaeology. The generalized `Approval` CRD (ADR 0017) provides human gates as a primitive but does not orchestrate environment-to-environment progression.
 
-A23 delivers **Kargo as the v1.0 promotion fabric** (ADR 0040): Helm values + install manifests, GitOps wiring against path-based environment overlays (`envs/dev/`, `envs/staging/`, `envs/prod/`) on a single mainline (no long-lived per-environment branches), Warehouse configuration for candidate commits, and per-Stage verification configs (smoke suites bound to each environment). It **composes** with the `Approval` CRD (B19) for human gates and with OPA (A7) for promotion-action policy. It lands early under the same phased trajectory as HolmesGPT: **single Stage initially**, with staging/prod Stages added as those environments come online. Substrate asymmetry (kind vs AWS) is invisible to Kargo — it promotes uniform claim shapes; Crossplane Compositions (ADR 0044) absorb the difference below the claim layer.
+A23 delivers **Kargo as the v1.0 promotion fabric** (ADR 0040): Helm values + install manifests, GitOps wiring against path-based environment overlays (`envs/dev/`, `envs/staging/`, `envs/prod/`) on a single mainline (no long-lived per-environment branches), Warehouse configuration for candidate commits, and per-Stage verification configs (smoke suites bound to each environment). It **composes** with the `Approval` CRD (B19) for human gates and with OPA (A7) for promotion-action policy. It lands early under the same phased trajectory as HolmesGPT: **single Stage initially**, with staging/prod Stages added as those environments come online. Substrate asymmetry (kind vs AWS) is invisible to Kargo — it promotes uniform XR shapes; Crossplane Compositions (ADR 0044) absorb the difference below the XR layer.
 
 This is the promotion *control plane* for the platform's entire GitOps surface, so it is specified thoroughly with explicit phased-rollout, composition, and recovery semantics.
 
@@ -71,7 +71,7 @@ This is the promotion *control plane* for the platform's entire GitOps surface, 
 
 - A23 **defines no platform CRD/XRD of its own.** Kargo's own CRDs (Stage, Warehouse, Promotion, etc.) are **upstream Kargo constructs** — `Stage` and `Warehouse` are Canon glossary terms; the others are vendor CRDs. Any Kargo field/kind not in glossary is `[PROPOSED — not in source]` and resolved against upstream Kargo at implementation (consult upstream Kargo docs).
 - **`Approval` (consumed, owner Argo Workflow + B19; namespaced)** — Canon key fields (§6.12, interface-contract §1.5): `requestingAgent`, `actionType`, `actionAttributes`, `defaultLevel`, `evidenceRefs[]`, `decision`, `decidedBy`, `decidedAt`. Kargo *creates* an `Approval` when a Stage needs a human gate and reads `decision`/`decidedBy`/`decidedAt` back. A23 invents no `Approval` fields.
-- **Crossplane claim shapes (consumed, not owned)** — Kargo promotes uniform claim shapes; substrate XRDs (`Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore`) and higher-level XRDs are B4-owned (interface-contract §1.6).
+- **Crossplane XR shapes (consumed, not owned)** — Kargo promotes uniform XR shapes; substrate XRDs (`Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore`) and higher-level XRDs are B4-owned (interface-contract §1.6).
 
 ### 4.2 APIs / SDK surfaces
 
@@ -88,7 +88,7 @@ Per-event-type names deferred to B12 (interface-contract §2):
 
 ### 4.4 Data schemas / connection-secret contracts
 
-- **N/A — connection secret:** Kargo is a control-plane install; it provisions no substrate primitive and writes no host/port/user/password/dbname connection secret (interface-contract §4 applies to substrate XRDs). It *promotes* claim shapes whose connection secrets are written by the Crossplane Compositions it triggers (B4), not by Kargo.
+- **N/A — connection secret:** Kargo is a control-plane install; it provisions no substrate primitive and writes no host/port/user/password/dbname connection secret (interface-contract §4 applies to substrate XRDs). It *promotes* XR shapes whose connection secrets are written by the Crossplane Compositions it triggers (B4), not by Kargo.
 - **GitOps repo contract:** single mainline; `envs/dev/`, `envs/staging/`, `envs/prod/` path overlays; promotion mutates the kustomization in `envs/<stage>/` to a new commit hash from the Warehouse (ADR 0040). Per-environment Kustomize overlays handle sizing/replicas only — substrate selection is the Composition's job (§14).
 - **Identity material:** Keycloak OIDC config (UI/API) + cluster-OIDC workload identity (controller); consumes the platform claim schema (§6.9) for OPA promotion-action decisions.
 
@@ -117,7 +117,7 @@ Per-event-type names deferred to B12 (interface-contract §2):
 
 ## 7. Non-Functional Requirements
 
-- **Security / multi-tenancy (§6.9, §6.6):** The CI/CD + promotion path is a privileged component (merge-trigger access to GitOps reconciliation). Promotion actions are OPA-gated (RBAC-as-floor / OPA-as-restrictor, ADR 0018); controller uses scoped workload identity (no long-lived static creds, consistent with §8 security-first design). Promotion across tenants/environments respects claim scope.
+- **Security / multi-tenancy (§6.9, §6.6):** The CI/CD + promotion path is a privileged component (merge-trigger access to GitOps reconciliation). Promotion actions are OPA-gated (RBAC-as-floor / OPA-as-restrictor, ADR 0018); controller uses scoped workload identity (no long-lived static creds, consistent with §8 security-first design). Promotion across tenants/environments respects XR scope.
 - **Observability (§6.5):** Promotion actions audited (REQ-A23-10); Grafana dashboard surfaces Stage health, verification pass/fail, in-flight promotions; `LogLevel` (ADR 0035) toggles Kargo-component verbosity per the platform pattern.
 - **Auditability:** Kargo's promotion record is the system of record for "what's deployed where" and the rollback handle (ADR 0040) — git history stays append-only.
 - **Scale / phasing:** Single-Stage v1.0 deliberately builds the muscle before it is load-bearing; the design must accept additional Stages additively without rework (ADR 0040). The trigger to add the third (prod) Stage is "v1.0 feature-complete and ready for real workloads."
@@ -152,7 +152,7 @@ Per §14.1 (ADR 0040 explicitly states standard deliverables apply):
 - **AC-A23-06** (REQ-A23-06): A promotion action denied by an OPA promotion-action policy (e.g. outside a time-of-day window) is blocked; an allowed one proceeds.
 - **AC-A23-07** (REQ-A23-07): The Kargo UI authenticates a human via Keycloak OIDC; the controller's outbound call uses cluster-OIDC workload identity (no static credential present).
 - **AC-A23-08** (REQ-A23-08): Rolling back by promoting a previous Warehouse commit re-runs the Stage verification + approval gates and does not require a `git revert` on main; git history remains append-only.
-- **AC-A23-09** (REQ-A23-09): Promoting a claim that resolves to different substrates (kind vs AWS) succeeds with an identical claim shape; the Composition absorbs the difference.
+- **AC-A23-09** (REQ-A23-09): Promoting an XR that resolves to different substrates (kind vs AWS) succeeds with an identical XR schema; the Composition absorbs the difference.
 - **AC-A23-10** (REQ-A23-10): Every promotion action emits a `platform.audit.*` event via the adapter, reconstructable as a promotion record.
 - **AC-A23-11** (REQ-A23-11): The two-kind setup (dev + staging) promotes a candidate dev→staging in CI without AWS.
 - **AC-A23-12** (REQ-A23-12): A Headlamp deep-link per Stage opens the Kargo UI showing current promotion state + verification results for that Stage.

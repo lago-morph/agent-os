@@ -15,12 +15,12 @@ The problem the decision solves: without an explicit rule it is tempting to trea
 - The rebuild-path obligation: every OpenSearch index has a documented rebuild source (sync dual-write or reindex).
 - Application to audit indexes (ADR 0034), KB indexes, Letta-derived indexes, test-result indexes (ADR 0011).
 - DR posture: managed-Postgres restore + object-storage durability + OpenSearch reindex (not OpenSearch backup/restore).
-- The dual-mode Postgres hosting invisibility (kind in-cluster / AWS RDS) resting on system-of-record semantics, via `XPostgres` substrate abstraction (ADR 0041).
+- The dual-mode Postgres hosting invisibility (kind in-cluster / AWS RDS) resting on system-of-record semantics, via `XPostgres` substrate abstraction (ADR 0044).
 
 ### 2.2 Out of scope (and where it lives instead)
 - The audit pipeline mechanics — ADR 0034 / component **A18**.
 - OpenSearch install/operation — ADR 0009 / component **A11**.
-- `XPostgres` Composition build — ADR 0041 / component **B4**.
+- `XPostgres` Composition build — ADR 0044 / component **B4**.
 - DR test execution — Workstream **F2**.
 - KB indexing pipeline — component **C8**.
 - Audit retention/redaction — Workstream **F1**.
@@ -34,11 +34,11 @@ ADR decisions honored:
 - **ADR 0011** — non-unit test results stream to OpenSearch as an advisory index; audit trail lives in the primary.
 - **ADR 0033** — dual-mode hosting (kind in-cluster Postgres / AWS RDS); invisible above the connection string.
 - **ADR 0034** — audit SoR is Postgres + S3 (Postgres-only on kind); OpenSearch audit index advisory.
-- **ADR 0040 / 0041** — `XPostgres` XRD with one Composition per substrate writes the uniform connection-secret; Kargo consumes it during promotion.
+- **ADR 0040 / 0044** — `XPostgres` XRD with one Composition per substrate writes the uniform connection-secret; Kargo consumes it during promotion.
 
 ## 4. Interfaces & Contracts
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
-- `XPostgres` (XRD, namespaced claim `Postgres`, B4) — `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: CloudNativePG `Cluster`; AWS: RDS. Status `ready`/`endpoint`/`version` (substrate-agnostic).
+- `XPostgres` (XRD, namespaced XR created directly in the tenant namespace per Crossplane v2, B4) — `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: CloudNativePG `Cluster`; AWS: RDS. Status `ready`/`endpoint`/`version` (substrate-agnostic).
 - `XSearchIndex` (XRD, B4) — backs OpenSearch as the derived retrieval layer; `connectionSecretRef`, `substrateClass`.
 - `AuditLog` (XRD, ADR 0034) — provisions the Postgres+S3 SoR pipeline plus the advisory OpenSearch indexer.
 
@@ -49,7 +49,7 @@ ADR decisions honored:
 - Audit events flow under `platform.audit.*`; lifecycle of memory/state stores under `platform.lifecycle.*`. This ADR introduces no new namespace.
 
 ### 4.4 Data schemas / connection-secret contracts
-- Uniform connection-secret shape (ADR 0041): `host`, `port`, `user`, `password`, `dbname` — written identically by the kind and AWS `XPostgres` Compositions so consumers bind the same keys regardless of substrate.
+- Uniform connection-secret shape (ADR 0044): `host`, `port`, `user`, `password`, `dbname` — written identically by the kind and AWS `XPostgres` Compositions so consumers bind the same keys regardless of substrate.
 - Audit in-flight rows live in the Postgres `audit_events` table (ADR 0034); on AWS a batch CronJob aggregates to immutable S3 (verified) before deleting rows; on kind Postgres alone is SoR and the batch step is disabled.
 
 ## 5. OSS-vs-Custom Decision
@@ -69,7 +69,7 @@ N/A — ADR. (Enforcement note: upstream primaries are **CloudNativePG**/**RDS**
 - Security/tenancy: primaries inherit namespace/RBAC scoping; audit SoR identifies actor + environment (ADR 0034).
 - Observability (§6.5): reindex/rebuild operations emit under `platform.lifecycle.*` / `platform.observability.*`; OpenSearch downtime MUST NOT break audit ingestion.
 - Scale: OpenSearch cost/scale is a function of derived indexes, all rebuildable; primary durability is the DR anchor.
-- Versioning (ADR 0030): `XPostgres`/`XSearchIndex` XRDs versioned with conversion webhooks (B4-owned).
+- Versioning (ADR 0030): `XPostgres`/`XSearchIndex` XRDs versioned with conversion webhooks (B4-owned, per ADR 0044).
 
 ## 8. Cross-Cutting Deliverable Checklist
 N/A — ADR (verification map in the PLAN). The §14.1 set is owned by enforcing components (A11, A18, B4, A10, C8, F2).
@@ -86,11 +86,11 @@ N/A — ADR (verification map in the PLAN). The §14.1 set is owned by enforcing
 
 ## 10. Risks & Open Questions
 - R-1 (med): On kind, with no S3, Postgres alone is the audit SoR; durability rests entirely on Postgres being a primary, not a cache — blast radius is kind/dev only.
-- OQ-1 (low): Capability-parity caveat — kind `XObjectStore` may produce "no archive lifecycle" (ADR 0041); affects archive-based rebuild on kind. `[PROPOSED]`
+- OQ-1 (low): Capability-parity caveat — kind `XObjectStore` may produce "no archive lifecycle" (ADR 0044); affects archive-based rebuild on kind. `[PROPOSED]`
 - R-2 (low): Synchronous dual-write paths can drift from the primary under partial failure; mitigated by reindex being the authoritative reconciliation.
 
 ## 11. References
 - ADR 0014 (`adr/0014-postgres-primary-opensearch-retrieval.md`) — the decision enforced here.
 - architecture-overview.md §6.3 (memory & data), §6.5 (observability); architecture-backlog.md §6 (invariant).
 - Enforcing components: A11 (OpenSearch), A18 (audit), B4 (Crossplane `XPostgres`/`XSearchIndex`), A10 (Letta), C8 (KB indexing), F2 (DR testing).
-- Related ADRs: 0009, 0011, 0033, 0034, 0040, 0041.
+- Related ADRs: 0009, 0011, 0033, 0034, 0040, 0044.

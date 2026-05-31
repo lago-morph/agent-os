@@ -89,7 +89,7 @@ Versioning: all follow ADR 0030 (per-component reconciler owns lifecycle).
 
 ### 4.4 Data schemas / connection-secret contracts
 N/A — this view introduces no substrate-backed primitive. Tenant databases are provisioned via
-`XAgentDatabase` (scope `tenant`) under V6-03's data architecture, not here.
+`AgentDatabase` (scope `tenant`) under V6-03's data architecture, not here.
 
 ## 5. OSS-vs-Custom Decision
 N/A — VIEW. Realizing components carry their own OSS-vs-custom decisions (Keycloak per ADR 0028/0029;

@@ -1,8 +1,8 @@
 # SPEC B16 — Initial OPA policy library content
 
 > kind: COMPONENT · workstream: B · tier: T0
-> upstream: [B3, A1, A6, A5, B13] · downstream: [] · adrs: [0002, 0018, 0013, 0032, 0017, 0041, 0038, 0030, 0027] · views: [6.6, 6.8, 6.9]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> upstream: [B3, A1, A6, A5, B13] · downstream: [] · adrs: [0002, 0018, 0013, 0032, 0017, 0044, 0038, 0030, 0027] · views: [6.6, 6.8, 6.9]
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
 
@@ -27,9 +27,9 @@ B22's threat-model output** (ADR 0027): B22 updates "the OPA policy library targ
   in §6.6: `Agent`, `AgentRun`, `Sandbox`, `SandboxTemplate`, `Memory`, `MemoryStore`, `MCPServer`,
   `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, `BudgetPolicy`,
   `Approval`, `LogLevel`, and the Crossplane XRs (`AgentEnvironment`, `SyntheticMCPServer`,
-  `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `XAgentDatabase`, and substrate XRDs
-  `XPostgres`/`XSearchIndex`/`XObjectStore`/`XMongoDocStore`).
-- The **substrate-mismatch admission rule** (ADR 0041): reject any XRD claim whose target substrate
+  `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `AgentDatabase`, and substrate XRDs
+  `Postgres`/`SearchIndex`/`ObjectStore`/`MongoDocStore`).
+- The **substrate-mismatch admission rule** (ADR 0044): reject any XR whose target substrate
   has no matching Composition for the cluster's `platform.io/environment` label (B4 supplies the
   requirement + input shape; B16 authors the Rego).
 - **Runtime LiteLLM-callback policies**: tool/model authorization, rate limiting, content checks,
@@ -84,7 +84,7 @@ B19-core (approval elevation), A20 (simulator dry-runs B16 entrypoints).
 - **ADR 0013** — capability/CapabilitySet model; cross-tenant publication is OPA-checked.
 - **ADR 0032** — B16 reads the *resolved* CapabilitySet, not the layered inputs.
 - **ADR 0017** — `approval.elevation` may only elevate.
-- **ADR 0041** — substrate-mismatch admission rejection.
+- **ADR 0044** — substrate-mismatch admission rejection.
 - **ADR 0038** — every entrypoint honors dry-run with `simulated: true`, audited under
   `platform.policy.*`, no enforcement-path side effects.
 - **ADR 0030** — bundle/policy versioning per the framework's convention.
@@ -101,6 +101,14 @@ N/A — B16 defines no CRD. It writes **Rego that decides over** the CRDs/XRDs i
 objects are owned by A7 + B16 content together (per B3 §4.1); B16 supplies the Rego bodies.
 
 ### 4.2 APIs / SDK surfaces
+
+The **OPA decision-document format is owned and defined by B3 (D-03)**; B16 does not own or redefine it — B16 authors policy content that evaluates to documents in the B3-owned format.
+
+**Policy-bundle ownership / signing / staged rollout:**
+- **#24 (ownership):** the **platform security team** owns the global/cross-tenant OPA bundle. Tenants propose changes by pull request; a security reviewer MUST approve before merge. B16 does not unilaterally own global bundle content.
+- **#25 (signing):** policy bundles are cryptographically signed and verified at load time; the engine refuses to load unsigned or tampered bundles.
+- **#26 (staged rollout):** a new or changed bundle first runs in **audit mode** (logs what it would block) and flips to enforce only after review; the Kargo promotion pipeline gates that flip.
+- Any security-relevant event B16 policies detect (e.g. signature-verification failure, tampered-bundle rejection) MUST also be emitted under `platform.security` (schema owned by A7), in addition to local handling.
 B16 emits **decision documents** in B3's canonical shape (input: Platform JWT claims
 `platform_tenants`/`platform_namespaces`/`platform_roles`/`tenant_roles`/`capability_set_refs`,
 action, target, context, dry-run; output: `allow`, `reasons[]`, `layer`, `simulated`). The field
@@ -131,8 +139,8 @@ one Rego toolchain across all decision points; the content is platform policy, i
   as an OPA decision point in §6.6 (the full kind list above), each conforming to B3's layout and
   decision contract.
 - **REQ-B16-02:** B16 MUST implement the **substrate-mismatch admission rule**: reject any XRD
-  claim whose target substrate has no matching Composition for the cluster's
-  `platform.io/environment` label (ADR 0041), using B4's supplied input shape.
+  XR whose target substrate has no matching Composition for the cluster's
+  `platform.io/environment` label (ADR 0044), using B4's supplied input shape.
 - **REQ-B16-03:** B16 MUST provide **LiteLLM runtime-callback policies** for tool/model
   authorization, rate limiting, content checks, and **budget enforcement** that reads
   `BudgetPolicy` data reconciled by B13 (§6.6).
@@ -182,7 +190,7 @@ one Rego toolchain across all decision points; the content is platform policy, i
 - Alerts — **applicable** (policy-violation spikes, budget-exceeded, dynamic-registration denies).
   `[PROPOSED — not in source]` for concrete thresholds.
 - Grafana dashboard (Crossplane XR) — **applicable** — policy-decision/violation dashboard authored
-  as a `GrafanaDashboard` claim (panels are also a B22 mandatory-signal landing zone).
+  as a `GrafanaDashboard` XR (panels are also a B22 mandatory-signal landing zone).
 - Headlamp plugin — **N/A** — the policy-review/simulator UI is A20/A22; B16 is content-only.
 - OPA/Rego integration — **applicable** — this component *is* the initial Rego content.
 - Audit emission (ADR 0034) — **applicable (defines content)** — emission performed by invoking
@@ -196,7 +204,7 @@ one Rego toolchain across all decision points; the content is platform policy, i
 ## 9. Acceptance Criteria
 - **AC-B16-01:** Every v1.0 CRD/XRD in the §6.6 list has an admission policy; applying a violating
   CR is denied and a conforming CR is admitted, for each. (→ REQ-B16-01)
-- **AC-B16-02:** An XRD claim on a `kind` cluster with no matching Composition is **denied at
+- **AC-B16-02:** An XR on a `kind` cluster with no matching Composition is **denied at
   admission** with a substrate-mismatch reason. (→ REQ-B16-02)
 - **AC-B16-03:** A LiteLLM call exceeding its `BudgetPolicy` limit is denied by the budget policy;
   an in-budget call is allowed; tool/model-authorization and rate-limit rules deny/allow per fixture.
@@ -247,7 +255,7 @@ one Rego toolchain across all decision points; the content is platform policy, i
   authoritative target list; line 544: policy simulator dry-run / `simulated` contract), §6.8
   (capability registries, resolved-set reads), §6.9 (multi-tenancy, cross-tenant publication).
 - ADR 0002 (OPA + Gatekeeper; B3/B16 split), 0018 (RBAC-floor / OPA-restrictor), 0013 (capability
-  model), 0032 (overlay — resolved set), 0017 (approval elevation), 0041 (substrate-mismatch
+  model), 0032 (overlay — resolved set), 0017 (approval elevation), 0044 (substrate-mismatch
   admission), 0038 (policy simulator dry-run), 0030 (versioning), 0027 (B22 feeds B16 targets).
 - interface-contract.md §1.2–§1.6 (CRD/XRD field names B16 decides over), §2 (`platform.policy.*`).
 - Related pieces: B3 (framework), A7 (OPA install), B2 (LiteLLM callbacks), A6 (Envoy), A5 (ARK),

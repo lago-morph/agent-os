@@ -15,7 +15,7 @@ on the deferred Azure bootstrap, not built in v1.0.
 
 ## 2. Ordered Task List
 - TASK-01: Encode the v1.0 target set (AWS-EKS + GitHub + kind; no Azure) as an install/CI scope assertion — produces: scope-conformance check — depends-on: []
-- TASK-02: Verify a dual-mode primitive provisions from one claim shape on kind and on AWS, consumer reads only connection-secret + agnostic status — produces: Chainsaw substrate-parity test — depends-on: [TASK-01]
+- TASK-02: Verify a dual-mode primitive provisions from one XR schema on kind and on AWS, consumer reads only connection-secret + agnostic status — produces: Chainsaw substrate-parity test — depends-on: [TASK-01]
 - TASK-03: Verify the kind cluster-OIDC bootstrap lets Keycloak validate a projected SA token — produces: PyTest/Chainsaw federation test — depends-on: []
 - TASK-04: Verify CI runs the component suite against both kind in-cluster and AWS-managed modes — produces: dual-mode CI matrix assertion — depends-on: [TASK-02]
 - TASK-05: Record the AKS opt-in-flags precondition on the deferred Azure-bootstrap design note — produces: design-note gating entry — depends-on: []

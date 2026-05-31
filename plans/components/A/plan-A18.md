@@ -42,7 +42,7 @@ A18 is the most-depended-on audit surface, so the **adapter interface is frozen 
 - TASK-02 (adapter) and TASK-03 (migrations) parallelize after TASK-01.
 
 ## 5. Test Strategy
-- **Chainsaw (operator/CRD):** AC-A18-08 (single `AuditLog` claim provisions pipeline, kind+AWS), -04 (kind no-S3/no-CronJob), -12 (`AuditLog` admission rejects malformed), -13 (migrations idempotent).
+- **Chainsaw (operator/CRD):** AC-A18-08 (single `AuditLog` XR provisions pipeline, kind+AWS), -04 (kind no-S3/no-CronJob), -12 (`AuditLog` admission rejects malformed), -13 (migrations idempotent).
 - **PyTest (logic):** AC-A18-01 (no direct store writes), -02 (row written), -03 (batch verify-then-delete + verify-fail-retain), -05 (OpenSearch-down ingest succeeds + rebuild), -06 (Postgres-down fail-closed), -07 (LogLevel raise no redeploy), -09 (envelope fields), -10 (version/deprecation).
 - **Playwright (UI/e2e):** Headlamp audit-inspection view over the advisory index.
 - **Fakes/fixtures:** mock `Postgres`/`ObjectStore`/`SearchIndex` (B4), mock `LogLevel` reconciler, a stoppable OpenSearch + Postgres for failure-mode tests. AWS-only S3-verify-then-delete needs a cloud integration fixture (kind cannot exercise the archive path — ADR 0023/0034 caveat).
@@ -59,4 +59,4 @@ A18 is the most-depended-on audit surface, so the **adapter interface is frozen 
 - **Rollup: L** (matches CSV). **Critical path:** TASK-01 (freeze contract) → 02 → 04 → 06 (S3 verify-then-delete) → 07 (`AuditLog` composition) → 11.
 
 ## 8. Rollback / Reversibility
-Back out by deleting the `AuditLog` claim (deprovisions endpoint/indexer/CronJob) and unpinning the adapter library. **Destructive caution:** deleting the Postgres store / S3 bucket loses the system of record — drain/archive first. **Downstream break:** every component linking the adapter loses its audit path; with the endpoint gone, callers **fail closed on Postgres-unavailable** (no silent audit loss, by design) — so a careless rollback halts audited operations platform-wide. Reverting the adapter contract is the highest-blast-radius action: pin a prior adapter version and keep the endpoint backward-compatible across one release (ADR 0030).
+Back out by deleting the `AuditLog` XR (deprovisions endpoint/indexer/CronJob) and unpinning the adapter library. **Destructive caution:** deleting the Postgres store / S3 bucket loses the system of record — drain/archive first. **Downstream break:** every component linking the adapter loses its audit path; with the endpoint gone, callers **fail closed on Postgres-unavailable** (no silent audit loss, by design) — so a careless rollback halts audited operations platform-wide. Reverting the adapter contract is the highest-blast-radius action: pin a prior adapter version and keep the endpoint backward-compatible across one release (ADR 0030).

@@ -55,7 +55,7 @@ ADR decisions honored:
 - Memory-store lifecycle (created/.../deleted) rides `platform.lifecycle.*` (ADR 0031, §2). Memory read/write audit rides `platform.audit.*` via the audit adapter (interface-contract §5). Per-event-type names deferred to B12; `[PROPOSED — not in source]` any concrete name.
 
 ### 4.4 Data schemas / connection-secret contracts
-- The `MemoryStore` XR composes a substrate backend; any composed Postgres/store writes the uniform connection-secret shape (`host`, `port`, `user`, `password`, `dbname`) per ADR 0041. The connection secret carries no access-mode field — mode is enforced at the platform/SDK plane, not the backend wire.
+- The `MemoryStore` XR composes a substrate backend; any composed Postgres/store writes the uniform connection-secret shape (`host`, `port`, `user`, `password`, `dbname`) per ADR 0044. The connection secret carries no access-mode field — mode is enforced at the platform/SDK plane, not the backend wire.
 
 ## 5. OSS-vs-Custom Decision
 N/A — ADR. (Enforcement note: backends are upstream **Letta** (A10) and Crossplane-composed XRs (B4); the access-mode contract is enforced by the platform/SDK plane plus a Gatekeeper admission policy — config/wrap, no fork.)
@@ -98,4 +98,4 @@ N/A — ADR (verification map lives in the PLAN). The §14.1 set applies to enfo
 - architecture-overview.md §6.3 (memory and data architecture).
 - architecture-backlog.md §4 (memory namespace and sharing model details), §6.
 - Enforcing/related components: A10 (Letta), B11 (memory adapter), B4 (Crossplane `MemoryStore` XR), A7 (OPA/Gatekeeper), A18 (audit), A5 (ARK).
-- ADR 0005 (Letta), 0016 (multi-tenancy), 0018 (RBAC-floor/OPA-restrictor), 0002 (Gatekeeper), 0027 (threat model), 0030 (versioning), 0041 (connection secret).
+- ADR 0005 (Letta), 0016 (multi-tenancy), 0018 (RBAC-floor/OPA-restrictor), 0002 (Gatekeeper), 0027 (threat model), 0030 (versioning), 0044 (connection secret).

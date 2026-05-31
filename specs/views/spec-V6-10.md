@@ -92,11 +92,14 @@ OPA bundles are policy artifacts, **not** platform CRDs, but share the same auth
 - **Three-state OPA decision API** — `allowed` / `upon-approval` / `denied` with attached conditions
   (e.g. "only during business hours", "only for objects matching this label selector").
 
-### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
-- Consumed: AlertManager → HolmesGPT is one of the two initial v1.0 trigger flows (§6.7); HolmesGPT
-  consumes observability/alert signals.
-- Emitted: remediation decisions and policy outcomes under `platform.policy.*`; approval requests
-  under `platform.approval.*`; all actions audited under `platform.audit.*`.
+### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031; single owner per namespace, QN-03)
+- Consumed: alerts are delivered **via the bus** under `platform.observability.*` (owner A13) as one
+  of the two initial v1.0 trigger flows (§6.7) — bus-mediated, no direct AlertManager → HolmesGPT
+  trigger. HolmesGPT pulls metrics from Mimir **directly** (data stream, not a bus event).
+- Emitted: remediation decisions and policy outcomes under `platform.policy.*` (owner A7); approval
+  requests under `platform.approval.*` (owner B19); all actions audited under `platform.audit.*`
+  (owner A18). When HolmesGPT detects a security-relevant event it also emits under
+  `platform.security.*` (owner A7).
 
 ### 4.4 Data schemas / connection-secret contracts
 N/A — this view introduces no substrate-backed primitive. HolmesGPT's early-phase AWS reads use a
@@ -149,7 +152,7 @@ OSS-vs-custom decisions.
 
 ## 8. Cross-Cutting Deliverable Checklist
 N/A — VIEW. Realized by components; HolmesGPT toolset, OPA/Rego integration, audit emission, Knative
-trigger flow (AlertManager → HolmesGPT), Headlamp suggestion cards belong to A14/B10/A16 and the
+trigger flow (bus-mediated alert consumption under `platform.observability.*`, owner A13 — no direct AlertManager → HolmesGPT wire), Headlamp suggestion cards belong to A14/B10/A16 and the
 policy/approval owners, verified end-to-end in PLAN §5.
 
 ## 9. Acceptance Criteria
@@ -184,7 +187,7 @@ The view holds when:
 
 ## 11. References
 - architecture-overview.md §6.10 (HolmesGPT self-management, ~L774–835): three-state model
-  (~L821–827), phased trajectory (~L829–835); §6.7 (AlertManager → HolmesGPT trigger flow).
+  (~L821–827), phased trajectory (~L829–835); §6.7 (bus-mediated alert trigger flow under `platform.observability.*`, owner A13 — no direct AlertManager → HolmesGPT wire).
 - ADR 0012 (HolmesGPT first-class agent + three-state + phasing), ADR 0017 (approval system),
   ADR 0022 (Knowledge Base primitive), ADR 0038 (policy simulator), ADR 0039 (Headlamp editors),
   ADR 0018 (RBAC-floor/OPA-restrictor), ADR 0031 (CloudEvent taxonomy).

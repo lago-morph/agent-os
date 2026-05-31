@@ -56,7 +56,7 @@ The system of record is **Postgres + S3**. In-flight rows live in the Postgres `
 ## 4. Interfaces & Contracts
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
-**`AuditLog`** (XRD; XR form `AuditLog`; namespaced; owner B4-composed, defined/consumed here per ADR 0034). Source-stated fields (interface-contract §1.6): `postgresRef`, `s3BucketRef`, `indexerRef`, `batchScheduleSpec`, `endpointReplicas`. One AuditLog XR provisions: Postgres store (via `Postgres`), S3 bucket + lifecycle (via `ObjectStore`, AWS only), OpenSearch indexer config, 5-min batch CronJob (AWS only), audit endpoint Deployment.
+**`AuditLog`** (namespace-scoped XR, Crossplane v2; owner B4-composed, defined/consumed here per ADR 0034). Source-stated fields (interface-contract §1.6): `postgresRef`, `s3BucketRef`, `indexerRef`, `batchScheduleSpec`, `endpointReplicas`. One AuditLog XR provisions: Postgres store (via `Postgres`), S3 bucket + lifecycle (via `ObjectStore`, AWS only), OpenSearch indexer config, 5-min batch CronJob (AWS only), audit endpoint Deployment.
 - Composes `Postgres` (system of record, both substrates) and `ObjectStore` (S3 on AWS; MinIO/no-op on kind) per ADR 0034/0044.
 - **Capability-parity caveat:** on kind the archive path is **no-op** (no S3, batch disabled) — `ready`/`endpoint`/`version` status remain substrate-agnostic; the absence of an archive is by design.
 - `LogLevel` (namespaced; consumed): the endpoint honors a `LogLevel` whose `componentSelector` targets the audit endpoint, with `scope` of component/tenant/eventClass (ADR 0035).
@@ -82,6 +82,9 @@ This is the T0 contract every component binds to. Source (ADR 0034 / interface-c
 
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
 - **Consumes / ingests `platform.audit.*`** — audit-emission events from any component (gateway request/response, admission decisions, egress connections, secret access, simulator dry-runs routed here under policy). The endpoint is the consumer of record.
+- **Namespace ownership (QN-03):** A18 (audit endpoint) is the **single owner of the `platform.audit` namespace** — A18 authors and registers its schema in B12 (the event catalogue). Every audit-emitting component takes an explicit dependency on A18 as the owner; A18 is the sink and namespace owner, while per-event-type names under it are registered in B12.
+- **Freeze-gate (D-05):** the audit-adapter interface and the `audit_events` schema are **frozen**. A18 publishes the frozen interface/schema and the **freeze-gate that MUST pass before any component emits audit events** — no component (A1 gateway, A5 ARK, A6 sandbox, A7 OPA, etc.) may emit audit until the audit-adapter freeze-gate (D-05) passes.
+- **Cross-cutting security emission (QN-03):** for any security-relevant event A18 detects (e.g. a forbidden/malformed audit write, a privileged admin action on the audit store), A18 MUST perform its existing local handling AND additionally emit the event to the bus under `platform.security` (schema owned by A7).
 - **Emits `platform.observability.*`** for its own threshold crossings (e.g. in-flight table growth, S3-verify failures) — `[PROPOSED — not in source]` (no specific A18 event named; namespace is the commitment).
 - **Self-audit:** A18's own privileged actions (endpoint config changes, batch deletions) emit `platform.audit.*` through the same adapter (dogfooding).
 - Per-event-type schemas → **B12**. A18 commits only to namespaces + the envelope.
@@ -110,7 +113,7 @@ This is the T0 contract every component binds to. Source (ADR 0034 / interface-c
 - **REQ-A18-07:** If **Postgres is unavailable**, the endpoint MUST **fail closed** for the emitting component (no silent drop).
 - **REQ-A18-08:** If the **S3 write or verification fails**, the batch MUST leave the rows in Postgres and **retry** — no data loss, only in-flight table growth until recovery.
 - **REQ-A18-09:** The audit endpoint MUST honor its own **`LogLevel`** toggle (ADR 0035) to raise verbosity per-tenant / per-event-class **without redeploying callers**.
-- **REQ-A18-10:** The whole pipeline MUST be provisioned by a single **`AuditLog`** claim composing `Postgres` + `ObjectStore` (and indexer/CronJob/endpoint), with the same claim shape on kind and AWS (kind producing no archive by design).
+- **REQ-A18-10:** The whole pipeline MUST be provisioned by a single **`AuditLog`** XR composing `Postgres` + `ObjectStore` (and indexer/CronJob/endpoint), with the same XR schema on kind and AWS (kind producing no archive by design).
 - **REQ-A18-11:** All audit events MUST carry the **`platform.audit.*`** type plus `specversion` + `schemaVersion`; per-event-type schemas resolve from **B12**.
 - **REQ-A18-12:** The adapter and endpoint HTTP API MUST be **versioned** (semantic versioning for the library; URL-path `/v1/...` for the endpoint) per ADR 0030, with a deprecation window before removing a version.
 - **REQ-A18-13:** Endpoint egress to S3 and AWS-managed OpenSearch MUST route through the **Envoy egress proxy** (ADR 0003); the endpoint is not a special case.
@@ -122,7 +125,7 @@ This is the T0 contract every component binds to. Source (ADR 0034 / interface-c
 - **Multi-tenancy (§6.9):** `audit_events` MUST carry tenant attribution so audit data respects namespace/tenant boundaries; `LogLevel` `scope` supports per-tenant verbosity. `AuditLog` XR is namespaced.
 - **Observability (§6.5):** Grafana dashboard (XR) for ingest rate, in-flight table size, batch lag, S3-verify failures, OpenSearch indexer lag. Alerts on Postgres-down (fail-closed), in-flight growth, S3-verify failure, indexer lag.
 - **Scale / availability:** `endpointReplicas` (XRD field) scales the endpoint; OpenSearch-down and S3-down are **bounded, non-data-loss** failure modes (REQ-A18-06/-08). Postgres-down is fail-closed by design.
-- **Versioning (ADR 0030):** adapter is the most-depended-on SDK surface — breaking changes require coordinated bumps + compatibility matrix; `AuditLog` claim-shape changes use conversion webhooks.
+- **Versioning (ADR 0030):** adapter is the most-depended-on SDK surface — breaking changes require coordinated bumps + compatibility matrix; `AuditLog` XR schema changes use conversion webhooks.
 
 ## 8. Cross-Cutting Deliverable Checklist
 - Helm/manifests — **applicable** (`AuditLog` XR/composition, endpoint Deployment, indexer, CronJob, migrations Job).
@@ -147,11 +150,11 @@ This is the T0 contract every component binds to. Source (ADR 0034 / interface-c
 - **AC-A18-05:** With OpenSearch stopped, an audit emit still succeeds (returns OK, row in Postgres); restarting OpenSearch and rebuilding repopulates the index from Postgres/S3. (→ REQ-A18-06)
 - **AC-A18-06:** With Postgres stopped, an emit causes the endpoint to fail closed and the caller observes the failure (no silent success). (→ REQ-A18-07)
 - **AC-A18-07:** Setting a `LogLevel` targeting the endpoint with a per-tenant/per-event-class scope raises verbosity without redeploying any caller. (→ REQ-A18-09)
-- **AC-A18-08:** A single `AuditLog` claim provisions Postgres, OpenSearch indexer, endpoint (and on AWS S3 + CronJob); the identical claim applies on kind producing no archive. (→ REQ-A18-10)
+- **AC-A18-08:** A single `AuditLog` XR provisions Postgres, OpenSearch indexer, endpoint (and on AWS S3 + CronJob); the identical XR applies on kind producing no archive. (→ REQ-A18-10)
 - **AC-A18-09:** Every emitted event carries a `platform.audit.*` type, `specversion`, and `schemaVersion`. (→ REQ-A18-11)
 - **AC-A18-10:** The adapter library and endpoint advertise versions; a deprecated `/v1` route stays reachable ≥1 platform release after a successor lands. (→ REQ-A18-12)
 - **AC-A18-11:** Endpoint→S3 and endpoint→managed-OpenSearch traffic is observed transiting the Envoy egress proxy. (→ REQ-A18-13)
-- **AC-A18-12:** The `AuditLog` admission Rego rejects a malformed claim; A18's own privileged action emits a `platform.audit.*` event. (→ REQ-A18-14)
+- **AC-A18-12:** The `AuditLog` admission Rego rejects a malformed XR; A18's own privileged action emits a `platform.audit.*` event. (→ REQ-A18-14)
 - **AC-A18-13:** Running the migrations creates the `audit_events` table at a known schema version; a re-run is idempotent. (→ REQ-A18-15)
 
 ## 10. Risks & Open Questions
@@ -168,6 +171,6 @@ This is the T0 contract every component binds to. Source (ADR 0034 / interface-c
 ## 11. References
 - architecture-overview.md §6.5 (observability + audit; logical fanout diagram), §6.6 (line 511; audit emission points — the full caller list that links the adapter; line 544 simulator runs audited under `platform.policy.*`), §6.7 (line 611; `platform.audit.*` consumed by the audit adapter), §14.1 (line 1684; A18 deliverable).
 - ADR 0034 (durable adapter; Postgres+S3 system of record; OpenSearch advisory; `AuditLog` XRD; failure modes). interface-contract §5 (audit adapter interface — the binding behavioral contract).
-- ADR 0035 (endpoint `LogLevel` toggle). ADR 0014 (Postgres primary). ADR 0009/0033 (OpenSearch dual-hosting). ADR 0021/0044 (`AuditLog` substrate-abstraction instance; connection secret). ADR 0003 (Envoy egress). ADR 0011 (test results via same path). ADR 0030/0031 (versioning / event taxonomy). ADR 0040 (Kargo promotes `AuditLog` claim).
+- ADR 0035 (endpoint `LogLevel` toggle). ADR 0014 (Postgres primary). ADR 0009/0033 (OpenSearch dual-hosting). ADR 0021/0044 (`AuditLog` substrate-abstraction instance; connection secret). ADR 0003 (Envoy egress). ADR 0011 (test results via same path). ADR 0030/0031 (versioning / event taxonomy). ADR 0040 (Kargo promotes `AuditLog` XR).
 - architecture-backlog.md §1.13 (retention deferred to F1), §6 (reproducibility invariant; all custom code is Python).
 - Related pieces: A11 (OpenSearch), A7/B3/B16 (OPA), B4 (substrate XRDs), A4/B8 (Knative), B12 (event schemas), F1 (retention).

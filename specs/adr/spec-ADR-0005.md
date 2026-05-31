@@ -20,7 +20,7 @@ ADR 0005 fixes Letta as the memory backend behind ARK's `Memory` CRD. This SPEC 
 - Per-store memory access-mode enforcement semantics — ADR 0025 (declared on `MemoryStore`).
 - `memory.*` SDK method signatures — B6 (not specified in source beyond the named surface).
 - OpenSearch retrieval tier — ADR 0009; Postgres-primary invariant — ADR 0014.
-- `MemoryStore` XR Composition mechanics — B4 / ADR 0041.
+- `MemoryStore` XR Composition mechanics — B4 / ADR 0044.
 
 ## 3. Context & Dependencies
 Upstream consumed: A11 (OpenSearch retrieval tier Letta indexes land in). Downstream consumers: B11 (memory backend adapter) wraps Letta.
@@ -81,4 +81,4 @@ Decision honored when:
 - ADR 0005 (`adr/0005-letta-memory-backend.md`) — the decision.
 - Enforcing components: A10 (Letta install, owner), B11 (memory backend adapter), B4 (`MemoryStore` XR), B6 (SDK `memory.*` + compat matrix), A11 (OpenSearch indexes), A7 (admission).
 - architecture-overview.md §6.3, §6.7, §6.13, §9; architecture-backlog.md §2.9, §6.
-- Related: ADR 0009, 0014, 0025, 0041, 0002, 0030.
+- Related: ADR 0009, 0014, 0025, 0044, 0002, 0030.

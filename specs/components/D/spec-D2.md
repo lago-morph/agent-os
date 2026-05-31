@@ -30,7 +30,7 @@ Each dashboard is delivered as a namespaced `GrafanaDashboard` Crossplane XR (AD
 ## 3. Context & Dependencies
 
 Upstream consumed:
-- **B4** — the `GrafanaDashboard` XRD + Composition + Grafana provider path; D2 manifests are claims against it.
+- **B4** — the `GrafanaDashboard` XRD + Composition + Grafana provider path; D2 manifests are namespace-scoped XRs against it (Crossplane v2, ADR 0044).
 - **A2 (Langfuse)** — prompt/version performance, eval scores, cost, and trace deep-link target; primary data source for prompt performance, A/B, eval trend, cost-per-success, failure-mode dashboards.
 - **A13 (Tempo + Mimir)** — metrics (Mimir) and traces (Tempo) backends queried by panels; latency/token/cost series.
 - **A1 (LiteLLM)** — gateway token/cost/model-routing metrics for cost-per-success and prompt performance.
@@ -53,7 +53,7 @@ ADRs honored:
 ## 4. Interfaces & Contracts
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
-- `GrafanaDashboard` (XR, namespaced; XR form `XGrafanaDashboard`) — fields used: `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled). One XR per dashboard. Version tracks the XRD owned by B4 (per ADR 0030/0041 conversion-webhook policy).
+- `GrafanaDashboard` (namespace-scoped XR, Crossplane v2) — fields used: `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled). One XR per dashboard. Version tracks the XRD owned by B4 (per ADR 0030/0044 conversion-webhook policy).
 - `Evaluation` (ARK CRD, A5) — read-only reference: D2 visualizes outcomes of `Evaluation` runs (`agentRef`, `datasetRef`, `evaluators[]`); D2 does not define or reconcile it.
 
 ### 4.2 APIs / SDK surfaces

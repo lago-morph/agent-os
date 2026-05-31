@@ -53,7 +53,7 @@ A11 is **T0, contract-owning** — it owns the search-tier contract (connection 
 - **ADR 0034** — OpenSearch is **advisory fanout only** for audit; if down, audit ingestion still succeeds; rebuildable from S3 (AWS) / Postgres (kind).
 - **ADR 0011** — non-unit test results stream to OpenSearch as an advisory index.
 - **ADR 0040** — the uniform connection secret is consumed by Kargo during environment promotion.
-- **ADR 0002** — substrate-claim admission (Gatekeeper) rejects no-matching-Composition claims.
+- **ADR 0002** — substrate-XR admission (Gatekeeper) rejects no-matching-Composition XRs.
 - **ADR 0031 / 0030** — any A11-emitted CloudEvents fall under the taxonomy; versioning policy applies.
 
 ## 4. Interfaces & Contracts
@@ -112,7 +112,7 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 - **REQ-A11-08:** Both Compositions SHALL write the **uniform connection secret** (endpoint/host, port, user, password, optional TLS) so consumers do not branch on substrate (ADR 0044/0009).
 - **REQ-A11-09:** The XR status surface SHALL be substrate-agnostic (`ready`, `endpoint`, `version`); substrate-specific fields SHALL be absent (ADR 0044).
 - **REQ-A11-10:** Reindex paths SHALL be first-class operational procedures, exercised in DR drills (F2) (ADR 0014).
-- **REQ-A11-11:** A claim for `SearchIndex` with no matching Composition for the cluster's `platform.io/environment` label SHALL be rejected at admission (ADR 0044/0002).
+- **REQ-A11-11:** An XR for `SearchIndex` with no matching Composition for the cluster's `platform.io/environment` label SHALL be rejected at admission (ADR 0044/0002).
 - **REQ-A11-12:** Audit-relevant operator actions on OpenSearch SHALL emit via the platform audit adapter; A11 SHALL NOT write its own audit records directly to any store (ADR 0034).
 
 ## 7. Non-Functional Requirements
@@ -121,7 +121,7 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 - **Durability / DR:** A11 is **not** the durability boundary — DR posture focuses on Postgres restore + object-storage durability; OpenSearch recovery is reindex from primaries (ADR 0014). Migration off OpenSearch is a reindex exercise, not a data migration (bounded risk).
 - **Observability (§6.5):** OTel + metrics (index health, query latency, reindex lag); per-component Grafana dashboard via `GrafanaDashboard` XR. OpenSearch is itself a query/dashboard target for audit + test results.
 - **Scale:** sized for v1.0 vector + hybrid + audit-fanout volumes; `nodeCount`/`storage` set per substrate via the XRD.
-- **Versioning (ADR 0030/0044):** `SearchIndex` claim shape versioned with conversion webhooks + deprecation windows (owned by B4); `version` field tracks the OpenSearch version.
+- **Versioning (ADR 0030/0044):** `SearchIndex` XR schema versioned with conversion webhooks + deprecation windows (owned by B4); `version` field tracks the OpenSearch version.
 
 ## 8. Cross-Cutting Deliverable Checklist (§14.1)
 
@@ -134,16 +134,16 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 | Alert rules | applicable — cluster red/yellow, reindex lag, storage pressure, query-latency breach |
 | Grafana dashboard (`GrafanaDashboard` XR) | applicable |
 | Headlamp plugin | applicable — index/cluster-health visibility (A11 ensures integration in our env) |
-| OPA/Rego integration | applicable — substrate-claim admission (`SearchIndex` no-matching-Composition reject); access-policy helpers (Rego in B16) |
+| OPA/Rego integration | applicable — substrate-XR admission (`SearchIndex` no-matching-Composition reject); access-policy helpers (Rego in B16) |
 | Audit emission (ADR 0034) | applicable — operator actions; note A11 also *hosts* the advisory audit index (written by A18's indexer) |
 | Knative trigger flow | applicable — reindex-lag / index-health observability flow under `platform.observability.*` |
 | HolmesGPT toolset | applicable — index-health query, reindex-status, search-diagnostics tools |
-| 3-layer tests | applicable — Chainsaw (`SearchIndex` claim + admission), PyTest (vector/hybrid query, advisory-fanout-down behavior), Playwright (Dashboards/Headlamp) |
+| 3-layer tests | applicable — Chainsaw (`SearchIndex` XR + admission), PyTest (vector/hybrid query, advisory-fanout-down behavior), Playwright (Dashboards/Headlamp) |
 | Tutorials & how-tos | applicable — "query the KB", "trigger a reindex", "connect Dashboards" |
 
 ## 9. Acceptance Criteria
 
-- **AC-A11-01** (REQ-A11-01): An `SearchIndex` claim provisions in-cluster OpenSearch on kind and AWS-managed OpenSearch on AWS; the XR schema is identical across substrates. *(Chainsaw, two substrates)*
+- **AC-A11-01** (REQ-A11-01): A `SearchIndex` XR provisions in-cluster OpenSearch on kind and AWS-managed OpenSearch on AWS; the XR schema is identical across substrates. *(Chainsaw, two substrates)*
 - **AC-A11-02** (REQ-A11-02): The same backend answers a dense-vector query, a BM25 query, and a hybrid query for the same corpus. *(PyTest)*
 - **AC-A11-03** (REQ-A11-03): For each index class, a documented rebuild path exists and a reindex reproduces the index from its primary. *(PyTest + doc check)*
 - **AC-A11-04** (REQ-A11-04): With OpenSearch stopped, an audit write still succeeds at the system of record (Postgres/S3); after restart a reindex restores the advisory index. *(PyTest)*
@@ -153,7 +153,7 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 - **AC-A11-08** (REQ-A11-08): The connection secret written by each Composition has identical keys (endpoint/host, port, user, password, optional TLS); a consumer binds to the same keys on both substrates. *(Chainsaw)*
 - **AC-A11-09** (REQ-A11-09): The XR status exposes only `ready`, `endpoint`, `version`; no substrate-specific fields (e.g. RDS ARN, Service path) appear. *(Chainsaw)*
 - **AC-A11-10** (REQ-A11-10): A DR-drill reindex procedure runs end to end and is documented as a first-class runbook. *(doc check + PyTest)*
-- **AC-A11-11** (REQ-A11-11): On a `kind`-labeled cluster, an `SearchIndex` claim whose only Composition targets `aws` is rejected at admission. *(Chainsaw)*
+- **AC-A11-11** (REQ-A11-11): On a `kind`-labeled cluster, a `SearchIndex` XR whose only Composition targets `aws` is rejected at admission. *(Chainsaw)*
 - **AC-A11-12** (REQ-A11-12): An audit-relevant operator action emits via the audit adapter; no direct store write from A11. *(PyTest)*
 
 ## 10. Risks & Open Questions
@@ -167,5 +167,5 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 ## 11. References
 
 - architecture-overview.md §6.3 Memory and data architecture (line ~294 — storage roles, reproducibility rule of thumb, dual-mode hosting, audit pipeline), §6.4 The Knowledge Base as a separate primitive (~349), §6.5 (~370, observability — advisory audit index), §6.13 (~981, versioning).
-- ADR 0009 (OpenSearch search/vector store), ADR 0014 (Postgres primary / OpenSearch retrieval-only), ADR 0044 (substrate abstraction — `SearchIndex`), ADR 0033 (dual-mode targets), ADR 0034 (audit pipeline — advisory fanout), ADR 0011 (three-layer testing — test-result fanout), ADR 0040 (Kargo — connection-secret consumer), ADR 0002 (substrate-claim admission), ADR 0031 (CloudEvent taxonomy), ADR 0030 (versioning), ADR 0024 (vendor-doc companion project).
+- ADR 0009 (OpenSearch search/vector store), ADR 0014 (Postgres primary / OpenSearch retrieval-only), ADR 0044 (substrate abstraction — `SearchIndex`), ADR 0033 (dual-mode targets), ADR 0034 (audit pipeline — advisory fanout), ADR 0011 (three-layer testing — test-result fanout), ADR 0040 (Kargo — connection-secret consumer), ADR 0002 (substrate-XR admission), ADR 0031 (CloudEvent taxonomy), ADR 0030 (versioning), ADR 0024 (vendor-doc companion project).
 - Related pieces: A10 (Letta), A18 (audit pipeline), B4 (`SearchIndex` Composition), B6 (SDK `rag.*`), C8 (KB indexing), B14 (test-results streamer), A17 (OpenSearch-as-MCP), A23 (Kargo).

@@ -58,12 +58,25 @@ The eventing slice owns no CRDs of its own; Knative `Broker`, `Trigger`, and sou
 - Adapter HTTP services — URL-path versioned (`/v1/...`) per interface-contract §3.3; pure field-mapping, no decision logic.
 - B12 schema registry — Git JSON schemas per event type; external systems subscribe declaratively.
 
-### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
-The closed set of ten top-level namespaces — every platform event falls under exactly one:
-`platform.lifecycle.*`, `platform.audit.*`, `platform.gateway.*`, `platform.policy.*`, `platform.capability.*`, `platform.evaluation.*`, `platform.approval.*`, `platform.observability.*`, `platform.tenant.*`, `platform.security.*`.
+### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031; single owner per namespace, QN-03)
+The closed set of ten top-level namespaces — every platform event falls under exactly one, and each namespace has **exactly one owner** (DECISIONS-LOG QN-03):
+
+| Event namespace | Single owner |
+|---|---|
+| `platform.lifecycle` | A5 (ARK) |
+| `platform.gateway` | A1 (LiteLLM gateway) |
+| `platform.policy` | A7 (OPA engine) |
+| `platform.audit` | A18 (audit endpoint) |
+| `platform.tenant` | A21 (tenant-onboarding reconciler) |
+| `platform.capability` | B13 (kopf operator) |
+| `platform.approval` | B19 (approval system) |
+| `platform.security` | A7 (OPA engine) |
+| `platform.observability` | A13 (Tempo + Mimir) |
+| `platform.evaluation` | B14 (test & eval framework) |
+
 - Per-event-type names within each namespace are design-time per component and deferred to B12's registry.
 - `platform.capability.changed` is the specific capability-change event (ADR 0013).
-- Initial v1.0 flows: AlertManager alerts route in as CloudEvents → Trigger → HolmesGPT; a LiteLLM callback emits a budget CloudEvent (`platform.observability.*`) → Trigger → notification adapter emails the user.
+- Initial v1.0 flows: AlertManager publishes alerts as CloudEvents onto the bus under `platform.observability.*` (owner A13) → Knative Trigger → HolmesGPT (bus-mediated; no direct AlertManager → HolmesGPT wire); a LiteLLM callback emits a budget CloudEvent (`platform.observability.*`) → Trigger → notification adapter emails the user.
 
 ### 4.4 Data schemas / connection-secret contracts
 - Every CloudEvent carries CloudEvents-native `specversion` plus a per-event-type `schemaVersion`; backward-compatible additions bump minor, breaking changes mint a new event type (ADR 0030/0031).

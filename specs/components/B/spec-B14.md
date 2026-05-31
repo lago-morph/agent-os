@@ -3,9 +3,11 @@
 > kind: COMPONENT · workstream: B · tier: T1
 > upstream: [B9] · downstream: [B15] · adrs: [0011, 0009, 0015, 0034, 0035, 0030, 0031, 0010]
 > · views: [6.5]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+B14 **owns the `platform.evaluation` event namespace** (QN-03): it authors the `platform.evaluation.*` CloudEvent schemas and registers them in the event catalogue (B12). Consumers (dashboards, promotion pipeline) take an explicit dependency on B14 and do not co-own the namespace.
 
 B14 is the **`agent-platform` test framework** — the test-orchestration surface every other
 component plugs its tests into. Per ADR 0011 the platform standardizes on **three test layers**

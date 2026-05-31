@@ -1,7 +1,7 @@
 # SPEC C8 — Knowledge Base RAG indexing pipeline  [PROPOSED]
 
 > kind: COMPONENT · workstream: C · tier: T1
-> upstream: [C1, C6, C7] · downstream: [F3, F6] · adrs: [0022, 0024, 0014, 0009, 0008, 0013, 0030, 0031, 0034, 0041] · views: [6.4]
+> upstream: [C1, C6, C7] · downstream: [F3, F6] · adrs: [0022, 0024, 0014, 0009, 0008, 0013, 0030, 0031, 0034, 0044] · views: [6.4]
 > canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
 
 ## 1. Purpose & Problem Statement
@@ -93,8 +93,8 @@ ADR decisions honored:
   pipeline's own HTTP/trigger surface (if any) is versioned.
 - **ADR 0031** — any trigger/result events fall under exactly one `platform.*` namespace.
 - **ADR 0034** — index runs emit audit via the audit adapter, not directly to a store.
-- **ADR 0041** — if the pipeline needs object storage / a search-index backend, it consumes them
-  via the substrate XRDs (`XObjectStore`, `XSearchIndex`) and the uniform connection-secret shape.
+- **ADR 0044** — if the pipeline needs object storage / a search-index backend, it consumes them
+  via the substrate XRDs (`ObjectStore`, `SearchIndex`) and the uniform connection-secret shape.
 
 ## 4. Interfaces & Contracts
 
@@ -141,8 +141,8 @@ fields beyond what B13's CRD provides; it consumes them by Canon name.
   Markdown corpus is the primary** (ADR 0014). Every index entry MUST be rebuildable from the
   corpus; the re-index-on-major/minor path IS the documented rebuild path.
 - If C8 stages corpus snapshots in object storage or uses a dedicated search index, it consumes
-  them via `XObjectStore` / `XSearchIndex` with the uniform connection-secret shape (`host`,
-  `port`, `user`, `password`, `dbname` or equivalent; ADR 0041). C8 defines no new secret shape.
+  them via `ObjectStore` / `SearchIndex` with the uniform connection-secret shape (`host`,
+  `port`, `user`, `password`, `dbname` or equivalent; ADR 0044). C8 defines no new secret shape.
 - The chunk/document metadata schema written into the index is `[PROPOSED — not in source]`
   (co-owned with the shared-conventions contract, §4.2).
 
@@ -173,7 +173,9 @@ ADR 0022 (named primitive), ADR 0024 (authored-only scope), ADR 0014 (rebuildabl
   separate companion project's responsibility (ADR 0024). Coordination is F3.
 - REQ-C8-08: Each index run SHALL emit an audit record via the audit adapter (ADR 0034) and a
   result event under exactly one Canon `platform.*` CloudEvent namespace (ADR 0031), without
-  introducing a new top-level namespace.
+  introducing a new top-level namespace. Audit emission is gated on the audit-adapter
+  freeze-gate (D-05): C8 emits no audit events until the adapter interface and `audit_events`
+  schema are frozen.
 - REQ-C8-09: The trigger SHALL be delivered through the v1.0 mechanism (GitHub Actions docs path,
   ADR 0010/0033, and/or a Knative-triggered flow, ADR 0031); the chosen mechanism is documented.
 - REQ-C8-10: Re-indexing SHALL be **idempotent** — re-running the same major/minor-flagged corpus
@@ -182,7 +184,7 @@ ADR 0022 (named primitive), ADR 0024 (authored-only scope), ADR 0014 (rebuildabl
 - REQ-C8-11: A full **rebuild-from-primary** path SHALL exist and be runnable on demand
   (independent of the major/minor trigger) per the OpenSearch-rebuildable invariant (ADR 0014).
 - REQ-C8-12: Any object-storage / search-index backing the pipeline SHALL be consumed via the
-  substrate XRDs and uniform connection-secret shape (ADR 0041), defining no new secret schema.
+  substrate XRDs and uniform connection-secret shape (ADR 0044), defining no new secret schema.
 
 ## 7. Non-Functional Requirements
 - Security: index runs SHALL NOT embed or log secrets; backend access uses the ESO/connection-secret
@@ -263,7 +265,7 @@ ADR 0022 (named primitive), ADR 0024 (authored-only scope), ADR 0014 (rebuildabl
 - ADR 0022 (Knowledge Base separate primitive), ADR 0024 (vendor doc separate companion project),
   ADR 0014 (Postgres/Git primary; OpenSearch derived/rebuildable), ADR 0009 (OpenSearch),
   ADR 0008 (Material for MkDocs), ADR 0013 (`RAGStore` CRD via B13), ADR 0030 (versioning),
-  ADR 0031 (CloudEvent taxonomy), ADR 0034 (audit pipeline/adapter), ADR 0041 (substrate XRDs).
+  ADR 0031 (CloudEvent taxonomy), ADR 0034 (audit pipeline/adapter), ADR 0044 (substrate XRDs).
 - _meta/glossary.md (Knowledge Base, `platform-knowledge-base`, `RAGStore`, OpenSearch).
 - _meta/interface-contract.md §1.4 (`RAGStore` fields, B13 owner), §2 (CloudEvent taxonomy + B12
   deferral), §4 (connection-secret), §6 (gaps left to component design).

@@ -129,6 +129,9 @@ Per-event-type names within each namespace are deferred to B12's registry (inter
 - **REQ-A22-14:** Plugin actions SHALL be gated by the author's Keycloak claims (`platform_roles`, `tenant_roles`, `platform_namespaces`) in plugin code (§9 Headlamp gating is DIY).
 - **REQ-A22-15:** Every editor authoring action (PR open, simulation run) SHALL emit a structured audit event through the platform audit adapter (ADR 0034) — simulator runs under `platform.policy.*`, PR-submission actions under `platform.audit.*`.
 - **REQ-A22-16:** The `Agent` editor SHALL constrain the `sdk` field to the v1.0 allowed values `langgraph` and `deep-agents` (ADR 0019).
+- **REQ-A22-17 (TenantOnboarding quota editor, #5/#9 — reverses ADR-0037 deferral):** The `TenantOnboarding` editor SHALL require both a `cpu` and a `memory` quota entry before a PR can be opened; each entry SHALL be either a concrete limit OR an explicit `unlimited: true`, and the form SHALL reject submission if either is omitted (mirroring the A21 admission rule). `spec.quotas` SHALL be presented as an **extensible typed list** whose entries each carry a `quotaType` discriminator plus type-specific fields.
+- **REQ-A22-18 (distinct RBAC granularity, #23):** Editor plugin gating SHALL respect the distinct RBAC permissions at the proposed granularity (set-agent-type-default-budget vs per-instance-budget-override vs budget-maintainer; policy-change vs policy-maintain); field-level edit rules native RBAC cannot express are enforced via Gatekeeper (OPA) admission (A7), not by the editor.
+- **REQ-A22-19 (audit freeze-gate, D-05):** The editor's PR-open / simulation-run audit emissions (REQ-A22-15) ride the audit-adapter interface and are gated on the audit-adapter freeze-gate (D-05); the framework consumes event schemas from their owners (A7 policy/security, A18 audit) and co-owns no `platform.*` namespace.
 
 ## 7. Non-Functional Requirements
 

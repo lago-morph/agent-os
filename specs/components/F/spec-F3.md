@@ -31,7 +31,7 @@ F3 is the production-readiness **handoff**: at the end of v1.0 it verifies that 
 
 **Upstream consumed:**
 - **C8 (Knowledge Base RAG indexing pipeline)** — the ingestion pipeline that indexes authored docs/runbooks into `platform-knowledge-base`; F3 verifies the companion project's vendor docs ride this same pipeline and trigger model. F3 consumes C8's pipeline contract, does not change it.
-- **B4 (Crossplane Compositions)** — provides the `XSearchIndex`/`XObjectStore` substrate backing the RAGStore that the companion's docs are indexed into.
+- **B4 (Crossplane Compositions)** — provides the `SearchIndex`/`ObjectStore` substrate backing the RAGStore that the companion's docs are indexed into.
 
 **Downstream consumers:** none (terminal handoff piece).
 
@@ -53,7 +53,7 @@ The companion project calls C8's **ingestion pipeline trigger** (the same major/
 A "vendor docs updated / indexed" notification, if emitted, falls under `platform.capability.*` (a RAGStore content change is a capability-registry change; `platform.capability.changed` per ADR 0013) or `platform.observability.*` for indexing-job telemetry — both `[PROPOSED — not in source]`. F3 mints no event types.
 
 ### 4.4 Data schemas / connection-secret contracts
-Vendor docs are indexed into the RAGStore backends (`XSearchIndex` vector/index + object storage) using the standard connection-secret contract (Canon §4); F3 adds no fields. The doc payload schema (chunking, embedding) is C8-owned.
+Vendor docs are indexed into the RAGStore backends (`SearchIndex` vector/index + object storage) using the standard connection-secret contract (Canon §4); F3 adds no fields. The doc payload schema (chunking, embedding) is C8-owned.
 
 ## 5. OSS-vs-Custom Decision
 **Integration verification + handoff documentation — no build.** The platform side already exists (C8 pipeline, ADR 0022 RAGStore, A11/A10 backends). F3 is **config/verify + docs**: wire a real vendor-doc source through the existing trigger, confirm retrieval, and write the boundary/handoff doc. No fork, no new service. Rationale: ADR 0024 deliberately scopes acquisition *out*; F3 must not build it, only prove and document the seam the architecture already committed to.

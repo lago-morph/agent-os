@@ -77,7 +77,7 @@ consumed by Platform Agents via CapabilitySet inclusion — a runtime relationsh
 - A12 **produces/maintains** (but does not define) the `SyntheticMCPServer` (Crossplane XR, owner
   B4) — `openApiSpecRef`, `authConfigRef`, `mcpServerRef` (back-link). A12 fills `mcpServerRef`
   once the synthetic server is registered.
-- A12 **produces** an `MCPServer` (kopf/B13-owned) — `endpoint`, `authMode` (system/user-cred),
+- A12 **produces** an `MCPServer` (kopf/B13-owned) — `endpoint`, `authMode` (`system`/`system-mediated`; the retired `user-cred` mode is not supported, D-01),
   `credentialsRef`, `tags`, `scopes`, `visibility` — for the synthetic server (registered by B13;
   A12 supplies the synthesized endpoint/spec). A12 invents no fields beyond this Canon set.
 - Consumes `LogLevel` (ADR 0035) and delivers a `GrafanaDashboard` XR (B4-owned XRD).

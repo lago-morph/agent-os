@@ -17,7 +17,7 @@ Install OpenSearch in both modes — in-cluster on kind and AWS-managed on AWS �
 - **TASK-05:** OpenSearch Dashboards with Keycloak SSO — produces: operator UI — depends-on: [TASK-04]
 - **TASK-06:** Advisory-only posture: reindex paths per index class + "OpenSearch-down ⇒ audit still succeeds" behavior — produces: reproducibility guarantee — depends-on: [TASK-03]
 - **TASK-07:** Uniform connection-secret + substrate-agnostic status (`ready`/`endpoint`/`version`) verification — produces: substrate-invisible contract — depends-on: [TASK-02]
-- **TASK-08:** Substrate-claim admission test (no-matching-Composition reject) — produces: admission guard validation — depends-on: [TASK-02]
+- **TASK-08:** Substrate-XR admission test (no-matching-Composition reject) — produces: admission guard validation — depends-on: [TASK-02]
 - **TASK-09:** Audit emission of operator actions via adapter (stub until A18) — produces: audit hooks — depends-on: [TASK-01]
 - **TASK-10:** DR-drill reindex runbook (F2-aligned) — produces: reindex runbook — depends-on: [TASK-06]
 - **TASK-11:** §14.1 deliverables (docs, alerts, dashboard XR, Headlamp integration, HolmesGPT toolset, tutorials) — produces: deliverable set — depends-on: [TASK-09, TASK-10]
@@ -50,7 +50,7 @@ A10 (Letta derived indexes), A18 (audit pipeline advisory index host). Cross-cut
 
 | AC | Layer | Fixtures / fakes |
 |---|---|---|
-| AC-A11-01,08,09,11 | Chainsaw | kind + AWS-managed targets; `SearchIndex` claim (real or stub Composition); mislabeled-env cluster; Gatekeeper |
+| AC-A11-01,08,09,11 | Chainsaw | kind + AWS-managed targets; `SearchIndex` XR (real or stub Composition); mislabeled-env cluster; Gatekeeper |
 | AC-A11-02,03,04,05,10,12 | PyTest | sample vector/text corpus; Keycloak OIDC fixture; stub audit endpoint; OpenSearch-down injector; reindex-from-primary fixture |
 | AC-A11-06,07 | Playwright / PyTest | Keycloak session; Dashboards |
 
@@ -69,4 +69,4 @@ Fakes for not-yet-landed upstreams: B4 `SearchIndex` Composition (local install 
 
 ## 8. Rollback / Reversibility
 
-Back out by reverting the OpenSearch install / `SearchIndex` claim. Because OpenSearch is **advisory only and never a system of record** (ADR 0014), rollback loses **no durable platform data** — every index is rebuildable from a primary (object storage / S3 / Postgres) by reindex. **Reverting A11 degrades retrieval** (RAG/KB search, Letta-derived retrieval, audit/test-result query and dashboards) but does **not** break the audit system of record or any primary store. This makes A11 the most reversible of the five T0 pieces: downstream consumers (A10, A18) lose their advisory index and dashboards but their primary write paths continue. Restore is reprovision-then-reindex, not a backup/restore loop.
+Back out by reverting the OpenSearch install / `SearchIndex` XR. Because OpenSearch is **advisory only and never a system of record** (ADR 0014), rollback loses **no durable platform data** — every index is rebuildable from a primary (object storage / S3 / Postgres) by reindex. **Reverting A11 degrades retrieval** (RAG/KB search, Letta-derived retrieval, audit/test-result query and dashboards) but does **not** break the audit system of record or any primary store. This makes A11 the most reversible of the five T0 pieces: downstream consumers (A10, A18) lose their advisory index and dashboards but their primary write paths continue. Restore is reprovision-then-reindex, not a backup/restore loop.

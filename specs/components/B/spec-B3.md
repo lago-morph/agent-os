@@ -2,9 +2,11 @@
 
 > kind: COMPONENT · workstream: B · tier: T0
 > upstream: [A7] · downstream: [B16] · adrs: [0002, 0018, 0030, 0038] · views: [6.6]
-> canon-glossary: b0edae10a2e6 · canon-interface: 0ce201d5d5af
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+B3 **solely owns the OPA decision-document format** (D-03): it produces the canonical decision-document schema that every decision point and policy bundle conforms to. No other B-component (including B16) owns or redefines this format; B16 authors policy content that evaluates to documents in the B3-owned format.
 
 B3 is the **framework** for the platform's OPA policy library: the Rego bundle structure, the
 shared library setup (helpers, common decision shapes, test scaffolding), and the

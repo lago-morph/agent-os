@@ -10,8 +10,8 @@ F2 is a one-time, scripted verification drill — no automation, no cadence (bot
 
 ## 2. Ordered Task List
 
-- **TASK-01:** Pre-drill fixtures — seed known row sets in Postgres (`audit_events` + an `XAgentDatabase`), index docs in OpenSearch, plant secrets; confirm backups/snapshots exist — produces: drill fixtures + backup baseline — depends-on: [].
-- **TASK-02:** Postgres restore drill — restore `XPostgres`/`XAgentDatabase` from snapshot; assert row recovery + connection-secret re-resolution + reconnect-without-config — produces: Postgres restore script + record — depends-on: [TASK-01].
+- **TASK-01:** Pre-drill fixtures — seed known row sets in Postgres (`audit_events` + an `AgentDatabase`), index docs in OpenSearch, plant secrets; confirm backups/snapshots exist — produces: drill fixtures + backup baseline — depends-on: [].
+- **TASK-02:** Postgres restore drill — restore `Postgres`/`AgentDatabase` from snapshot; assert row recovery + connection-secret re-resolution + reconnect-without-config — produces: Postgres restore script + record — depends-on: [TASK-01].
 - **TASK-03:** OpenSearch reindex drill — delete index, rebuild from S3 (AWS) / Postgres (kind); assert doc-count match; assert audit ingestion succeeds while OpenSearch down — produces: reindex script + record — depends-on: [TASK-01].
 - **TASK-04:** Secret recovery drill — rotate/delete a secret, recover via ESO from AWS Secrets Manager, assert workload returns ready; no secret material in record — produces: secret-recovery script + record — depends-on: [TASK-01].
 - **TASK-05:** Full from-cold restore — ArgoCD/Kargo Git re-sync + store restore (TASK-02/03) + secret recovery (TASK-04) + capability-registry reconcile → serviceable platform serving an e2e agent request — produces: full-restore script + record — depends-on: [TASK-02, TASK-03, TASK-04].
@@ -25,7 +25,7 @@ F2 is a one-time, scripted verification drill — no automation, no cadence (bot
 ### 3.1 Upstream that must ship first (HARD)
 - **A18** — audit stores (Postgres `audit_events`, S3 archive, OpenSearch indexer) restore/rebuild targets.
 - **A11** — OpenSearch reindex path. **A10** — memory store(s) in the full restore.
-- **B4** — `XPostgres`/`XSearchIndex`/`XObjectStore`/`XAgentDatabase`/`AuditLog`/`MemoryStore` restore behavior + connection-secret contract.
+- **B4** — `Postgres`/`SearchIndex`/`ObjectStore`/`AgentDatabase`/`AuditLog`/`MemoryStore` restore behavior + connection-secret contract.
 - **A23** — Kargo/ArgoCD Git desired-state for the GitOps half of full restore.
 
 ### 3.2 Downstream blocked on this

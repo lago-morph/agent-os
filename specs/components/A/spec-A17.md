@@ -8,7 +8,7 @@
 
 A17 lands the platform's **fixed initial set of MCP services** so that Platform Agents have a concrete, governed, day-one tool surface rather than an ad-hoc per-team onboarding flow. Per ADR 0020 the set is: **GitHub**, **Google Drive**, **Context7**, **OpenSearch**, **Postgres**, **MongoDB**, and **generic web-search + web-scrape** servers. Each is registered as a namespaced `MCPServer` CRD (reconciled by the B13 kopf operator into the LiteLLM registry), has its secrets sourced via **ESO**, and is reachable by a Platform Agent only through **CapabilitySet inclusion + OPA** gating.
 
-The problem A17 solves is twofold. First, it makes the abstract "approved MCP server" primitive (§6.8) real by exercising every credential mode the architecture commits to: **system-credential**, **user-credential** (LiteLLM-brokered OAuth), and **system-mediated** (OpenSearch against the platform's own cluster). Second, it proves the per-agent/tenant/user runtime-database provisioning story by fronting Postgres and MongoDB with the `AgentDatabase` XRD (ADR 0020/0044) — the first place a Crossplane XR mints *runtime* per-agent state. A17 carries no bypass path: adding a service means landing a new `MCPServer` CRD plus its ESO/OPA wiring, never a gateway-side toggle.
+The problem A17 solves is twofold. First, it makes the abstract "approved MCP server" primitive (§6.8) real by exercising both credential modes the architecture commits to (D-01): **`system`** (system/platform-process credentials, not tenant-specific) and **`system-mediated`** (credentials LiteLLM holds on behalf of a specific tenant's agents, with per-tenant isolation — covering the LiteLLM-brokered OAuth GitHub/Drive flows and the platform-OpenSearch flow). The retired `user-cred` mode is not supported; agents never hold credentials directly. Second, it proves the per-agent/tenant/user runtime-database provisioning story by fronting Postgres and MongoDB with the `AgentDatabase` XRD (ADR 0020/0044) — the first place a Crossplane XR mints *runtime* per-agent state. A17 carries no bypass path: adding a service means landing a new `MCPServer` CRD plus its ESO/OPA wiring, never a gateway-side toggle.
 
 ## 2. Scope
 
@@ -17,9 +17,9 @@ The problem A17 solves is twofold. First, it makes the abstract "approved MCP se
 - **ESO wiring** per service: `ExternalSecret`/`SecretStore` plumbing that materializes each service's `credentialsRef` secret from the configured secret provider (AWS SM / Vault / AKV per §6.6).
 - **CapabilitySet wiring**: registering each service so it can be referenced by `mcpServers[]` in a `CapabilitySet`; the resolved-view is read in Headlamp.
 - **OPA integration (Rego)** contributed to the policy library for: MCP-server-access decisions (especially web-search/scrape query/domain/target gating), database-assignment gating for Postgres/MongoDB, and admission of the A17 `MCPServer` CRDs.
-- **GitHub & Google Drive**: both **system-credential** and **user-credential** modes; LiteLLM brokers the user OAuth flow for user-credential mode.
-- **Context7**: install + register; documentation/library lookup; system-credential.
-- **OpenSearch MCP**: **system-mediated** mode against the platform OpenSearch (reusing `SearchIndex`, ADR 0044) **plus** an agent/tenant/user-credentialed mode for externally operated OpenSearch.
+- **GitHub & Google Drive**: both **`system`** and **`system-mediated`** modes; LiteLLM brokers and holds the per-tenant OAuth credential for `system-mediated` mode.
+- **Context7**: install + register; documentation/library lookup; `system` mode.
+- **OpenSearch MCP**: **`system-mediated`** mode against the platform OpenSearch (reusing `SearchIndex`, ADR 0044) **plus** a `system-mediated` mode for externally operated OpenSearch (LiteLLM holding the per-tenant credential in both; no `user-cred`, D-01).
 - **Postgres & MongoDB MCP**: agent/tenant/user-scoped DB access fronted by the **`AgentDatabase`** XRD (composing `Postgres` / `MongoDocStore`); RBAC + OPA decide which agent resolves to which database.
 - **Generic web-search + web-scrape** in-cluster MCP servers (build-new or adopt OSS); access control enforced at the MCP-server-access layer, not internally.
 - Standard §14.1 deliverables: Helm/manifests, per-product docs, runbooks, alerts, Grafana dashboard (XR), Headlamp plugin contribution, audit emission (rides the LiteLLM path), Knative trigger-flow design, HolmesGPT toolset, 3-layer tests, tutorials/how-tos.
@@ -27,7 +27,7 @@ The problem A17 solves is twofold. First, it makes the abstract "approved MCP se
 ### 2.2 Out of scope (and where it lives instead)
 - **LiteLLM gateway + MCP broker path itself** → **A1**. A17 rides A1's MCP callback chain; no separate emission/health point.
 - **The `MCPServer` reconciler** (CRD → LiteLLM registry) → **B13** kopf operator. A17 authors CRD *instances*, not the reconciler.
-- **The Crossplane Composition machinery + the `AgentDatabase` / `Postgres` / `MongoDocStore` / `SearchIndex` XRD definitions** → **B4** (Crossplane Compositions). A17 consumes/claims them.
+- **The Crossplane Composition machinery + the `AgentDatabase` / `Postgres` / `MongoDocStore` / `SearchIndex` XRD definitions** → **B4** (Crossplane Compositions). A17 consumes them as namespace-scoped XRs.
 - **OPA engine + Gatekeeper install** → **A7**; **OPA framework** → B3; **initial OPA content** → B16. A17 contributes its own service-specific Rego.
 - **Audit endpoint + adapter library** → **A18**. A17 emits via the adapter on the LiteLLM path.
 - **Per-service auth-flow / scope / secret-shape / revocation / budget / per-XRD-field detail** → **deferred** per architecture-backlog §1.11; A17 implements within whatever those settle to and tags gaps `[PROPOSED]`.
@@ -43,20 +43,20 @@ The problem A17 solves is twofold. First, it makes the abstract "approved MCP se
 - **B13 (kopf operator)** — reconciles each `MCPServer` CRD into the LiteLLM registry and emits `platform.capability.changed`.
 
 **Effective build-order dependencies (named here, not in the CSV upstream list):**
-- **B4 (Crossplane Compositions)** — owns `AgentDatabase`, `Postgres`, `MongoDocStore`, `SearchIndex`. A17 claims these; they must exist for Postgres/MongoDB/OpenSearch system-mediated modes. `[PROPOSED — not in source]` that A17 declares a hard dependency on B4 (the CSV lists only A1/A7/B13; B4 ownership of these XRDs is stated in waves.md and the interface contract).
+- **B4 (Crossplane Compositions)** — owns `AgentDatabase`, `Postgres`, `MongoDocStore`, `SearchIndex`. A17 creates these as namespace-scoped XRs; they must exist for Postgres/MongoDB/OpenSearch system-mediated modes. `[PROPOSED — not in source]` that A17 declares a hard dependency on B4 (the CSV lists only A1/A7/B13; B4 ownership of these XRDs is stated in waves.md and the interface contract).
 - **A11 (OpenSearch)** — the platform OpenSearch the system-mediated OpenSearch MCP targets.
 - **ESO** (installed via A15-adjacent baseline / §6.6) — secret materialization.
 
 **Downstream consumers:** none in the CSV. De-facto consumers: early Platform Agents (Interactive Access Agent A16, HolmesGPT A14, Coach B10) compose against this capability surface via CapabilitySet.
 
 **ADRs honored:**
-- **ADR 0020** — the exact seven-service set, three credential modes, `AgentDatabase` fronting for DBs, MCP-server-access as the enforcement point for web-search/scrape, Firecrawl removed, per-service detail deferred.
+- **ADR 0020** — the exact seven-service set, credential modes `system`/`system-mediated` (D-01), `AgentDatabase` fronting for DBs, MCP-server-access as the enforcement point for web-search/scrape, Firecrawl removed, per-service detail deferred.
 - **ADR 0013** — capability-CRD model; access via CapabilitySet inclusion; `platform.capability.changed` emission on reconcile.
 - **ADR 0009 / 0033** — OpenSearch dual-hosting (in-cluster on kind, AWS-managed on AWS) underpinning system-mediated mode.
 - **ADR 0014** — Postgres primary; DB assignment gated at admission + request time, not hard-coded in the `MCPServer` spec.
-- **ADR 0021 / 0044** — Crossplane XR composition + substrate abstraction; `AgentDatabase` composes `Postgres` / `MongoDocStore`; same claim shape every substrate; connection-secret contract.
+- **ADR 0021 / 0044** — Crossplane XR composition + substrate abstraction; `AgentDatabase` composes `Postgres` / `MongoDocStore`; same XR schema every substrate; connection-secret contract.
 - **ADR 0038** — the web-search/scrape OPA bundle is a primary policy-simulator target before rollout (false-positives degrade capability, false-negatives leak egress).
-- **ADR 0040** — Kargo promotes `AgentDatabase` claims uniformly across substrates.
+- **ADR 0040** — Kargo promotes `AgentDatabase` XRs uniformly across substrates.
 - **ADR 0034** — audit emission via the adapter, riding the LiteLLM callback path.
 - **ADR 0030 / 0031** — CRD versioning; CloudEvent taxonomy.
 
@@ -67,7 +67,7 @@ The problem A17 solves is twofold. First, it makes the abstract "approved MCP se
 - Per D-01 `authMode` enumerates exactly `system` and `system-mediated`. OpenSearch, GitHub/Drive OAuth, and externally operated stores all resolve to `system-mediated` (LiteLLM holds the per-tenant credentials and enforces isolation); the platform-process flows use `system`. Agents never hold credentials directly; a system agent needing direct access uses a platform-granted workload identity (service account), separate from `authMode`.
 - `[PROPOSED — not in source]` per-service `tags`/`scopes` values (e.g. a `web-search`/`web-scrape` tag, GitHub repo scopes) — concrete values deferred per backlog §1.11.
 
-**`AgentDatabase`** (XRD; claim form `AgentDatabase`; owner B4; consumed here). Source-stated fields: `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef`. Composes `Postgres` or `MongoDocStore`. A17 creates AgentDatabase XRs; field shape beyond these is `[PROPOSED — not in source]` / deferred to B4 + backlog §1.11.
+**`AgentDatabase`** (namespace-scoped XR, Crossplane v2; owner B4; consumed here). Source-stated fields: `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef`. Composes `Postgres` or `MongoDocStore`. A17 creates AgentDatabase XRs; field shape beyond these is `[PROPOSED — not in source]` / deferred to B4 + backlog §1.11.
 
 **`SearchIndex`** (XRD; owner B4) — reused by the OpenSearch system-mediated MCP mode. Source-stated: `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass`.
 
@@ -75,7 +75,7 @@ CRD versioning per ADR 0030: A17's `MCPServer` instances pin the `MCPServer` CRD
 
 ### 4.2 APIs / SDK surfaces
 - A17 exposes **no new platform API**. MCP tool invocation is the standard `§7.3 MCP tool invocation` path through LiteLLM. The web-search/web-scrape servers expose an **MCP tool interface** only (tool names/argument schemas `[PROPOSED — not in source]`, deferred per backlog §1.11).
-- **User-credential OAuth** (GitHub, Google Drive) is brokered by **LiteLLM** (A1); A17 supplies the per-service OAuth client config materialized via ESO. Exact broker mechanics, requested scopes, and revocation flows are deferred (backlog §1.11) and tagged `[PROPOSED]` where A17 must choose.
+- **`system-mediated` OAuth** (GitHub, Google Drive) is brokered by **LiteLLM** (A1), which holds the per-tenant OAuth credential and enforces per-tenant isolation (D-01); A17 supplies the per-service OAuth client config materialized via ESO. The agent never holds the credential. Exact broker mechanics, requested scopes, and revocation flows are deferred (backlog §1.11) and tagged `[PROPOSED]` where A17 must choose.
 - HTTP APIs of any custom A17 service (web-search/scrape) follow URL-path versioning `/v1/...` (interface-contract §3.3).
 
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
@@ -98,11 +98,11 @@ CRD versioning per ADR 0030: A17's `MCPServer` instances pin the `MCPServer` CRD
 
 ## 6. Functional Requirements
 - **REQ-A17-01:** Each of the seven services (GitHub, Google Drive, Context7, OpenSearch, Postgres, MongoDB, web-search, web-scrape) MUST be registered as a namespaced `MCPServer` CRD using only the source-stated fields (`endpoint`, `authMode`, `credentialsRef`, `tags`, `scopes`, `visibility`).
-- **REQ-A17-02:** GitHub MUST be provided in **both** system-credential and user-credential modes; the user-credential mode MUST broker the user's OAuth flow through LiteLLM (A1), not through a per-service auth scheme.
-- **REQ-A17-03:** Google Drive MUST be provided in **both** system-credential and user-credential modes, following the same LiteLLM-brokered OAuth pattern as GitHub.
-- **REQ-A17-04:** Context7 MUST be installed and registered as an `MCPServer` providing documentation/library lookup (system-credential).
-- **REQ-A17-05:** The OpenSearch MCP server MUST provide a **system-mediated** mode against the platform's own OpenSearch (reusing `SearchIndex`) AND an **agent/tenant/user-credentialed** mode for externally operated OpenSearch instances.
-- **REQ-A17-06:** Postgres and MongoDB MCP access MUST resolve to databases provisioned by the **`AgentDatabase`** XRD (`engine` postgres/mongodb), which composes `Postgres`/`MongoDocStore`; the same claim shape MUST work on kind and AWS.
+- **REQ-A17-02:** GitHub MUST be provided in **both** `system` and `system-mediated` modes; the `system-mediated` mode MUST broker the OAuth flow through LiteLLM (A1) — LiteLLM holds the per-tenant OAuth credential and enforces per-tenant isolation (D-01) — not through a per-service auth scheme, and never by handing the credential to the agent. (`user-cred` is retired.)
+- **REQ-A17-03:** Google Drive MUST be provided in **both** `system` and `system-mediated` modes, following the same LiteLLM-brokered OAuth pattern as GitHub.
+- **REQ-A17-04:** Context7 MUST be installed and registered as an `MCPServer` providing documentation/library lookup (`system` mode).
+- **REQ-A17-05:** The OpenSearch MCP server MUST provide a **`system-mediated`** mode against the platform's own OpenSearch (reusing `SearchIndex`) AND a **`system-mediated`** mode for externally operated OpenSearch instances (LiteLLM holding the per-tenant credential in both; no `user-cred`, D-01).
+- **REQ-A17-06:** Postgres and MongoDB MCP access MUST resolve to databases provisioned by the **`AgentDatabase`** XRD (`engine` postgres/mongodb), which composes `Postgres`/`MongoDocStore`; the same XR schema MUST work on kind and AWS.
 - **REQ-A17-07:** Which agent/tenant/user resolves to which provisioned database MUST be decided by **RBAC + OPA** at admission and at request time, and MUST NOT be hard-coded into the `MCPServer` spec (ADR 0014).
 - **REQ-A17-08:** Generic web-search and web-scrape MCP servers MUST be deployed in-cluster with **no internal RBAC/OPA stack**; access control (allow/deny by query, domain, or scrape target) MUST be enforced at the **MCP-server-access OPA layer**.
 - **REQ-A17-09:** Every service's secret MUST be materialized via **ESO** into the secret referenced by the `MCPServer` `credentialsRef`; no secret may be embedded in the CRD or image.
@@ -115,14 +115,14 @@ CRD versioning per ADR 0030: A17's `MCPServer` instances pin the `MCPServer` CRD
 - **REQ-A17-16:** **Firecrawl MUST NOT be deployed** in v1.0; the generic web-search/scrape services fill its role.
 
 ## 7. Non-Functional Requirements
-- **Security:** No secret in CRD/image (ESO only); unapproved MCP servers unreachable (REQ-A17-10); web-search/scrape egress controlled at the access layer; user-credential OAuth tokens brokered/stored by LiteLLM, not by A17. Egress from any A17 service to external destinations rides the Envoy egress proxy (ADR 0003) and is FQDN-allowlisted.
-- **Multi-tenancy (§6.9):** All `MCPServer` CRDs and `AgentDatabase` claims are **namespaced**; DB assignment is per agent/tenant/user via `scope`; OPA reads `platform_namespaces`/`capability_set_refs` to gate access. No cross-namespace DB reuse without policy.
+- **Security:** No secret in CRD/image (ESO only); unapproved MCP servers unreachable (REQ-A17-10); web-search/scrape egress controlled at the access layer; `system-mediated` OAuth tokens are brokered/stored by LiteLLM, not by A17, and never handed to the agent (D-01). External egress from any A17 service rides the Envoy **L7** egress proxy (A6; ADR 0003) and is FQDN-allowlisted; in-cluster L3/L4 reachability is governed by the sandbox `NetworkPolicy` baseline — FQDN/method-level (L7) control requires Envoy, not `NetworkPolicy` (D-08). A17 emits audit events via the audit-adapter interface; emission is gated on the audit-adapter freeze-gate (D-05). For any security-relevant event A17 detects (e.g. a denied MCP-server-access decision), A17 MUST perform its existing local handling AND additionally emit the event to the event bus under `platform.security` (schema owned by A7, QN-03).
+- **Multi-tenancy (§6.9):** All `MCPServer` CRDs and `AgentDatabase` XRs are **namespaced**; DB assignment is per agent/tenant/user via `scope`; OPA reads `platform_namespaces`/`capability_set_refs` to gate access. No cross-namespace DB reuse without policy.
 - **Observability (§6.5):** Per-service Grafana dashboard (Crossplane `GrafanaDashboard` XR); MCP call telemetry via LiteLLM/Langfuse; audit via A18. Health uses only what the MCP protocol exposes (no synthetic health layer; backlog §1.9).
 - **Scale:** Web-search/scrape servers stateless/horizontally scalable; `AgentDatabase` provisioning is per-principal and must not create unbounded DBs without OPA/budget gating (`[PROPOSED]` quota at OPA, deferred).
 - **Versioning (ADR 0030):** `MCPServer` instances pin the B13-served CRD major; XRD schemas follow ADR 0044 conversion-webhook lifecycle.
 
 ## 8. Cross-Cutting Deliverable Checklist
-- Helm/manifests — **applicable** (MCPServer CRDs, ESO ExternalSecrets, web-search/scrape Deployments, AgentDatabase claims).
+- Helm/manifests — **applicable** (MCPServer CRDs, ESO ExternalSecrets, web-search/scrape Deployments, AgentDatabase XRs).
 - Per-product docs (10.5) — **applicable** (one per service: setup, modes, scopes).
 - Runbook (10.7) — **applicable** (credential rotation, OAuth re-consent, DB-provisioning failure, scrape IP-block).
 - Backup/restore — **applicable** (DB stores via AgentDatabase; covered by substrate primitives).
@@ -138,11 +138,11 @@ CRD versioning per ADR 0030: A17's `MCPServer` instances pin the `MCPServer` CRD
 
 ## 9. Acceptance Criteria
 - **AC-A17-01:** All seven services exist as namespaced `MCPServer` CRDs whose fields are a subset of {`endpoint`,`authMode`,`credentialsRef`,`tags`,`scopes`,`visibility`}; a schema check finds no invented fields. (→ REQ-A17-01, -16)
-- **AC-A17-02:** An agent with GitHub user-credential mode triggers a LiteLLM-brokered OAuth flow and obtains user-scoped access; system-credential mode uses the platform identity. (→ REQ-A17-02)
+- **AC-A17-02:** An agent with GitHub `system-mediated` mode triggers a LiteLLM-brokered OAuth flow in which LiteLLM holds the per-tenant credential and obtains tenant-scoped access without the agent ever holding the credential; `system` mode uses the platform identity. (→ REQ-A17-02)
 - **AC-A17-03:** Google Drive exhibits both modes equivalently. (→ REQ-A17-03)
 - **AC-A17-04:** Context7 is registered and answers a documentation/library lookup through the MCP path. (→ REQ-A17-04)
 - **AC-A17-05:** The OpenSearch MCP serves a query in system-mediated mode against the platform OpenSearch AND, with credentials supplied, against an external instance. (→ REQ-A17-05)
-- **AC-A17-06:** A `Postgres`/`AgentDatabase` claim provisions a database, role, and grants; the same claim YAML applies unchanged on kind and AWS. (→ REQ-A17-06, -15)
+- **AC-A17-06:** A `Postgres`/`AgentDatabase` XR provisions a database, role, and grants; the same XR YAML applies unchanged on kind and AWS. (→ REQ-A17-06, -15)
 - **AC-A17-07:** An agent not authorized by RBAC+OPA for a given database is denied at request time even though the `MCPServer` endpoint is reachable. (→ REQ-A17-07)
 - **AC-A17-08:** A web-scrape request to a policy-blocked domain is denied at the MCP-server-access OPA layer; an allowed domain succeeds. (→ REQ-A17-08)
 - **AC-A17-09:** Removing a service's ESO `ExternalSecret` causes its `credentialsRef` secret to disappear and the service to fail closed; no credential is found in any CRD or image. (→ REQ-A17-09)
@@ -161,11 +161,11 @@ CRD versioning per ADR 0030: A17's `MCPServer` instances pin the `MCPServer` CRD
 - **R4 (med):** `AgentDatabase` is the **first runtime-state XR** — unbounded per-principal DB creation could exhaust the substrate without quota/budget gating (not yet specified). `[PROPOSED]` OPA/budget cap.
 - **R5 (low):** `ObjectStore`/archive capability-parity caveat does not affect A17 directly but the kind OpenSearch path may differ in behavior from AWS-managed; tests must cover both.
 - **OQ1:** Are web-search/scrape built-new or OSS-adopted? Deferred; affects supply-chain (B22) review surface.
-- **OQ2:** Do user-credential tokens persist in LiteLLM across sessions or re-consent each run? Deferred to A1/backlog §1.11.
+- **OQ2:** Do `system-mediated` OAuth tokens (held by LiteLLM) persist across sessions or re-consent each run? Deferred to A1/backlog §1.11.
 - **OQ3:** Is B4 a hard build-order upstream for A17 despite absence from the CSV `upstream` cell? `[PROPOSED]` yes (XRD ownership).
 
 ## 11. References
 - architecture-overview.md §6.1 (gateway / MCP broker), §6.8 (line 632; capability registries, CapabilitySet layering, `platform.capability.changed`), §6.6 (line 517; "A17 MCP services ride this path"), §7.3 (line 1157; MCP tool invocation), §14.1 (line 1683; A17 deliverable).
-- ADR 0020 (initial MCP services set — the seven services, three credential modes, AgentDatabase, MCP-server-access, Firecrawl removed). ADR 0013 (capability CRD / CapabilitySet). ADR 0009 / 0033 (OpenSearch dual-hosting). ADR 0014 (Postgres primary / DB assignment gating). ADR 0021 / 0044 (XR composition / substrate abstraction / connection secret). ADR 0038 (policy-simulator target for search/scrape bundle). ADR 0040 (Kargo promotes claims). ADR 0034 (audit). ADR 0030 / 0031 (versioning / event taxonomy).
+- ADR 0020 (initial MCP services set — the seven services, AgentDatabase, MCP-server-access, Firecrawl removed; credential modes `system`/`system-mediated` per D-01). ADR 0013 (capability CRD / CapabilitySet). ADR 0009 / 0033 (OpenSearch dual-hosting). ADR 0014 (Postgres primary / DB assignment gating). ADR 0021 / 0044 (XR composition / substrate abstraction / connection secret). ADR 0038 (policy-simulator target for search/scrape bundle). ADR 0040 (Kargo promotes claims). ADR 0034 (audit). ADR 0030 / 0031 (versioning / event taxonomy).
 - architecture-backlog.md §1.9 (MCP health deferred), §1.11 (A17 per-service detail deferred).
 - Related pieces: A1 (LiteLLM), A7/B3/B16 (OPA), B13 (kopf reconciler), B4 (Crossplane XRDs), A11 (OpenSearch), A18 (audit), A20 (simulator).

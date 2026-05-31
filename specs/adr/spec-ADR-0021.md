@@ -1,7 +1,7 @@
 # SPEC ADR-0021 — Dashboards as namespaced Crossplane-composed GrafanaDashboard XRs `[PROPOSED]`
 
 > kind: ADR · workstream: — · tier: T1
-> upstream: [ADR-0016, ADR-0018, ADR-0041, ADR-0040, ADR-0002] · downstream: [B4, D1, D2, D3, A-components, B10, A14] · adrs: [0021] · views: [6.5]
+> upstream: [ADR-0016, ADR-0018, ADR-0044, ADR-0040, ADR-0002] · downstream: [B4, D1, D2, D3, A-components, B10, A14] · adrs: [0021] · views: [6.5]
 > canon-glossary: 6aadcc2a4f38 · canon-interface: 54f5ede58e5f
 
 ## 1. Purpose & Problem Statement
@@ -88,5 +88,5 @@ N/A — ADR. (Enforcing deliverables — Helm/manifests, Gatekeeper policy, Head
 ## 11. References
 - ADR 0021 (this decision). Enforcing components: B4 (XRD + Composition), Workstream D (D1/D2/D3), Workstream A components (per-component dashboards), B10/A14 (agent-published).
 - architecture-overview.md §11 (Grafana dashboards), §14.4 (Workstream D).
-- ADR 0016, ADR 0018, ADR 0002 (Gatekeeper), ADR 0006 (kopf vs Crossplane split), ADR 0040, ADR 0041, ADR 0030.
+- ADR 0016, ADR 0018, ADR 0002 (Gatekeeper), ADR 0006 (kopf vs Crossplane split), ADR 0040, ADR 0044, ADR 0030.
 - Canon: `_meta/interface-contract.md` §1.6 (`GrafanaDashboard` XR), glossary (`GrafanaDashboard`).

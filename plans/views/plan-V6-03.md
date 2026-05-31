@@ -9,7 +9,7 @@ This view is realized, not built. The realization map follows the wave layering:
 
 ## 2. Ordered Task List
 - **TASK-01:** Confirm A11 OpenSearch serves vectors/hybrid + advisory audit fanout and is never a system of record — produces: retrieval-role checklist — depends-on: []
-- **TASK-02:** Confirm B4 substrate XRDs (`XPostgres`/`XSearchIndex`/`XObjectStore`/`XMongoDocStore`) write the uniform connection secret with substrate-agnostic status and label-driven admission-validated selection — produces: substrate-contract checklist — depends-on: []
+- **TASK-02:** Confirm B4 substrate XRs (Crossplane v2, namespace-scoped: `Postgres`/`SearchIndex`/`ObjectStore`/`MongoDocStore`) write the uniform connection secret with substrate-agnostic status and label-driven admission-validated selection — produces: substrate-contract checklist — depends-on: []
 - **TASK-03:** Confirm A10 Letta persists state to Postgres and indexes to OpenSearch/object-storage per storage roles — produces: memory-service checklist — depends-on: [TASK-01, TASK-02]
 - **TASK-04:** Confirm B11 adapts `memory.*` to Letta and `MemoryStore.accessMode` (private/namespace-shared/RBAC-OPA) is enforced — produces: access-mode checklist — depends-on: [TASK-03]
 - **TASK-05:** Define end-to-end view verification: drop/rebuild reproducibility, access-mode enforcement, connection-secret parity, admission rejection of unmatched substrate — produces: view acceptance suite mapping (AC-01..09) — depends-on: [TASK-04]

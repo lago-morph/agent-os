@@ -1,7 +1,7 @@
 # SPEC F1 — Audit retention policy
 
 > kind: COMPONENT · workstream: F · tier: T2
-> upstream: [A18, B4] · downstream: [] · adrs: [0034, 0041, 0035, 0009, 0014, 0030] · views: [6.5, 6.3]
+> upstream: [A18, B4] · downstream: [] · adrs: [0034, 0044, 0035, 0009, 0014, 0030] · views: [6.5, 6.3]
 > canon-glossary: b0edae10a2e6 · canon-interface: 0ce201d5d5af
 
 ## 1. Purpose & Problem Statement
@@ -19,7 +19,7 @@ F1 runs at the **end** of v1.0 (production-readiness): it hardens and verifies a
 pipeline rather than building new infrastructure. Its deliverable is a policy specification plus
 the concrete `AuditLog` XRD field values (lifecycle, batch schedule) and an OpenSearch index
 state management (ISM) configuration that realize it, verified against the dual-mode (kind/AWS)
-substrate behavior ADR 0041 guarantees.
+substrate behavior ADR 0044 guarantees.
 
 ## 2. Scope
 
@@ -51,8 +51,8 @@ substrate behavior ADR 0041 guarantees.
 - **A18 (audit endpoint + adapter)** — the system of record this policy governs; the `audit_events`
   Postgres table, the 5-minute batch CronJob, the OpenSearch indexer. F1 consumes the existing
   schema and write path; it does not alter them.
-- **B4 (Crossplane Compositions)** — owns the `AuditLog` XRD that composes `XPostgres` and
-  `XObjectStore`. F1 supplies `batchScheduleSpec` and S3 lifecycle values into the claim.
+- **B4 (Crossplane Compositions)** — owns the `AuditLog` XRD that composes `Postgres` and
+  `ObjectStore`. F1 supplies `batchScheduleSpec` and S3 lifecycle values into the XR.
 
 **Downstream consumers:** none (terminal production-readiness piece).
 
@@ -60,7 +60,7 @@ substrate behavior ADR 0041 guarantees.
 - **ADR 0034** — Postgres + S3 are the system of record; OpenSearch is advisory and rebuildable;
   retention/redaction/lifecycle are exactly F1's deferred surface (S3 lifecycle on the XRD +
   OpenSearch rollover). Legal-hold / synchronous-archive are revisit triggers, out of scope.
-- **ADR 0041** — substrate abstraction: kind `XObjectStore` may be a no-op archive; retention
+- **ADR 0044** — substrate abstraction: kind `ObjectStore` may be a no-op archive; retention
   policy MUST tolerate the no-archive kind path (capability-parity not promised).
 - **ADR 0009 / 0014** — OpenSearch advisory-only; Postgres primary. Retention on OpenSearch never
   makes it authoritative.
@@ -83,7 +83,7 @@ below are `[PROPOSED — not in source]`:
 
 ### 4.2 APIs / SDK surfaces
 N/A — F1 introduces no API/SDK surface. It consumes the A18 adapter contract (Canon §5) and the
-`AuditLog` claim. The redaction strategy is realized in the adapter/endpoint config (A18), not a
+`AuditLog` XR. The redaction strategy is realized in the adapter/endpoint config (A18), not a
 new surface.
 
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
@@ -94,7 +94,7 @@ or retention-violation alert, if emitted, would fall under `platform.observabili
 
 ### 4.4 Data schemas / connection-secret contracts
 Governs the Postgres `audit_events` table (A18-owned) and the S3 archive objects (immutable,
-checksum-verified per ADR 0034). Uses the standard `XPostgres` / `XObjectStore` connection-secret
+checksum-verified per ADR 0034). Uses the standard `Postgres` / `ObjectStore` connection-secret
 shape (`host`, `port`, `user`, `password`, `dbname`; Canon §4) — F1 adds no fields. Redaction
 operates on record *contents*, not the connection contract.
 
@@ -110,7 +110,7 @@ attach to" (S3 lifecycle + OpenSearch rollover); F1 attaches policy, it does not
 - **REQ-F1-01:** F1 MUST define a concrete retention duration for each tier — Postgres
   `audit_events`, S3 archive (AWS), OpenSearch advisory index — with substrate-specific values.
 - **REQ-F1-02:** S3 archive lifecycle (transitions + expiry) MUST be expressed via the `AuditLog`
-  XRD `s3BucketRef` lifecycle and applied on AWS only (no-op/absent on kind per ADR 0041).
+  XRD `s3BucketRef` lifecycle and applied on AWS only (no-op/absent on kind per ADR 0044).
 - **REQ-F1-03:** OpenSearch advisory-index retention MUST be expressed as ISM rollover + delete,
   and MUST NOT make OpenSearch authoritative — the index stays rebuildable from S3/Postgres (ADR 0009/0034).
 - **REQ-F1-04:** On kind, where no S3 archive exists, the policy MUST keep Postgres as the system
@@ -138,7 +138,7 @@ attach to" (S3 lifecycle + OpenSearch rollover); F1 attaches policy, it does not
   retention is treated as a breaking compliance change requiring review.
 
 ## 8. Cross-Cutting Deliverable Checklist
-- Helm/manifests — **applicable** (ISM policy, S3 lifecycle values, proposed Postgres prune CronJob; via `AuditLog` claim).
+- Helm/manifests — **applicable** (ISM policy, S3 lifecycle values, proposed Postgres prune CronJob; via `AuditLog` XR).
 - Per-product docs (10.5) — **applicable** (retention policy reference; redaction matrix).
 - Runbook (10.7) — **applicable** (retention change procedure; batch-stall / table-growth response). Feeds **F6**.
 - Alerts — **applicable** (`audit_events` growth / batch stall; ISM failure). `[PROPOSED — not in source]`.
@@ -148,7 +148,7 @@ attach to" (S3 lifecycle + OpenSearch rollover); F1 attaches policy, it does not
 - Audit emission (ADR 0034) — **N/A (governs audit data; does not itself emit)** — F1 is policy over the audit pipeline.
 - Knative trigger flow — **N/A** — no new event flow; retention is scheduled/lifecycle, not event-driven.
 - HolmesGPT toolset — **applicable** — `[PROPOSED]` read tool to report retention posture / archive lag during triage.
-- 3-layer tests — **applicable** (Chainsaw for `AuditLog` claim lifecycle values; PyTest for redaction + Postgres prune logic).
+- 3-layer tests — **applicable** (Chainsaw for `AuditLog` XR lifecycle values; PyTest for redaction + Postgres prune logic).
 - Tutorials & how-tos — **applicable** (how-to: change a retention duration; how-to: add a redaction rule).
 
 ## 9. Acceptance Criteria
@@ -181,5 +181,5 @@ attach to" (S3 lifecycle + OpenSearch rollover); F1 attaches policy, it does not
   retention paragraph, line 335 dual-mode Postgres).
 - Canon interface-contract §5 (audit adapter interface; "retention deferred to F1"), §1.6 (`AuditLog` XRD), §2 (`platform.audit.*`), §4 (connection secret).
 - ADR 0034 (audit pipeline — retention/redaction/lifecycle deferred to F; S3 lifecycle + OpenSearch rollover surface; verified-write invariant; revisit triggers).
-- ADR 0041 (substrate abstraction; kind no-archive parity caveat). ADR 0009/0014 (OpenSearch advisory; Postgres primary). ADR 0035 (verbosity toggle, kept orthogonal). ADR 0030 (versioning).
+- ADR 0044 (substrate abstraction; kind no-archive parity caveat). ADR 0009/0014 (OpenSearch advisory; Postgres primary). ADR 0035 (verbosity toggle, kept orthogonal). ADR 0030 (versioning).
 - Related pieces: A18 (audit endpoint/adapter), B4 (`AuditLog` XRD), B12 (event schemas), F2 (DR), F6 (runbook compilation).

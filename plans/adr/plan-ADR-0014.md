@@ -22,7 +22,7 @@ Enforcement/verification map. ADR 0014 is a platform invariant enforced by every
 ### 3.2 Downstream pieces blocked on this
 - A10 (Letta derived indexes), A18 (audit SoR), C8 (KB indexing), F2 (DR testing).
 ### 3.3 Continuous (non-blocking) inputs
-- ADR 0034 (audit pipeline), ADR 0041 (substrate abstraction), B14 test framework.
+- ADR 0034 (audit pipeline), ADR 0044 (substrate abstraction), B14 test framework.
 
 ## 4. Parallelizable Subtasks
 TASK-03, TASK-04 fan out once TASK-01 lands. TASK-05/06/07 fan out once TASK-02 lands.

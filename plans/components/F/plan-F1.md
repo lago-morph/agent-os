@@ -6,13 +6,13 @@
 
 ## 1. Implementation Strategy
 
-F1 is a policy-attachment piece, not a build: it sets concrete values on surfaces ADR 0034 already exposed (S3 lifecycle on the `AuditLog` XRD, OpenSearch ISM rollover) and config on the A18 adapter (redaction). The approach is compliance-first — derive the retention durations from a compliance review, then express them as Git-reconciled config (XRD claim values, OpenSearch ISM policy, a proposed Postgres prune CronJob), then verify against both substrates (kind = Postgres-only system of record; AWS = full S3 archive path). Critical path: compliance review (sets the `[PROPOSED]` numbers) → encode as config → dual-substrate verification → redaction + durability-invariant tests.
+F1 is a policy-attachment piece, not a build: it sets concrete values on surfaces ADR 0034 already exposed (S3 lifecycle on the `AuditLog` XRD, OpenSearch ISM rollover) and config on the A18 adapter (redaction). The approach is compliance-first — derive the retention durations from a compliance review, then express them as Git-reconciled config (XR values, OpenSearch ISM policy, a proposed Postgres prune CronJob), then verify against both substrates (kind = Postgres-only system of record; AWS = full S3 archive path). Critical path: compliance review (sets the `[PROPOSED]` numbers) → encode as config → dual-substrate verification → redaction + durability-invariant tests.
 
 ## 2. Ordered Task List
 
 - **TASK-01:** Compliance review — set retention durations per tier (Postgres, S3 archive, OpenSearch), record legal-hold gap as out-of-scope — produces: retention-duration table + compliance mapping — depends-on: [].
 - **TASK-02:** Redaction strategy — name sensitive field classes + redaction stage (emission/archive/index) + irreversibility note — produces: redaction matrix — depends-on: [].
-- **TASK-03:** Encode S3 lifecycle (transition + expiry) into the `AuditLog` claim `s3BucketRef` lifecycle (AWS only) — produces: AuditLog claim values — depends-on: [TASK-01]. (B4 XRD available.)
+- **TASK-03:** Encode S3 lifecycle (transition + expiry) into the `AuditLog` XR `s3BucketRef` lifecycle (AWS only) — produces: AuditLog XR values — depends-on: [TASK-01]. (B4 XRD available.)
 - **TASK-04:** Encode OpenSearch ISM rollover + delete policy; assert rebuildable-from-source — produces: ISM policy — depends-on: [TASK-01].
 - **TASK-05:** Proposed Postgres standalone retention (kind system-of-record) — prune CronJob / window, gated on no-S3 path — produces: Postgres prune job — depends-on: [TASK-01].
 - **TASK-06:** Apply redaction config to the A18 adapter/endpoint (single write path) — produces: adapter redaction config — depends-on: [TASK-02].
@@ -25,7 +25,7 @@ F1 is a policy-attachment piece, not a build: it sets concrete values on surface
 
 ### 3.1 Upstream that must ship first (HARD)
 - **A18** — `audit_events` table, 5-min batch CronJob, OpenSearch indexer, single adapter write path. Consumed: the schema + write path F1 governs.
-- **B4** — `AuditLog` XRD composing `XPostgres`/`XObjectStore`. Consumed: the claim fields (lifecycle, batchScheduleSpec) F1 sets values into.
+- **B4** — `AuditLog` XRD composing `Postgres`/`ObjectStore`. Consumed: the XR fields (lifecycle, batchScheduleSpec) F1 sets values into.
 
 ### 3.2 Downstream blocked on this
 - None (terminal). F2 (DR reindex/restore) and F6 (runbook) reference F1 outputs.
@@ -39,7 +39,7 @@ F1 is a policy-attachment piece, not a build: it sets concrete values on surface
 - TASK-06 (redaction config) parallels the tier-encoding tasks.
 
 ## 5. Test Strategy
-- **Chainsaw (operator/CRD):** AC-F1-02 (`AuditLog` claim lifecycle on AWS / absent on kind), AC-F1-03 (ISM rollover+delete then rebuild), AC-F1-04 (kind Postgres window, no batch-delete).
+- **Chainsaw (operator/CRD):** AC-F1-02 (`AuditLog` XR lifecycle on AWS / absent on kind), AC-F1-03 (ISM rollover+delete then rebuild), AC-F1-04 (kind Postgres window, no batch-delete).
 - **PyTest (logic):** AC-F1-05 (redaction stage + absence from archive), AC-F1-08 (verify-failure leaves Postgres intact), AC-F1-07 (retention change is itself audited), Postgres prune logic.
 - **Playwright:** N/A — F1 has no UI surface (Headlamp editor is N/A).
 - **Fixtures/fakes:** AWS-substrate fixture for S3 lifecycle (kind cannot exercise it — share with F2); a sensitive-field fixture for redaction; an S3-verify-failure injector.
@@ -56,4 +56,4 @@ F1 is a policy-attachment piece, not a build: it sets concrete values on surface
 - **Rollup: S** (matches CSV). **Critical path:** TASK-01 → 03/04 → 07 → 10.
 
 ## 8. Rollback / Reversibility
-Back out by reverting the retention/redaction config commit (Git/ArgoCD) — the `AuditLog` claim reverts to its pre-F1 (B4 default) values, ISM policy is removed, redaction config is dropped. Non-destructive for already-archived S3 objects (immutable). **Caution:** redaction is irreversible for objects already written under it; rollback restores future behavior, not redacted historical data. No downstream component breaks (F1 is terminal).
+Back out by reverting the retention/redaction config commit (Git/ArgoCD) — the `AuditLog` XR reverts to its pre-F1 (B4 default) values, ISM policy is removed, redaction config is dropped. Non-destructive for already-archived S3 objects (immutable). **Caution:** redaction is irreversible for objects already written under it; rollback restores future behavior, not redacted historical data. No downstream component breaks (F1 is terminal).
