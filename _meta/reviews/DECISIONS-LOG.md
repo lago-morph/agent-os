@@ -32,7 +32,7 @@ Buckets: **Decided** (act on these) · **Future version** (post-MVP — importan
 ### Egress (D-08)
 - **Envoy stays.** The Kubernetes agent-sandbox `NetworkPolicySpec` is **L3/L4 only** (IP/CIDR/port, native NetworkPolicy); it cannot do FQDN or HTTP-method allowlisting. The platform needs L7 (`EgressTarget` has `fqdn`/`scheme`/`allowedMethods`), so Envoy remains.
 - **Two layers:** sandbox `NetworkPolicySpec` = L3/L4 default-deny baseline for in-cluster traffic; Envoy = L7 (FQDN/method) for external egress, via `EgressTarget` / `CapabilitySet`.
-- **Default sandbox egress allow-set:** LiteLLM gateway (A1), Envoy egress proxy (A6), audit endpoint (A18). *Proposed additions to confirm:* cluster DNS (CoreDNS), memory backend (A10), telemetry/trace collector (A2 / OTel), event broker (B8).
+- **Default sandbox egress allow-set (a non-exhaustive, extensible *baseline* — NOT a closed/immutable allowlist):** LiteLLM gateway (A1), Envoy egress proxy (A6), audit endpoint (A18). *Proposed additions to confirm:* cluster DNS (CoreDNS), memory backend (A10), telemetry/trace collector (A2 / OTel), event broker (B8). **Document it as a starting baseline a future contributor can extend with a legitimately-needed target — not a hard ceiling to fight against.**
 - **OAuth credentials** are not an end-user flow — operator-entered secrets via the LiteLLM GUI. No OAuth-lifecycle machinery.
 
 ### Template layering (confirmed existing)
@@ -65,12 +65,23 @@ Recorded so they are not re-raised.
 
 ## STILL OPEN (awaiting ruling)
 - **#24 / #25 / #26** — global OPA bundle ownership; policy-bundle signing + load-time verification; staged policy rollout (audit→enforce, whether Kargo gates it). *(You said "don't know on everything related to policies here.")*
-- **D-04 / D-09** — concrete `MemoryStore` connection-secret field list, and the B4↔B11 dependency direction.
-- **D-08 wiring** — how Envoy is linked to the requesting agent (sidecar-per-agent vs shared egress gateway keyed on workload identity). Many good options; the work is choosing.
+- **D-04** — concrete `MemoryStore` connection-secret field list (still open). **D-09 resolved:** the memory adapter (B11) depends on the infrastructure layer (B4), which provisions the memory store and emits its connection secret — dependency runs **B4 → B11**; csv fixed accordingly.
+- **QN-03 — event-namespace ownership** — assign an owning/authoring component to each of the ten `platform.*` CloudEvent namespaces (walkthrough in progress).
+- **D-08 wiring — not a standing decision.** Envoy's deployment topology (sidecar vs shared gateway) and the agent↔Envoy linkage are ordinary build-time implementation details, decided during implementation. The spec only states: Envoy enforces the per-agent L7 egress allowlist resolved from the agent's `CapabilitySet`.
 - **D-11** — Crossplane **v1→v2 conformance pass** go-ahead (and revising/superseding ADR-0041). The specs are written on the v1 model.
 - **PROPOSED-ADR-A** — the tenant quota field schema (needed to land #5/#9).
 - **`system-mediated` reconciliation** (see D-01).
 - **Default sandbox egress allow-set** — confirm the proposed additions above.
+
+---
+
+## MY-SCOPE CLEANUP (not decisions — I fix these, no ruling needed)
+- **QN-02** — inconsistent `canon-*` front-matter hash formatting. Mechanical normalization.
+- **QN-04** — untestable ACs (B16 canary-only invariant, B16 self-referential coverage map, V6-06 conformance depending on non-frozen enums). Rewrite to objectively testable.
+- **QN-01** — moot: it was an AC-coverage gap in OPS5, which is being retired (out-of-scope/future).
+- **QN-05** — "platform release" unit undefined: folds into #18 (versioning, future); for v1 the affected ACs get reworded or dropped.
+- **SearchIndex / MongoDocStore / ObjectStore** missing from glossary — folds into D-11 (v1→v2 pass): define or rename with v2 semantics.
+- **D-09** — resolved (above); csv dependency reciprocity fixed.
 
 ---
 
