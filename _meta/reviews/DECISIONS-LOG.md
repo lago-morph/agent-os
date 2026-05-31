@@ -56,7 +56,7 @@ Buckets: **Decided** (act on these) · **Future version** (post-MVP — importan
 
 **Cross-cutting security requirement (applies to every component):** when a component detects a security-relevant event, it performs its existing local handling **and additionally emits the event to the bus** under `platform.security` (schema owned by A7). Security alerts are treated like policy violations — "we caught something out of the norm worth capturing." The bus emission is an *export/notification* surface (for dashboards, audit, external SIEM), not the primary response path. This needs to land as a requirement in each component spec.
 
-**Observability note:** alarming happens inside the observability stack (AlertManager → HolmesGPT, §6.7). `platform.observability` events are an **export surface for outside consumers** (cloud-native logging initially), **not** a load-bearing internal dependency. A13 owns the schema.
+**Observability note (corrected).** AlertManager (which alarms off **Mimir** metrics *and* **Loki** logs) publishes alerts onto the **event bus** under `platform.observability` (A13 owns the schema). Consumers — HolmesGPT and possibly many others — subscribe to alerts **via the bus**; there is **no direct AlertManager→HolmesGPT wire** (point-to-point coupling defeats the bus, whose purpose is emit-once / consumers-choose). Separately, HolmesGPT pulls **metrics from Mimir directly** — a data *stream* it uses to do its job, not events; that must not go on the bus. ⚠️ The corpus currently specifies a direct `AlertManager → HolmesGPT` trigger (glossary / §6.7) — that must be changed to bus-mediated alert consumption.
 
 ---
 
