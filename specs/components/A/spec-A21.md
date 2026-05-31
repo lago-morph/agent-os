@@ -45,7 +45,7 @@ CapabilitySets are intentionally **not coupled** to onboarding (ADR 0013, ADR 00
 
 **ADR decisions honored:**
 
-- **ADR 0037** — `TenantOnboarding` XRD is the GitOps tenant representation; composition creates namespace + default SAs + cluster-OIDC-side mapper; **no CapabilitySet coupling** (UX prompt only); Headlamp+GitOps flow (PR-only, no direct cluster writes from the plugin); symmetric auditable offboarding; defers quotas + role catalog.
+- **ADR 0037** — `TenantOnboarding` XRD is the GitOps tenant representation; composition creates namespace + default SAs + cluster-OIDC-side mapper; **no CapabilitySet coupling** (UX prompt only); Headlamp+GitOps flow (PR-only, no direct cluster writes from the plugin); symmetric auditable offboarding; **defers role catalog** (decisions #5/#9 reversed the quota deferral — quotas are now mandatory at admission; see REQ-A21-13).
 - **ADR 0028** — identity federation chain; **only the cluster-OIDC-side mapper is owned here**; upstream-IdP mapper authoring is the install admin's job.
 - **ADR 0029** — the Keycloak claim schema the mapper resolves into (`platform_tenants`, `platform_namespaces`, `tenant_roles`).
 - **ADR 0016** — multi-tenancy via namespaces with RBAC + OPA + network enforcement; the namespace is the tenancy boundary.
@@ -69,7 +69,7 @@ CapabilitySets are intentionally **not coupled** to onboarding (ADR 0013, ADR 00
 | `clusterOIDCClaimMapping` | The cluster-OIDC-side mapper resolving the platform claim schema into this tenant's `platform_tenants` / `platform_namespaces` entries. |
 
 - Field sets beyond the four above are **not specified in source**; any addition (e.g. labels, SA role bindings detail) is `[PROPOSED — not in source]`.
-- **Quotas, role-catalog fields are deliberately absent** (deferred, ADR 0037) — do not invent.
+- **Role-catalog fields are deliberately absent** (deferred, ADR 0037) — do not invent. **Quota fields (`spec.quotas`) are now mandatory** per decisions #5/#9 (extensible typed list; `cpu` and `memory` entries required at admission — see REQ-A21-13).
 - Versioning per ADR 0030/0044: `v1alpha1`→`v1`; breaking changes via new `vN` group + conversion webhook; owner = Crossplane B4.
 - **Composition outputs (source-stated):** tenant namespace(s) labelled with platform tenancy metadata; templated default ServiceAccounts; cluster-OIDC-side claim mapper record. (No connection secret — this XRD provisions no substrate primitive; see §4.4.)
 
@@ -165,7 +165,7 @@ Per §14.1:
 - **OQ-A21-2** (med): A22 ships a baseline `TenantOnboarding` editor in its ADR 0039 initial set, but §14.1 says A21 owns its CRD's editor. **Reconciliation note:** A21's editor is built on the A22 framework and supersedes/extends A22's baseline with tenant-specific validation (claim-mapping proposal, multi-namespace handling). Coordinate so the editor is not double-built. `[PROPOSED]` boundary.
 - **OQ-A21-3** (med): The `clusterOIDCClaimMapping` storage/representation is not field-detailed in source (only the field name + intent). Concrete shape is `[PROPOSED — not in source]`; depends on the Keycloak/cluster-OIDC integration owned by the install admin + B1.
 - **OQ-A21-4** (low): The `defaultServiceAccounts[]` *baseline set* (which SAs, with which RBAC) is described only by example (developer/operator/agent-default SA). Exact templates are `[PROPOSED — not in source]`; must align with RBAC-as-floor (ADR 0018) and the deferred `platform_roles` catalog.
-- **OQ-A21-5** (low): Tenant-scoped quotas are deferred (ADR 0037 / backlog §1.2); the XRD must be shaped so quotas compose on additively later without a breaking version bump.
+- **OQ-A21-5** (resolved): Tenant-scoped quotas are **no longer deferred** — decisions #5/#9 reversed the ADR-0037 deferral. `cpu` and `memory` entries are mandatory at admission (REQ-A21-13). The `spec.quotas` extensible typed list ensures additional quota types compose on additively later without a breaking version bump.
 - **OQ-A21-6** (low): Offboarding "archive audit references" interacts with the deferred F1 retention policy; A21 archives but cannot define expiry — risk of ambiguity until F1 lands.
 
 ## 11. References

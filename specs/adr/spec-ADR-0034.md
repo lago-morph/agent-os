@@ -135,7 +135,7 @@ Deployment manifests, runbook, audit emission, HolmesGPT toolset, 3-layer tests)
 - AC-ADR-0034-05: Honored when, on kind, the pipeline ingests and serves audit with no S3 provisioned and the batch CronJob absent/disabled. (→ REQ-06)
 - AC-ADR-0034-06: Honored when OpenSearch is taken down mid-ingest, ingestion still succeeds, and the audit index is shown to rebuild from S3 (AWS) / Postgres (kind). (→ REQ-07)
 - AC-ADR-0034-07: Honored when every sampled audit event carries a `type` under `platform.audit.*` and no audit event is emitted under `platform.security.*`. (→ REQ-08)
-- AC-ADR-0034-08: Honored when one `AuditLog` claim is shown to provision the endpoint Deployment, Postgres store, and (on AWS) S3 bucket + lifecycle + indexer + batch CronJob. (→ REQ-09)
+- AC-ADR-0034-08: Honored when one `AuditLog` XR is shown to provision the endpoint Deployment, Postgres store, and (on AWS) S3 bucket + lifecycle + indexer + batch CronJob. (→ REQ-09)
 - AC-ADR-0034-09: Honored when a `LogLevel` change on the audit endpoint raises verbosity per-tenant / per-event-class with no caller redeploy. (→ REQ-10)
 - AC-ADR-0034-10: Honored when endpoint egress to S3 / managed OpenSearch is observed traversing the Envoy egress proxy. (→ REQ-11)
 - AC-ADR-0034-11: Honored when the audit-adapter interface and `audit_events` schema are marked frozen (D-05) and a CI freeze-gate fails any pipeline in which a component emits audit events before that gate passes. (→ REQ-12)
@@ -147,5 +147,5 @@ Deployment manifests, runbook, audit emission, HolmesGPT toolset, 3-layer tests)
 - Open: retention durations / redaction rules — deferred to Workstream F (F1); the S3 lifecycle on the `AuditLog` XRD is the surface they attach to.
 
 ## 11. References
-- ADR 0034 (this decision). Enforcing/realizing components: A18 (adapter library + audit endpoint), B4 (`AuditLog` Composition), A11 (OpenSearch advisory), A7 (admission), A23 (Kargo claim promotion), B12 (`platform.audit.*` schemas).
+- ADR 0034 (this decision). Enforcing/realizing components: A18 (adapter library + audit endpoint), B4 (`AuditLog` Composition), A11 (OpenSearch advisory), A7 (admission), A23 (Kargo XR schema promotion), B12 (`platform.audit.*` schemas).
 - architecture-overview.md §6.5 (observability/audit), §6.3 (data architecture). architecture-backlog.md §1.13 (retention deferred to F), §6 (reproducibility invariant; all custom code Python). ADR 0003, 0009, 0011, 0014, 0021, 0031, 0033, 0035, 0040, 0044.

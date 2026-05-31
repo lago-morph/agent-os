@@ -28,9 +28,8 @@ B4 is foundation (T0, W1): it owns the XRD set that A18/A21/A23/B19/B11 consume,
   `SearchIndex`, `ObjectStore`, `MongoDocStore` — each with **one Composition per substrate**
   (kind + AWS), both writing the **same connection-secret shape** (§4.4) and exposing the same
   substrate-agnostic XR status (`ready`, `endpoint`, `version`).
-- The **higher-level XRDs** that compose those substrate primitives: `AuditLog` (XR `AuditLog`,
-  ADR 0034), `AgentDatabase` (claim `AgentDatabase`, ADR 0020), `GrafanaDashboard`
-  (XR `GrafanaDashboard`, ADR 0021), `TenantOnboarding` (ADR 0028/0037).
+- The **higher-level XRDs** that compose those substrate primitives: `AuditLog` (ADR 0034),
+  `AgentDatabase` (ADR 0020), `GrafanaDashboard` (ADR 0021), `TenantOnboarding` (ADR 0028/0037).
 - The **agent-facing composed XRs**: `MemoryStore` (ADR 0025 access modes), `AgentEnvironment`,
   `SyntheticMCPServer` (back-link to `MCPServer` produced by A12).
 - The **connection-secret contract** as a tested invariant: shape, status-field normalization,
@@ -164,7 +163,7 @@ not mint event types. `[PROPOSED — not in source]`: whether Crossplane reconci
 - **Secret-shape conformance is tested**, not convention (REQ-B4-12 / AC-B4-12).
 - `connectionSecretRef` on each XRD names where the secret is written; consumers read it without
   branching on substrate.
-- **Capability-parity is not promised**: claim *shape* is uniform; runtime *behaviour* may differ
+- **Capability-parity is not promised**: XR *schema* is uniform; runtime *behaviour* may differ
   (e.g. kind `ObjectStore` may produce "no archive"; kind `AuditLog` is Postgres-only). Each XRD
   documents its substrate-specific behavioural differences.
 
@@ -268,13 +267,13 @@ and broken cross-substrate promotion.
   and one matches `=aws`; an XR resolves to the matching one. (→ REQ-B4-02)
 - **AC-B4-03:** On kind, XRs provision CloudNativePG/OpenSearch-operator/MinIO/Bitnami-Mongo; on
   AWS they provision RDS/managed-OpenSearch/S3/DocumentDB. (→ REQ-B4-03)
-- **AC-B4-04:** An `AuditLog` claim on AWS provisions Postgres+S3+indexer+batch-CronJob+endpoint; on
+- **AC-B4-04:** An `AuditLog` XR on AWS provisions Postgres+S3+indexer+batch-CronJob+endpoint; on
   kind it provisions Postgres+indexer+endpoint with the batch step disabled. (→ REQ-B4-04)
 - **AC-B4-05:** An `AgentDatabase` XR with `engine=postgres` composes `Postgres`; with
   `engine=mongodb` composes `MongoDocStore`. (→ REQ-B4-05)
-- **AC-B4-06:** A `GrafanaDashboard` claim provisions a namespaced dashboard with RBAC+OPA-gated
+- **AC-B4-06:** A `GrafanaDashboard` XR provisions a namespaced dashboard with RBAC+OPA-gated
   `visibility`. (→ REQ-B4-06)
-- **AC-B4-07:** A `TenantOnboarding` claim creates the declared namespaces, SAs, and OIDC claim
+- **AC-B4-07:** A `TenantOnboarding` XR creates the declared namespaces, SAs, and OIDC claim
   mapping and does NOT create any CapabilitySet. (→ REQ-B4-07)
 - **AC-B4-08:** `MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer` XRs install with their
   source-stated fields; `MemoryStore.accessMode` accepts only the three modes. (→ REQ-B4-08)
