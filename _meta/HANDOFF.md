@@ -1,11 +1,32 @@
 # HANDOFF — Spec + Plan Generation Run (Agentic Execution Platform)
 
 > Original run branch: `claude/spec-plan-review-parallel-zR9Qr` · Date: 2026-05-30
-> **Status (updated 2026-05-31): authoring complete; review + decisions session done.
-> Every open question is resolved EXCEPT the Crossplane v1→v2 conformance pass.
-> Decisions are recorded in `_meta/reviews/DECISIONS-LOG.md` but NOT yet applied to the
-> spec/plan files. § "SESSION 2 HANDOFF" below is the current entry point; §§1–7 are kept
-> as background on the original authoring run.**
+> **Status (updated 2026-05-31 Session 3): ALL decisions applied. Corpus is Crossplane v2.
+> All rulings from DECISIONS-LOG.md are threaded into spec/plan files. OPS layer trimmed.
+> Awaiting PR review + merge. No open decisions remain.**
+>
+> Session 3 branch: `claude/gracious-cray-YbkhX` · PR: open for review.
+> §§1–7 are background on the original authoring run. SESSION 2 HANDOFF is retained for
+> history. SESSION 3 HANDOFF below is the current state.
+
+---
+
+## SESSION 3 HANDOFF — All Decisions Applied (2026-05-31): current state
+
+**Everything in the SESSION 2 list below is DONE.** All four task groups completed:
+
+1. **Crossplane v1→v2 pass** ✅ — ADR-0044 created; ADR-0041 superseded + moved; full corpus swept; zero residual v1 XRD names or claim language.
+2. **OPS-layer trim** ✅ — OPS2/OPS5 retired; OPS1/OPS3/OPS4/OPS6 trimmed to in-scope slivers.
+3. **Rulings threaded into specs** ✅ — All D-01..D-08, QN-03, #5/#9/#23/#24/#25/#26, observability correction, secrets, D-04, D-07 applied to every affected spec/plan.
+4. **Cleanup** ✅ — QN-02 (hash normalization), QN-04 (untestable ACs), QN-05 (platform release unit), A21 quota consistency.
+
+**PR:** `claude/gracious-cray-YbkhX` — open for review. No merge conflicts expected (additive changes to spec/plan files, OPS files trimmed, new ADR-0044 files).
+
+**What remains for future sessions:**
+- Merge the PR (human review).
+- Build the per-piece PR graph (119 PRs, one per piece, stacked on wave/N branches — see §6.4 of original plan).
+- Targeted adversarial review on T0 contract pieces (see §6.3).
+- The Future-version backlog items (#11, #18, #20, #27 — see DECISIONS-LOG).
 
 ---
 

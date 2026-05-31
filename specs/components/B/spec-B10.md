@@ -2,7 +2,7 @@
 
 > kind: COMPONENT · workstream: B · tier: T1
 > upstream: [B6, A5, A2, A14] · downstream: [] · adrs: [0012, 0017, 0019, 0022, 0030, 0031, 0034, 0038] · views: [6.10, 6.2, 6.5, 6.4]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
 
@@ -132,7 +132,7 @@ Per-event-type names are deferred to B12's registry; B10 binds only to the **clo
 ### 4.4 Data schemas / connection-secret contracts
 N/A — B10 provisions no datastore of its own and owns no connection secret. It reads via Langfuse
 APIs and the Platform SDK; any memory it keeps is via a `Memory`/`MemoryStore` (ADR 0025), whose
-connection secret follows the uniform `host`/`port`/`user`/`password`/`dbname` shape (ADR 0041).
+connection secret follows the uniform `host`/`port`/`user`/`password`/`dbname` shape (ADR 0044).
 
 ## 5. OSS-vs-Custom Decision
 **Build-new agent on OSS foundations.** The Coach is **not** a forked product; it is a custom

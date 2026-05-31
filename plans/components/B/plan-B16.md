@@ -16,6 +16,8 @@ coverage map + a B22 extension point are maintained throughout so threat-model o
 lands additively.
 
 ## 2. Ordered Task List
+- **TASK-SIGN:** Implement cryptographic signing of policy bundles + load-time verification; engine refuses unsigned/tampered bundles (#25). The decision-document format is owned by B3, not B16 (D-03).
+- **TASK-ROLLOUT:** Implement staged rollout — new/changed bundles run in audit mode first, then flip to enforce after review, gated by the Kargo promotion pipeline (#26). Global/cross-tenant bundle changes go through PR + security-reviewer approval (#24).
 - **TASK-01:** Bind to B3's frozen decision-document/input contract + bundle layout; stand up the B16
   package skeleton and coverage-map scaffold — produces: B16 bundle skeleton + coverage map — depends-on: []
 - **TASK-02:** Admission policies for all ARK/sandbox/kopf CRDs (`Agent`, `AgentRun`, `Sandbox`,
@@ -23,9 +25,9 @@ lands additively.
   `Skill`, `CapabilitySet`, `VirtualKey`, `BudgetPolicy`, `Approval`, `LogLevel`) — produces: admission
   Rego + tests — depends-on: [TASK-01]
 - **TASK-03:** Admission policies for the Crossplane XRs (`AgentEnvironment`, `SyntheticMCPServer`,
-  `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `XAgentDatabase`, substrate XRDs) — produces:
+  `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `AgentDatabase`, substrate XRDs) — produces:
   XR admission Rego + tests — depends-on: [TASK-01]
-- **TASK-04:** **Substrate-mismatch** admission rule (ADR 0041) using B4's supplied input shape —
+- **TASK-04:** **Substrate-mismatch** admission rule (ADR 0044) using B4's supplied input shape —
   produces: substrate-mismatch Rego + test — depends-on: [TASK-03]
 - **TASK-05:** LiteLLM-callback runtime policies: tool/model authorization, rate limiting, content
   checks, **budget enforcement** (reads B13-reconciled `BudgetPolicy` data) — produces: gateway Rego +
@@ -46,7 +48,7 @@ lands additively.
 - **TASK-12:** Dry-run/`simulated` coverage across every entrypoint (ADR 0038) + `platform.policy.*`
   audit-content verification — produces: dry-run tests — depends-on: [TASK-02..TASK-10]
 - **TASK-13:** Coverage map completion (every §6.6 decision point → package) + **B22 extension point** +
-  operability `GrafanaDashboard` claim + alerts + docs + how-tos — produces: coverage map, dashboard,
+  operability `GrafanaDashboard` XR + alerts + docs + how-tos — produces: coverage map, dashboard,
   docs — depends-on: [TASK-11, TASK-12]
 
 ## 3. Dependency Map

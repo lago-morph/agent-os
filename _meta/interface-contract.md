@@ -4,7 +4,7 @@ The cross-piece interface registry. Spec authors **READ** this to keep CRD / XRD
 SDK / connection-secret names consistent across ~30 parallel specs. Names and fields here
 are extracted verbatim from `architecture-overview.md` (§6.12 CRD inventory, §6.13 versioning,
 §6.7 eventing, §6.8 capability registries) and the contract-defining ADRs (0013, 0030, 0031,
-0034, 0041, 0020, 0037). **No fields are invented.** Where the source does not specify a
+0034, 0044, 0020, 0037). **No fields are invented.** Where the source does not specify a
 field set, this file says **"fields: not specified in source."** Anything an author needs that
 is not here must be tagged `[PROPOSED — not in source]` in the spec, not silently added.
 
@@ -22,8 +22,8 @@ is not here must be tagged `[PROPOSED — not in source]` in the spec, not silen
   **deprecated for at least one minor platform release** before removal.
 - Versioning is **per-component, not centrally coordinated**. Owner of each CRD's versioning
   lifecycle = the component that owns its reconciler (see "Owner" column).
-- ADR 0041 confirms CRD/API versioning applies to XRDs identically (conversion webhooks +
-  deprecation windows on both Compositions when a claim shape changes).
+- ADR 0044 confirms CRD/API versioning applies to XRDs identically (conversion webhooks +
+  deprecation windows on both Compositions when an XR schema changes).
 
 ### 1.2 ARK-reconciled CRDs (owner: ARK install = component A5)
 
@@ -67,29 +67,29 @@ the capability CRDs; detailed overlay resolution is deferred to ADR 0032.
 | `Approval` | Argo Workflow + component B19 | namespaced | `requestingAgent`, `actionType`, `actionAttributes`, `defaultLevel`, `evidenceRefs[]`, `decision`, `decidedBy`, `decidedAt`. |
 | `LogLevel` | per-component (in-process or rolling-restart) | namespaced | `componentSelector`, `level`, `traceGranularity`, `scope` (component/tenant/eventClass), `expiresAt`. ADR 0035. |
 
-### 1.6 Crossplane XRs / XRDs (owner: Crossplane Compositions = component B4) — ADR 0041
+### 1.6 Crossplane XRs / XRDs (owner: Crossplane Compositions = component B4) — ADR 0044
 
-ADR 0041 naming: `X`-prefixed = cluster-scoped composite (XR); the user-facing **namespaced
-claim drops the prefix** (XR `XPostgres` ↔ claim `Postgres`). Earlier ADRs that name the claim
-form (`AuditLog`, `AgentDatabase`, `GrafanaDashboard`) and the XR-form names refer to the same
-XRD/artifact. **All are namespaced; there are no cluster-scoped platform CRDs in v1.0.**
+ADR 0044 (Crossplane v2): substrate XRDs are **namespace-scoped XRs** that users create directly
+in their namespace — there is no claim layer and no `X` prefix. The substrate XRs are `Postgres`,
+`SearchIndex`, `ObjectStore`, `MongoDocStore`, `AgentDatabase`, `AuditLog`, and `GrafanaDashboard`.
+**All are namespaced; there are no cluster-scoped platform CRDs in v1.0.**
 
 | XR / XRD | Scope | Key fields (source-stated) |
 |---|---|---|
 | `MemoryStore` (XR) | namespaced | `accessMode` (private / namespace-shared / RBAC-OPA), `backendType`. ADR 0025. |
 | `AgentEnvironment` (XR) | namespaced | `region`, `quotas`, `defaultCapabilitySetRef`. |
 | `SyntheticMCPServer` (XR) | namespaced | `openApiSpecRef`, `authConfigRef`, `mcpServerRef` (back-link). Produced by A12 OpenAPI->MCP converter. |
-| `GrafanaDashboard` (XR) | namespaced | `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled). ADR 0021. (XR form: `XGrafanaDashboard`.) |
-| `AuditLog` (XRD) | namespaced | `postgresRef`, `s3BucketRef`, `indexerRef`, `batchScheduleSpec`, `endpointReplicas`. ADR 0034. (XR form: `XAuditLog`.) |
-| `TenantOnboarding` (XRD) | namespaced | `tenantId`, `namespaces[]`, `defaultServiceAccounts[]`, `clusterOIDCClaimMapping`. ADR 0028 / 0037. CapabilitySets intentionally not coupled. |
-| `XAgentDatabase` (XRD) | namespaced | `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef`. ADR 0020 / 0041. Claim form: `AgentDatabase`. Composes `XPostgres` or `XMongoDocStore`. |
-| `XPostgres` (XRD) | namespaced | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: CloudNativePG; AWS: RDS. |
-| `XSearchIndex` (XRD) | namespaced | `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass`. kind: in-cluster OpenSearch; AWS: managed OpenSearch. |
-| `XObjectStore` (XRD) | namespaced | `bucketName`, `lifecycle`, `connectionSecretRef`, `substrateClass`. kind: MinIO or no-op; AWS: S3. Capability-parity caveat: kind may have no archive lifecycle. |
-| `XMongoDocStore` (XRD) | namespaced | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: Bitnami MongoDB; AWS: DocumentDB or self-managed. |
+| `GrafanaDashboard` (XR) | namespaced | `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled). ADR 0021 / 0044. |
+| `AuditLog` (XR) | namespaced | `postgresRef`, `s3BucketRef`, `indexerRef`, `batchScheduleSpec`, `endpointReplicas`. ADR 0034 / 0044. |
+| `TenantOnboarding` (XR) | namespaced | `tenantId`, `namespaces[]`, `defaultServiceAccounts[]`, `clusterOIDCClaimMapping`. ADR 0028 / 0037. CapabilitySets intentionally not coupled. |
+| `AgentDatabase` (XR) | namespaced | `engine` (postgres/mongodb), `scope` (agent/tenant/user), `ownerRef`, `credentialsSecretRef`. ADR 0020 / 0044. Composes `Postgres` or `MongoDocStore`. |
+| `Postgres` (XR) | namespaced | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: CloudNativePG; AWS: RDS. |
+| `SearchIndex` (XR) | namespaced | `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass`. kind: in-cluster OpenSearch; AWS: managed OpenSearch. |
+| `ObjectStore` (XR) | namespaced | `bucketName`, `lifecycle`, `connectionSecretRef`, `substrateClass`. kind: MinIO or no-op; AWS: S3. Capability-parity caveat: kind may have no archive lifecycle. |
+| `MongoDocStore` (XR) | namespaced | `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: Bitnami MongoDB; AWS: DocumentDB or self-managed. |
 
-**Substrate XRDs committed for v1.0** (§14, §6.3): `XPostgres`, `XSearchIndex`, `XObjectStore`,
-`XMongoDocStore`. `XAuditLog`, `XAgentDatabase`, `XGrafanaDashboard` are higher-level XRDs that
+**Substrate XRs committed for v1.0** (§14, §6.3): `Postgres`, `SearchIndex`, `ObjectStore`,
+`MongoDocStore`. `AuditLog`, `AgentDatabase`, `GrafanaDashboard` are higher-level XRs that
 compose those substrate primitives.
 
 ---
@@ -161,7 +161,7 @@ Mastra / ARK ADK can be enrolled later as additive changes. Third-party harness 
 
 ---
 
-## 4. Connection-secret schema / substrate XRDs — ADR 0041
+## 4. Connection-secret schema / substrate XRDs — ADR 0044
 
 **Uniform connection-secret contract (architectural invariant, tested — not convention):**
 
@@ -173,9 +173,9 @@ Mastra / ARK ADK can be enrolled later as additive changes. Third-party harness 
 - **XR status fields are substrate-agnostic**: `ready`, `endpoint`, `version`. Substrate-specific
   fields (RDS ARN, in-cluster Service paths) are deliberately absent from user-visible status.
 - **Every cluster carries `platform.io/environment=kind|aws`.** An OPA Gatekeeper admission
-  policy (ADR 0002) **rejects any claim with no matching Composition** for the cluster's label.
-- **Capability-parity is not promised**: claim *shape* is consistent; runtime *behaviour* may
-  differ per substrate (e.g. kind `XObjectStore` may produce "no archive").
+  policy (ADR 0002) **rejects any XR with no matching Composition** for the cluster's label.
+- **Capability-parity is not promised**: XR *schema* is consistent; runtime *behaviour* may
+  differ per substrate (e.g. kind `ObjectStore` may produce "no archive").
 - **Documented exceptions — intentionally NOT wrapped:** Knative event sources (ADR 0023),
   cluster bootstrap, cloud-provider stack selection, resource sizing/replicas/region (Kustomize).
 

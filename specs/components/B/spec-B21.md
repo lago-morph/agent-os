@@ -2,9 +2,11 @@
 
 > kind: COMPONENT · workstream: B · tier: T2
 > upstream: [B7, B6, B9] · downstream: [] · adrs: [0019, 0033, 0040, 0028, 0030, 0011] · views: [6.2, 6.11]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+`TenantOnboarding` is a Crossplane v2 namespace-scoped composite resource (no claim layer). Its admission MUST verify that `cpu` and `memory` quota entries are present (each a concrete limit or `unlimited: true`); quota presence is mandatory, not optional or deferred (#5/#9; coordinated with B4 and A21).
 
 Developers building new Platform Agents need a supported, documented path from empty repo to a
 running agent — the SDK to use, how to wire capabilities, how to run and debug locally, and how to
@@ -78,7 +80,7 @@ N/A — B21 is docs/tooling/conventions; it emits and consumes no CloudEvents. A
 emit `platform.lifecycle.*` via ARK/sandbox like any agent — owned upstream, not by B21.
 
 ### 4.4 Data schemas / connection-secret contracts
-N/A — B21 owns no data backend. On the kind path, local substrate backings follow the ADR 0041
+N/A — B21 owns no data backend. On the kind path, local substrate backings follow the ADR 0044
 connection-secret contract owned by B4; B21 only documents how a developer consumes them.
 
 ## 5. OSS-vs-Custom Decision
@@ -147,7 +149,7 @@ blocks exist; the gap is a coherent, supported on-ramp covering both local and s
 - R2 (med): The **shared dev cluster** topology (who provisions, capacity, multi-tenant isolation for
   developers) is not architecture-specified. Open question for Workstream A/F; B21 documents conventions, not the cluster.
 - R3 (low): Parity gaps between kind and the shared cluster (substrate capability-parity caveat, §6.3
-  / ADR 0041) may surface behavior differences. Open question: document known gaps per the Composition docs.
+  / ADR 0044) may surface behavior differences. Open question: document known gaps per the Composition docs.
 - R4 (low): Local "third-party / custom harness images" are documented-but-unsupported (§6.2); B21
   must mark that path clearly as unsupported to avoid implying official support.
 

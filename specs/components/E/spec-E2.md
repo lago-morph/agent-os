@@ -56,7 +56,7 @@ N/A — E2 exposes no API or SDK surface. Developer labs drive existing surfaces
 
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
 
-N/A — E2 emits and consumes no CloudEvents of its own. Lab exercises may observe or emit existing platform events (e.g. `platform.lifecycle.*`, `platform.evaluation.*`, `platform.audit.*`) as part of the triggers, evaluation, and debugging modules, but the events are emitted by the components under exercise, not by E2.
+N/A — E2 emits and consumes no CloudEvents of its own. Lab exercises may observe existing platform events (e.g. `platform.lifecycle.*`, `platform.evaluation.*`, `platform.audit.*`) as part of the triggers, evaluation, and debugging modules, but those events are emitted by the components under exercise, not by E2; `platform.evaluation.*` is owned by B14 (test & eval framework) and E2 is at most a consumer/dependent, never an owner.
 
 ### 4.4 Data schemas / connection-secret contracts
 

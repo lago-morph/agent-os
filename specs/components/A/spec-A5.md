@@ -88,14 +88,16 @@ Owner: ARK install = A5 (interface-contract §1.2). All namespaced (glossary: no
 
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
 
-- **Emitted:** ARK `Agent`/`AgentRun`/`Sandbox-handoff`/`MemoryStore`-related lifecycle events under **`platform.lifecycle.*`** (created/started/paused/resumed/completed/failed/deleted — interface-contract §2). Audit-relevant ARK actions also emit under **`platform.audit.*`** via the audit adapter.
+- **Emitted:** ARK `Agent`/`AgentRun`/`Sandbox-handoff`/`MemoryStore`-related lifecycle events under **`platform.lifecycle.*`** (created/started/paused/resumed/completed/failed/deleted — interface-contract §2). Audit-relevant ARK actions also emit under **`platform.audit.*`** via the audit adapter; audit emission is gated on the audit-adapter freeze-gate (D-05).
+- **Namespace ownership (QN-03):** A5 (ARK / agent operator) is the **single owner of the `platform.lifecycle` namespace** — A5 authors and registers its schema in B12 (the event catalogue). Consumers (A6 sandbox, dashboards) take an explicit dependency on A5 as the owner and do not co-own it.
+- **Cross-cutting security emission (QN-03):** for any security-relevant lifecycle event ARK detects (e.g. an agent failing admission on a policy cause, an unexpected policy-driven termination), ARK MUST perform its existing local handling AND additionally emit the event to the bus under `platform.security` (schema owned by A7).
 - **Consumed:** ARK reconciles `AgentRun` resources created by Knative event adapters (B8) and Argo Workflow steps (A3); the triggering CloudEvents themselves are consumed by B8 adapters which then create the `AgentRun` (ARK does not subscribe to the broker directly — §6.7, ADR 0001 consequence).
 - Per-event-type **names and schemas** under `platform.lifecycle.*` are **deferred to B12's schema registry** (interface-contract §2, §6). Each event carries `specversion` + `schemaVersion` (ADR 0030/0031). `[PROPOSED — not in source]` concrete event-type names (e.g. an `agentrun` completed type) are not in Canon and must be registered in B12, not coined here.
 
 ### 4.4 Data schemas / connection-secret contracts
 
 - ARK persists no platform-of-record data of its own beyond Kubernetes resource state; agent state/checkpoints live in Postgres via Letta/Memory (§6.3), not in ARK.
-- N/A — no substrate connection-secret is produced by A5 (connection-secret contract per ADR 0041 applies to B4 substrate XRDs, not to ARK).
+- N/A — no substrate connection-secret is produced by A5 (connection-secret contract per ADR 0044 applies to B4 substrate XRDs, not to ARK).
 
 ## 5. OSS-vs-Custom Decision
 

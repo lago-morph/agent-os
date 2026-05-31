@@ -23,8 +23,8 @@ component so other components can emit LLM traces from day one.
 ### 2.1 In scope
 - Langfuse Helm install + values, branding, and operation as a platform service.
 - Backing-store wiring: Langfuse-resident state in the shared Postgres deployment (provisioned
-  via the `XPostgres` substrate XRD, owned by B4); object storage for large payloads via the
-  `XObjectStore` substrate XRD where Langfuse requires it `[PROPOSED — not in source]`.
+  via the `Postgres` substrate XRD, owned by B4); object storage for large payloads via the
+  `ObjectStore` substrate XRD where Langfuse requires it `[PROPOSED — not in source]`.
 - SSO via Keycloak / oauth2-proxy handoff (config owned by B1; A2 exposes the surface).
 - The ingestion endpoint configuration that the agent SDK and LiteLLM callbacks target.
 - `trace_id` correlation contract honored on the receiving side (ADR 0015).
@@ -47,7 +47,7 @@ component so other components can emit LLM traces from day one.
 ## 3. Context & Dependencies
 
 **Upstream consumed:** none (W0 foundation). A2 consumes only the assumed k8-platform baseline
-(Grafana/Prometheus/Loki) and the shared Postgres substrate (via B4's `XPostgres`, available in
+(Grafana/Prometheus/Loki) and the shared Postgres substrate (via B4's `Postgres`, available in
 the foundation band).
 
 **Downstream consumers:**
@@ -74,7 +74,7 @@ the foundation band).
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 A2 defines **no platform CRD**. It consumes:
-- `XPostgres` (XRD, owner B4) — `version`, `size`, `storage`, `connectionSecretRef`,
+- `Postgres` (XRD, owner B4) — `version`, `size`, `storage`, `connectionSecretRef`,
   `substrateClass` — for Langfuse-resident state.
 - `LogLevel` (per-component, ADR 0035) — `componentSelector`, `level`, `traceGranularity`,
   `scope` (component/tenant/eventClass), `expiresAt` — A2 honors this to gate ingest verbosity.
@@ -96,8 +96,8 @@ A2 defines **no platform CRD**. It consumes:
 - Per-event-type names/schemas are owned by **B12's registry** (deferred per interface-contract).
 
 ### 4.4 Data schemas / connection-secret contracts
-- Langfuse Postgres connection consumes the **uniform connection secret** from `XPostgres`:
-  `host`, `port`, `user`, `password`, `dbname` (ADR 0041 canonical shape).
+- Langfuse Postgres connection consumes the **uniform connection secret** from `Postgres`:
+  `host`, `port`, `user`, `password`, `dbname` (ADR 0044 canonical shape).
 - Langfuse internal trace schema is the **upstream product schema** — not a platform-owned
   contract; the only platform-owned invariant is that `trace_id` matches the value Tempo holds
   (ADR 0015).
@@ -115,7 +115,7 @@ A2 defines **no platform CRD**. It consumes:
 - **REQ-A2-01:** A2 SHALL install Langfuse via Helm with platform values (branding, replicas,
   resource sizing via Kustomize overlay) as a single ArgoCD-synced release.
 - **REQ-A2-02:** A2 SHALL persist Langfuse-resident state in the shared Postgres provisioned via
-  the `XPostgres` XRD, consuming the uniform connection secret (host/port/user/password/dbname).
+  the `Postgres` XRD, consuming the uniform connection secret (host/port/user/password/dbname).
 - **REQ-A2-03:** A2 SHALL expose the Langfuse ingestion endpoint such that the agent SDK (B6) and
   LiteLLM callbacks (A1) can post LLM-grade spans to it.
 - **REQ-A2-04:** A2 SHALL store and key LLM-grade traces by the `trace_id` supplied by the
@@ -168,7 +168,7 @@ A2 defines **no platform CRD**. It consumes:
 - **AC-A2-01 (REQ-A2-01):** `helm`/ArgoCD sync brings Langfuse to Ready; pods pass readiness;
   one ArgoCD application owns the release. *(Chainsaw/PyTest)*
 - **AC-A2-02 (REQ-A2-02):** Langfuse connects using only the five connection-secret fields from
-  `XPostgres`; killing/recreating the pod retains traces (state is in Postgres). *(PyTest)*
+  `Postgres`; killing/recreating the pod retains traces (state is in Postgres). *(PyTest)*
 - **AC-A2-03 (REQ-A2-03):** A span POSTed to the configured ingest endpoint with a valid key is
   retrievable in Langfuse. *(PyTest)*
 - **AC-A2-04 (REQ-A2-04):** A span emitted with `trace_id=X` is stored under `trace_id=X` and is
@@ -193,7 +193,7 @@ A2 defines **no platform CRD**. It consumes:
   confirm Langfuse reload behavior during implementation.*
 - **R2 (low):** Per-tenant trace partitioning model in Langfuse is design-time
   `[PROPOSED — not in source]`. Blast radius limited to UI scoping; enforcement floor is RBAC/OPA.
-- **R3 (low):** Object-store need for large payloads (`XObjectStore`) is `[PROPOSED]`; may be
+- **R3 (low):** Object-store need for large payloads (`ObjectStore`) is `[PROPOSED]`; may be
   unnecessary if Postgres suffices.
 - **R4 (med):** `trace_id` correlation is only as good as emitters (A1/B6); an emitter that omits
   `trace_id` breaks correlation (ADR 0015 consequence) — out of A2's control; covered by SDK tests.
@@ -203,7 +203,7 @@ A2 defines **no platform CRD**. It consumes:
   §14.1 (Workstream A deliverables, A2 row, line ~1668).
 - ADR 0015 (Tempo + Langfuse correlated by `trace_id`).
 - ADR 0035 (dynamic log/trace toggle); ADR 0034 (audit pipeline — A2 not a sink);
-  ADR 0031 (CloudEvent taxonomy); ADR 0030 (versioning); ADR 0041 (connection-secret shape).
+  ADR 0031 (CloudEvent taxonomy); ADR 0030 (versioning); ADR 0044 (connection-secret shape).
 - View V6-05 (Observability architecture).
 - Related pieces: A13 (Tempo + Mimir), A1 (LiteLLM emitter), B6 (SDK OTel emission), B10 (Coach),
-  A14 (HolmesGPT toolset consumer), B1 (SSO), B4 (XPostgres/GrafanaDashboard).
+  A14 (HolmesGPT toolset consumer), B1 (SSO), B4 (Postgres/GrafanaDashboard).

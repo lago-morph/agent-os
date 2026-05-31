@@ -23,7 +23,7 @@ F3 verifies and documents a seam ADR 0024 deliberately left open: the companion 
 
 ### 3.1 Upstream that must ship first (HARD)
 - **C8** — Knowledge Base RAG indexing pipeline + the major/minor trigger model. Consumed: the trigger/ingest contract F3 verifies the companion targets.
-- **B4** — `XSearchIndex`/`XObjectStore` substrate backing the `platform-knowledge-base` RAGStore.
+- **B4** — `SearchIndex`/`ObjectStore` substrate backing the `platform-knowledge-base` RAGStore.
 
 ### 3.2 Downstream blocked on this
 - None (terminal handoff). F6 references the integration runbook.

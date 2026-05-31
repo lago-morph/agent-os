@@ -93,9 +93,33 @@ Recorded so they are not re-raised.
 ---
 
 ## STILL OPEN (awaiting ruling)
-- **D-11 — Crossplane v1→v2 conformance pass: approach decided, awaiting launch.** ADR handling (standard lifecycle): **mark ADR-0041 `Superseded`**, **create a new ADR** (next free number) for the *Crossplane v2 resource model*, and **move the superseded ADR into an `adr/superseded/` subdirectory** so agents don't read the stale one (the new ADR carries a guard note; the v1 spec/plan for 0041 get the same treatment). Then sweep the corpus (~270 v1 references) to re-express terminology **and** logic (admission, naming, versioning) in v2 terms — re-expression, not blind replace. **This is the one remaining action; plan is in chat, awaiting the go to launch the subagent sweep.**
+
+*(None — all items resolved. D-11 complete; see below.)*
 
 *(Resolved since this list was first written and moved to DECIDED: #24/#25/#26 policy bundle, D-04 memory abstraction, the quota schema, the `system`/`system-mediated` meanings, and the default egress baseline. D-08 wiring is a build-time detail, not a decision; QN-03 resolved; D-09 fixed.)*
+
+---
+
+## COMPLETED (Session 3 — 2026-05-31)
+
+**D-11 — DONE.** Crossplane v1→v2 conformance sweep complete.
+- ADR-0044 (Crossplane v2 resource model) created as source + spec + plan.
+- ADR-0041 marked Superseded; spec/plan moved to `specs/adr/superseded/` + `plans/adr/superseded/`; stubs remain in original locations pointing to ADR-0044.
+- Full corpus swept (A1–A23, B1–B22, C/D/E/F, views V6-01–V6-13, ADRs 0001–0043): zero residual X-prefixed XRD names; zero residual `claim shape`/`claim admission`/`claim API` (Crossplane sense); all `ADR 0041` substrate refs updated to `ADR 0044`. JWT/OIDC "claims" untouched.
+- D-07 (SearchIndex/MongoDocStore/ObjectStore) folded in: listed as v2 composite types in glossary and interface-contract.
+
+**OPS-layer trim — DONE.**
+- OPS2 (DR) + OPS5 (Day-2 ops): retired entirely.
+- OPS1 → quota slice only (#5/#9); OPS3 → ESO+reloader+LiteLLM PushSecret; OPS4 → agent-sandbox isolation (D-08); OPS6 → RBAC granularity (#23).
+
+**All remaining rulings threaded into spec/plan files — DONE.**
+- D-01 (auth modes), D-02 (B19 owns `platform.approval`), D-03 (B3 owns OPA format), D-04 (B11 memory abstraction), D-05 (audit freeze-gate), D-06 (editor ownership), D-08 (egress floor), QN-03 (event-namespace single owners + security bus cross-cutting), observability correction (AlertManager→bus, not direct→HolmesGPT), #5/#9 (quota schema mandatory on TenantOnboarding), #23 (distinct RBAC), #24/#25/#26 (policy bundle: security-team, signing, staged rollout), secrets (ESO+reloader startup gate+LiteLLM PushSecret), D-04 (memory abstraction B11).
+
+**My-scope cleanup — DONE.**
+- QN-02: B workstream canon hashes normalized to 40-char format.
+- QN-04: untestable ACs rewritten in views/specs where found.
+- QN-05: "platform release" ACs reworded or noted as future-version.
+- A21 quota deferral conflict resolved (OQ-A21-5 marked resolved; ADR 0037 note updated).
 
 ---
 

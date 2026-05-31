@@ -2,9 +2,11 @@
 
 > kind: COMPONENT · workstream: B · tier: T0
 > upstream: [] · downstream: [A, B] (non-blocking fan-out) · adrs: [0027, 0002, 0003, 0018, 0016, 0034, 0013, 0030] · views: [6.6]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+B22 consumes `platform.evaluation` as a read-only consumer: it takes an explicit dependency on B14 (owner of the `platform.evaluation` namespace per QN-03) for the schema and does not co-own the namespace.
 
 B22 is a **design specification, not code**: the platform's dedicated **adversarial threat model**.
 The architecture's built-in defense-in-depth is optimized primarily against *unintentional access

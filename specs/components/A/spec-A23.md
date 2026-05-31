@@ -1,14 +1,14 @@
 # SPEC A23 — Kargo promotion fabric
 
 > kind: COMPONENT · workstream: A · tier: T1
-> upstream: [A7, B19] · downstream: [B5] · adrs: [0040, 0017, 0018, 0028, 0034, 0041, 0010, 0033, 0030, 0031, 0039] · views: [6.6, 7.4, 8, 11, 14]
+> upstream: [A7, B19] · downstream: [B5] · adrs: [0040, 0017, 0018, 0028, 0034, 0044, 0010, 0033, 0030, 0031, 0039] · views: [6.6, 7.4, 8, 11, 14]
 > canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
 
 ## 1. Purpose & Problem Statement
 
 v1.0 starts on a single dev cluster (initially kind), scales to dev+staging, then dev+staging+prod as the platform reaches pilot use. ArgoCD is the within-environment GitOps deployer and pre-merge GitHub Actions checks (ADR 0010) catch syntax/schema/policy problems before merge — but neither addresses **promotion**: "what's deployed in dev right now and how it gets to staging" is otherwise buried in branch-and-path conventions and ad-hoc human handoff, with audit trails reconstructed from git-log archaeology. The generalized `Approval` CRD (ADR 0017) provides human gates as a primitive but does not orchestrate environment-to-environment progression.
 
-A23 delivers **Kargo as the v1.0 promotion fabric** (ADR 0040): Helm values + install manifests, GitOps wiring against path-based environment overlays (`envs/dev/`, `envs/staging/`, `envs/prod/`) on a single mainline (no long-lived per-environment branches), Warehouse configuration for candidate commits, and per-Stage verification configs (smoke suites bound to each environment). It **composes** with the `Approval` CRD (B19) for human gates and with OPA (A7) for promotion-action policy. It lands early under the same phased trajectory as HolmesGPT: **single Stage initially**, with staging/prod Stages added as those environments come online. Substrate asymmetry (kind vs AWS) is invisible to Kargo — it promotes uniform claim shapes; Crossplane Compositions (ADR 0041) absorb the difference below the claim layer.
+A23 delivers **Kargo as the v1.0 promotion fabric** (ADR 0040): Helm values + install manifests, GitOps wiring against path-based environment overlays (`envs/dev/`, `envs/staging/`, `envs/prod/`) on a single mainline (no long-lived per-environment branches), Warehouse configuration for candidate commits, and per-Stage verification configs (smoke suites bound to each environment). It **composes** with the `Approval` CRD (B19) for human gates and with OPA (A7) for promotion-action policy. It lands early under the same phased trajectory as HolmesGPT: **single Stage initially**, with staging/prod Stages added as those environments come online. Substrate asymmetry (kind vs AWS) is invisible to Kargo — it promotes uniform XR shapes; Crossplane Compositions (ADR 0044) absorb the difference below the XR layer.
 
 This is the promotion *control plane* for the platform's entire GitOps surface, so it is specified thoroughly with explicit phased-rollout, composition, and recovery semantics.
 
@@ -24,7 +24,7 @@ This is the promotion *control plane* for the platform's entire GitOps surface, 
 - **OPA promotion-action gating (A7)** — OPA gates who can promote what, where, when (fine-grained, including time-of-day windows); promotion-action policies live in the OPA bundle alongside the rest of the Rego (B16).
 - **Identity** — Keycloak OIDC (ADR 0028) for the Kargo UI/API (human users); cluster-OIDC → Keycloak workload identity for the Kargo controller's outbound calls.
 - **Recovery model** — "promote a previous Warehouse commit through the affected Stages" via Kargo (NOT `git revert` on main); git history stays append-only; same verification + approval gates apply to rollback promotions.
-- **Substrate-transparency** — Kargo promotes claim shapes; substrate-asymmetric resources are reconciled by Crossplane Compositions (ADR 0041); kind→AWS promotion is invisible to Kargo.
+- **Substrate-transparency** — Kargo promotes XR shapes; substrate-asymmetric resources are reconciled by Crossplane Compositions (ADR 0044); kind→AWS promotion is invisible to Kargo.
 - **Two-kind integration test setup** (one kind = dev, one = staging) exercising promotion mechanics without AWS, suitable for CI.
 - **Headlamp surface** — deep-link into the Kargo UI per Stage (extends the §11 deep-link inventory). (The Kargo Headlamp **plugin** is B5 — see §2.2.)
 - Standard Workstream A deliverables (§14.1): docs, runbook, alerts, Grafana dashboard, OPA integration, audit emission, Knative trigger flow, HolmesGPT toolset, 3-layer tests, tutorials/how-tos.
@@ -60,7 +60,7 @@ This is the promotion *control plane* for the platform's entire GitOps surface, 
 - **ADR 0018** — RBAC-as-floor / OPA-as-restrictor; OPA gates promotion actions.
 - **ADR 0028** — identity federation: Keycloak OIDC (UI/API), cluster-OIDC workload identity (controller).
 - **ADR 0034** — Kargo promotion actions emit audit through the platform adapter; promotion is a first-class auditable event.
-- **ADR 0041** — substrate asymmetry absorbed by Crossplane Compositions; Kargo promotes claim shapes only.
+- **ADR 0044** — substrate asymmetry absorbed by Crossplane Compositions; Kargo promotes XR shapes only.
 - **ADR 0010 / 0033** — GitHub Actions pre-merge checks complement Kargo; AWS + GitHub are the initial targets.
 - **ADR 0030 / 0031** — versioning + CloudEvent taxonomy.
 - **ADR 0039** — authoring is upstream of Kargo via Headlamp editors; Kargo promotes what was authored/merged.
@@ -71,7 +71,7 @@ This is the promotion *control plane* for the platform's entire GitOps surface, 
 
 - A23 **defines no platform CRD/XRD of its own.** Kargo's own CRDs (Stage, Warehouse, Promotion, etc.) are **upstream Kargo constructs** — `Stage` and `Warehouse` are Canon glossary terms; the others are vendor CRDs. Any Kargo field/kind not in glossary is `[PROPOSED — not in source]` and resolved against upstream Kargo at implementation (consult upstream Kargo docs).
 - **`Approval` (consumed, owner Argo Workflow + B19; namespaced)** — Canon key fields (§6.12, interface-contract §1.5): `requestingAgent`, `actionType`, `actionAttributes`, `defaultLevel`, `evidenceRefs[]`, `decision`, `decidedBy`, `decidedAt`. Kargo *creates* an `Approval` when a Stage needs a human gate and reads `decision`/`decidedBy`/`decidedAt` back. A23 invents no `Approval` fields.
-- **Crossplane claim shapes (consumed, not owned)** — Kargo promotes uniform claim shapes; substrate XRDs (`XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`) and higher-level XRDs are B4-owned (interface-contract §1.6).
+- **Crossplane XR shapes (consumed, not owned)** — Kargo promotes uniform XR shapes; substrate XRDs (`Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore`) and higher-level XRDs are B4-owned (interface-contract §1.6).
 
 ### 4.2 APIs / SDK surfaces
 
@@ -88,7 +88,7 @@ Per-event-type names deferred to B12 (interface-contract §2):
 
 ### 4.4 Data schemas / connection-secret contracts
 
-- **N/A — connection secret:** Kargo is a control-plane install; it provisions no substrate primitive and writes no host/port/user/password/dbname connection secret (interface-contract §4 applies to substrate XRDs). It *promotes* claim shapes whose connection secrets are written by the Crossplane Compositions it triggers (B4), not by Kargo.
+- **N/A — connection secret:** Kargo is a control-plane install; it provisions no substrate primitive and writes no host/port/user/password/dbname connection secret (interface-contract §4 applies to substrate XRDs). It *promotes* XR shapes whose connection secrets are written by the Crossplane Compositions it triggers (B4), not by Kargo.
 - **GitOps repo contract:** single mainline; `envs/dev/`, `envs/staging/`, `envs/prod/` path overlays; promotion mutates the kustomization in `envs/<stage>/` to a new commit hash from the Warehouse (ADR 0040). Per-environment Kustomize overlays handle sizing/replicas only — substrate selection is the Composition's job (§14).
 - **Identity material:** Keycloak OIDC config (UI/API) + cluster-OIDC workload identity (controller); consumes the platform claim schema (§6.9) for OPA promotion-action decisions.
 
@@ -108,7 +108,7 @@ Per-event-type names deferred to B12 (interface-contract §2):
 - **REQ-A23-06:** Promotion actions SHALL be gated by **OPA** (A7) — who can promote what, where, when, including time-of-day windows where configured; promotion-action Rego SHALL live in the platform OPA bundle (B16) (ADR 0040/0018).
 - **REQ-A23-07:** The Kargo UI/API SHALL authenticate human users via **Keycloak OIDC**; the Kargo controller's outbound calls SHALL use **cluster-OIDC → Keycloak workload identity** (ADR 0028/0040).
 - **REQ-A23-08:** Recovery SHALL be performed by **promoting a previous Warehouse commit through the affected Stages** via Kargo — NOT `git revert` on main; the same per-Stage verification + approval gates SHALL apply to a rollback promotion (ADR 0040).
-- **REQ-A23-09:** Kargo SHALL promote **uniform claim shapes** only; substrate-asymmetric resources SHALL be reconciled by Crossplane Compositions (ADR 0041), making kind→AWS promotion invisible to Kargo (ADR 0040/0041).
+- **REQ-A23-09:** Kargo SHALL promote **uniform XR shapes** only; substrate-asymmetric resources SHALL be reconciled by Crossplane Compositions (ADR 0044), making kind→AWS promotion invisible to Kargo (ADR 0040/0044).
 - **REQ-A23-10:** Every promotion action SHALL emit a structured audit event through the **platform audit adapter** (ADR 0034) — promotion is a first-class auditable event.
 - **REQ-A23-11:** A23 SHALL provide a **two-kind integration test setup** (one kind = dev, one = staging) exercising promotion mechanics without AWS, suitable for CI (ADR 0040).
 - **REQ-A23-12:** A23 SHALL register a **Headlamp deep-link per Stage** into the Kargo UI surfacing current promotion state, verification results, and manual-promotion controls (the deep-link inventory in §11), while the Kargo Headlamp *plugin* is delivered by B5 (ADR 0040/§14.2).
@@ -117,12 +117,12 @@ Per-event-type names deferred to B12 (interface-contract §2):
 
 ## 7. Non-Functional Requirements
 
-- **Security / multi-tenancy (§6.9, §6.6):** The CI/CD + promotion path is a privileged component (merge-trigger access to GitOps reconciliation). Promotion actions are OPA-gated (RBAC-as-floor / OPA-as-restrictor, ADR 0018); controller uses scoped workload identity (no long-lived static creds, consistent with §8 security-first design). Promotion across tenants/environments respects claim scope.
+- **Security / multi-tenancy (§6.9, §6.6):** The CI/CD + promotion path is a privileged component (merge-trigger access to GitOps reconciliation). Promotion actions are OPA-gated (RBAC-as-floor / OPA-as-restrictor, ADR 0018); controller uses scoped workload identity (no long-lived static creds, consistent with §8 security-first design). Promotion across tenants/environments respects XR scope.
 - **Observability (§6.5):** Promotion actions audited (REQ-A23-10); Grafana dashboard surfaces Stage health, verification pass/fail, in-flight promotions; `LogLevel` (ADR 0035) toggles Kargo-component verbosity per the platform pattern.
 - **Auditability:** Kargo's promotion record is the system of record for "what's deployed where" and the rollback handle (ADR 0040) — git history stays append-only.
 - **Scale / phasing:** Single-Stage v1.0 deliberately builds the muscle before it is load-bearing; the design must accept additional Stages additively without rework (ADR 0040). The trigger to add the third (prod) Stage is "v1.0 feature-complete and ready for real workloads."
 - **Versioning (ADR 0030):** Kargo version pinned + tested; Kargo's own CRD/API versioning is the vendor's; any A23-owned config surface follows the per-component model.
-- **Substrate parity caveat:** promotion across substrates is *shape*-uniform but runtime behaviour may differ per substrate (ADR 0041 capability-parity caveat) — the design must not assume identical runtime behaviour kind vs AWS.
+- **Substrate parity caveat:** promotion across substrates is *shape*-uniform but runtime behaviour may differ per substrate (ADR 0044 capability-parity caveat) — the design must not assume identical runtime behaviour kind vs AWS.
 
 ## 8. Cross-Cutting Deliverable Checklist
 
@@ -152,7 +152,7 @@ Per §14.1 (ADR 0040 explicitly states standard deliverables apply):
 - **AC-A23-06** (REQ-A23-06): A promotion action denied by an OPA promotion-action policy (e.g. outside a time-of-day window) is blocked; an allowed one proceeds.
 - **AC-A23-07** (REQ-A23-07): The Kargo UI authenticates a human via Keycloak OIDC; the controller's outbound call uses cluster-OIDC workload identity (no static credential present).
 - **AC-A23-08** (REQ-A23-08): Rolling back by promoting a previous Warehouse commit re-runs the Stage verification + approval gates and does not require a `git revert` on main; git history remains append-only.
-- **AC-A23-09** (REQ-A23-09): Promoting a claim that resolves to different substrates (kind vs AWS) succeeds with an identical claim shape; the Composition absorbs the difference.
+- **AC-A23-09** (REQ-A23-09): Promoting an XR that resolves to different substrates (kind vs AWS) succeeds with an identical XR schema; the Composition absorbs the difference.
 - **AC-A23-10** (REQ-A23-10): Every promotion action emits a `platform.audit.*` event via the adapter, reconstructable as a promotion record.
 - **AC-A23-11** (REQ-A23-11): The two-kind setup (dev + staging) promotes a candidate dev→staging in CI without AWS.
 - **AC-A23-12** (REQ-A23-12): A Headlamp deep-link per Stage opens the Kargo UI showing current promotion state + verification results for that Stage.
@@ -171,6 +171,6 @@ Per §14.1 (ADR 0040 explicitly states standard deliverables apply):
 ## 11. References
 
 - architecture-overview.md §6.6 (security/policy); §7.4 (developer iteration via GitOps, lines 1223–1225 — Kargo on top of within-env loop, recovery model); §8 (CI/CD integration, lines 1364–1388 — pre-merge checks complement Kargo's runtime gates); §11 (Headlamp deep-link inventory, line 1550 — Kargo deep-link per Stage); §14 promotion model (lines 1645 — promotion via Kargo, phased Stage trajectory, substrate via Crossplane, overlays = sizing/replicas only); §14.1 A23 (line 1689); §14.2 B5 (line 1699); §5 (Kargo install + config, line 160).
-- ADR 0040 (Kargo as v1.0 promotion fabric — primary). ADR 0017 (`Approval` CRD). ADR 0018 (RBAC-floor / OPA-restrictor — OPA gates promotion). ADR 0028 (identity federation — Keycloak OIDC + cluster-OIDC). ADR 0034 (audit emission). ADR 0041 (substrate abstraction). ADR 0010 (GitHub Actions pre-merge). ADR 0033 (AWS + GitHub targets). ADR 0030 (versioning). ADR 0031 (CloudEvent taxonomy). ADR 0039 (Headlamp editors upstream of Kargo).
+- ADR 0040 (Kargo as v1.0 promotion fabric — primary). ADR 0017 (`Approval` CRD). ADR 0018 (RBAC-floor / OPA-restrictor — OPA gates promotion). ADR 0028 (identity federation — Keycloak OIDC + cluster-OIDC). ADR 0034 (audit emission). ADR 0044 (substrate abstraction). ADR 0010 (GitHub Actions pre-merge). ADR 0033 (AWS + GitHub targets). ADR 0030 (versioning). ADR 0031 (CloudEvent taxonomy). ADR 0039 (Headlamp editors upstream of Kargo).
 - Related pieces: A7 (OPA), B19 (approval system), B5 (Kargo Headlamp plugin), B4 (Crossplane Compositions), B16 (OPA policy content), B9 (`agent-platform` CLI / `promote`), B15 (CI/CD reference pipeline), A18 (audit adapter).
 - _meta/interface-contract.md §1.5 (`Approval` fields), §1.6 (substrate XRDs), §2 (CloudEvent taxonomy), §4 (connection-secret — N/A here). _meta/waves.md (B19→A23→B5 cycle resolution, A23 = W4).

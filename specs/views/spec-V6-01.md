@@ -47,7 +47,7 @@ ADR decisions honored:
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 The gateway slice consumes (does not own) these B13-reconciled CRDs:
-- `MCPServer` — `endpoint`, `authMode` (system/user-cred), `credentialsRef`, `tags`, `scopes`, `visibility`.
+- `MCPServer` — `endpoint`, `authMode` (system/system-mediated; `user-cred` retired per D-01), `credentialsRef`, `tags`, `scopes`, `visibility`.
 - `A2APeer` — `endpoint`, `direction` (internal/external), `auth`, `tags`.
 - `RAGStore` — `backend`, `indexes[]`, `contentSourceRefs[]`, `ingestionPipelineRef`.
 - `EgressTarget` — `fqdn`, `port`, `scheme`, `allowedMethods`.
@@ -65,13 +65,13 @@ All namespaced; versioning per ADR 0030; owner of versioning lifecycle = B13.
 - LiteLLM admin API (the reconciliation target of B13) — HTTP, URL-path versioned (`/v1/...`) per interface-contract §3.3.
 - Platform SDK model-invocation / `rag.*` / A2A-registration helpers terminate here (owned by B6; consumed, not defined, by this view).
 
-### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
-Emitted by the gateway slice (per-event-type names deferred to B12 registry):
-- `platform.gateway.*` — routing decisions, provider failover, MCP health changes, A2A handoffs.
-- `platform.audit.*` — request/response, MCP calls, A2A handoffs (via the audit adapter).
-- `platform.policy.*` — OPA decisions and dynamic-registration accept/deny from the callback path.
-- `platform.capability.*` — capability-registry changes reconciled by B13 (`platform.capability.changed`, ADR 0013).
-- `platform.observability.*` — budget-exceeded notification trigger (the v1.0 budget-exceeded → email flow originates as a LiteLLM callback CloudEvent).
+### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031; single owner per namespace, QN-03)
+Emitted by the gateway slice (per-event-type names deferred to B12 registry). Each `platform.*` namespace has exactly one owner (QN-03); the gateway owns only `platform.gateway.*` and otherwise emits into namespaces owned elsewhere:
+- `platform.gateway.*` (owner **A1**, the LiteLLM gateway) — routing decisions, provider failover, MCP health changes, A2A handoffs.
+- `platform.audit.*` (owner **A18**, audit endpoint) — request/response, MCP calls, A2A handoffs (via the audit adapter).
+- `platform.policy.*` (owner **A7**, OPA engine) — OPA decisions and dynamic-registration accept/deny from the callback path.
+- `platform.capability.*` (owner **B13**, kopf operator) — capability-registry changes reconciled by B13 (`platform.capability.changed`, ADR 0013).
+- `platform.observability.*` (owner **A13**, Tempo + Mimir) — budget-exceeded notification trigger (the v1.0 budget-exceeded → email flow originates as a LiteLLM callback CloudEvent published into the A13-owned namespace).
 
 ### 4.4 Data schemas / connection-secret contracts
 - MCP/A2A/RAG registry is internal LiteLLM state, populated only by B13 reconciliation — `[PROPOSED — not in source]` for any field beyond the CRD-stated set.

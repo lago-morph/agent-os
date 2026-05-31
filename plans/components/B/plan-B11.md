@@ -5,12 +5,14 @@
 > upstream-pieces: [A10] · downstream-pieces: []
 
 ## 1. Implementation Strategy
+
+B11 owns the abstract memory interface (D-04); concrete providers (Letta first) are subclasses behind that abstraction. Memory is not a Crossplane substrate resource (no XR); provider connection details are negotiated at design time and not pinned in Canon.
 Build a **thin adapter** that is the single seam between Letta (A10) and the platform's memory
 contract (ARK's `Memory` CRD + the SDK `memory.*` surface from B6). Localize every Letta-specific
 assumption so a future backend swap is a B11 re-implementation, not a platform change (ADR 0005).
 Enforce the per-store **access modes** at the backend boundary (private/namespace-shared
 structurally; RBAC/OPA-controlled via RBAC-floor + OPA-restrictor). Consume the **B4-composed
-`MemoryStore` + uniform connection secret** (ADR 0041) so the adapter never branches on substrate.
+`MemoryStore` + uniform connection secret** (ADR 0044) so the adapter never branches on substrate.
 Because the `memory.*` signatures are B6-owned and not yet fixed, build against a **fake backend +
 fake SDK seam** first and converge with B6.
 

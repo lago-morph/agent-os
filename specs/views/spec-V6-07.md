@@ -18,13 +18,13 @@ The problem it solves: an agent platform must route events between many producer
 - The adapter invariant: adapters are pure field-mapping services with no decision logic (CloudEvent → `AgentRun` CR; CloudEvent → Argo Workflow).
 - The CloudEvent taxonomy invariant: the closed set of ten top-level namespaces; every emitted event falls under exactly one; schemas live in B12's registry (ADR 0031).
 - Event versioning: CloudEvents `specversion` + per-event-type `schemaVersion`; backward-compatible additions bump minor; breaking changes mint a new event type (ADR 0030/0031).
-- The two initial v1.0 trigger flows: AlertManager → HolmesGPT; budget-exceeded → email user.
+- The two initial v1.0 trigger flows: AlertManager-alert (published on the bus under `platform.observability` by A13) consumed via the bus by HolmesGPT; budget-exceeded → email user. There is no direct AlertManager → HolmesGPT wire — alert delivery is bus-mediated.
 - Mattermost bidirectional integration via Knative Eventing with OPA-driven Trigger filtering, generic chat-platform driver pattern (ADR 0036).
 
 ### 2.2 Out of scope (and where it lives instead)
 - CloudEvent per-event-type names and concrete schemas — component B12 registry (deferred per ADR 0031).
 - The CloudEvent schema-registry implementation — component B12 (consumed, not defined here).
-- HolmesGPT self-management behavior on receipt of AlertManager events — view V6-10.
+- HolmesGPT self-management behavior on receipt of bus-delivered alert events — view V6-10.
 - Budget enforcement / `BudgetPolicy` semantics — view V6-06 (the budget-exceeded CloudEvent originates from a LiteLLM callback).
 - ARK `AgentRun` reconciliation — view V6-02 (the adapter only creates the CR).
 - Argo Workflows engine — component A3 (the adapter only submits the workflow).
@@ -41,7 +41,7 @@ ADR decisions honored:
 - **ADR 0004** — NATS JetStream as the Knative broker backend.
 - **ADR 0023** — Knative broker is in the architecture; sources are environment-specific by design (documented exception to substrate abstraction).
 - **ADR 0030** — versioning policy: event versioning carries `schemaVersion`; breaking changes mint new event types.
-- **ADR 0031** — CloudEvent top-level type taxonomy: closed set of ten namespaces; introducing a new namespace is a breaking change requiring a new ADR.
+- **ADR 0031** — CloudEvent top-level type taxonomy: closed set of ten namespaces, **one owner per namespace** (QN-03); introducing a new namespace is a breaking change requiring a new ADR.
 - **ADR 0036** — two-way Mattermost integration via Knative Eventing as the v1.0 chat-platform pattern.
 
 ## 4. Interfaces & Contracts
@@ -58,12 +58,25 @@ The eventing slice owns no CRDs of its own; Knative `Broker`, `Trigger`, and sou
 - Adapter HTTP services — URL-path versioned (`/v1/...`) per interface-contract §3.3; pure field-mapping, no decision logic.
 - B12 schema registry — Git JSON schemas per event type; external systems subscribe declaratively.
 
-### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
-The closed set of ten top-level namespaces — every platform event falls under exactly one:
-`platform.lifecycle.*`, `platform.audit.*`, `platform.gateway.*`, `platform.policy.*`, `platform.capability.*`, `platform.evaluation.*`, `platform.approval.*`, `platform.observability.*`, `platform.tenant.*`, `platform.security.*`.
+### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031; single owner per namespace, QN-03)
+The closed set of ten top-level namespaces — every platform event falls under exactly one, and each namespace has **exactly one owner** (DECISIONS-LOG QN-03):
+
+| Event namespace | Single owner |
+|---|---|
+| `platform.lifecycle` | A5 (ARK) |
+| `platform.gateway` | A1 (LiteLLM gateway) |
+| `platform.policy` | A7 (OPA engine) |
+| `platform.audit` | A18 (audit endpoint) |
+| `platform.tenant` | A21 (tenant-onboarding reconciler) |
+| `platform.capability` | B13 (kopf operator) |
+| `platform.approval` | B19 (approval system) |
+| `platform.security` | A7 (OPA engine) |
+| `platform.observability` | A13 (Tempo + Mimir) |
+| `platform.evaluation` | B14 (test & eval framework) |
+
 - Per-event-type names within each namespace are design-time per component and deferred to B12's registry.
 - `platform.capability.changed` is the specific capability-change event (ADR 0013).
-- Initial v1.0 flows: AlertManager alerts route in as CloudEvents → Trigger → HolmesGPT; a LiteLLM callback emits a budget CloudEvent (`platform.observability.*`) → Trigger → notification adapter emails the user.
+- Initial v1.0 flows: AlertManager publishes alerts as CloudEvents onto the bus under `platform.observability.*` (owner A13) → Knative Trigger → HolmesGPT (bus-mediated; no direct AlertManager → HolmesGPT wire); a LiteLLM callback emits a budget CloudEvent (`platform.observability.*`) → Trigger → notification adapter emails the user.
 
 ### 4.4 Data schemas / connection-secret contracts
 - Every CloudEvent carries CloudEvents-native `specversion` plus a per-event-type `schemaVersion`; backward-compatible additions bump minor, breaking changes mint a new event type (ADR 0030/0031).
@@ -80,9 +93,9 @@ Each requirement is an **invariant/constraint this view imposes** on every parti
 - **REQ-V6-07-02:** Event sources MUST be environment-specific by design (PingSource, ApiServerSource, AwsSqsSource on AWS, webhook receivers in kind) and are a documented exception to the substrate-abstraction pattern — source kinds MUST NOT be unified behind a Crossplane Composition (ADR 0023). (§6.7, line ~555)
 - **REQ-V6-07-03:** All event filtering MUST happen at the Knative Trigger (declarative, GitOps-able, audited and policy-checked); no filtering logic may live in adapters. (§6.7, line ~602)
 - **REQ-V6-07-04:** Adapters MUST be pure field-mapping services with no decision logic — one creates an `AgentRun` CR, the other submits an Argo Workflow — so every event flows through Knative's audit and policy layer. (§6.7, line ~602)
-- **REQ-V6-07-05:** Every CloudEvent a platform component emits MUST fall under exactly one of the closed set of ten top-level namespaces; introducing a new top-level namespace is a breaking change requiring a new ADR (ADR 0031). (§6.7, lines ~606–620)
+- **REQ-V6-07-05:** Every CloudEvent a platform component emits MUST fall under exactly one of the closed set of ten top-level namespaces, **each owned by exactly one component** (QN-03 ownership table in §4.3); introducing a new top-level namespace is a breaking change requiring a new ADR (ADR 0031). (§6.7, lines ~606–620)
 - **REQ-V6-07-06:** Event schemas MUST live in the B12 Git registry; every event MUST carry CloudEvents `specversion` plus a per-event-type `schemaVersion`; backward-compatible additions bump minor and breaking changes mint a new event type (ADR 0030/0031). (§6.7, line ~621)
-- **REQ-V6-07-07:** The two initial v1.0 trigger flows (AlertManager → HolmesGPT; budget-exceeded → email user) MUST ship to exercise the path end-to-end; each subsequent component MUST design its own trigger flows as a standard deliverable. (§6.7, lines ~623–628)
+- **REQ-V6-07-07:** The two initial v1.0 trigger flows MUST ship to exercise the path end-to-end: (a) AlertManager publishes alerts onto the bus under `platform.observability.*` (owner A13) and HolmesGPT consumes them **via the bus** (no direct AlertManager → HolmesGPT wire); (b) budget-exceeded → email user. Each subsequent component MUST design its own trigger flows as a standard deliverable. (§6.7, lines ~623–628)
 - **REQ-V6-07-08:** Mattermost MUST integrate as a bidirectional surface via Knative Eventing using the same broker + Trigger machinery, with OPA-driven Trigger filtering and a generic chat-platform driver pattern; only Mattermost Team Edition ships in v1.0 (ADR 0036). (§6.7, line ~630)
 
 ## 7. Non-Functional Requirements
@@ -102,7 +115,7 @@ The view holds when:
 - **AC-V6-07-04:** The CloudEvent→`AgentRun` adapter and the CloudEvent→Argo Workflow adapter contain no branching/decision logic (field-mapping only). (→ REQ-04)
 - **AC-V6-07-05:** A conformance check confirms every emitted event type maps to exactly one of the ten namespaces; an attempt to emit outside the set fails the check. (→ REQ-05)
 - **AC-V6-07-06:** Each event type has a schema in B12's registry and carries `specversion` + `schemaVersion`; a backward-compatible change bumps minor and a breaking change appears as a new event type. (→ REQ-06)
-- **AC-V6-07-07:** An AlertManager alert reaches HolmesGPT via a Trigger, and a budget-exceeded LiteLLM callback CloudEvent reaches the email-notification adapter via a Trigger. (→ REQ-07)
+- **AC-V6-07-07:** An AlertManager alert published on the bus under `platform.observability.*` (owner A13) reaches HolmesGPT via a Trigger (bus-mediated, no direct wire), and a budget-exceeded LiteLLM callback CloudEvent reaches the email-notification adapter via a Trigger. (→ REQ-07)
 - **AC-V6-07-08:** A Mattermost message flows in and a platform event flows out through the same broker/Trigger machinery, with OPA deciding channel routing; Team Edition is the deployed tier. (→ REQ-08)
 
 ## 10. Risks & Open Questions

@@ -6,13 +6,13 @@
 
 ## 1. Implementation Strategy
 
-Install Letta unmodified at a pinned version (config + wrap, ADR 0005), namespace-scoped, and wire it to the substrate-abstracted Postgres (system of record) and OpenSearch (reproducible retrieval index) through the connection secrets B4's `XPostgres`/`XSearchIndex` write — never branching on substrate. The non-negotiable invariants to enforce and test are: (1) agents reach Letta only via `memory.*`/the B11 adapter behind the `Memory` CRD; (2) the three `MemoryStore` access modes behave identically regardless of backend; (3) everything Letta writes to OpenSearch is reproducible from Postgres/object storage. Critical path: pin Letta → Postgres wiring → access-mode behavior → audit + reproducibility → deliverables. Build with fakes for A5 `Memory`, B4 XRs, B6 SDK, and B11 adapter until they land.
+Install Letta unmodified at a pinned version (config + wrap, ADR 0005), namespace-scoped, and wire it to the substrate-abstracted Postgres (system of record) and OpenSearch (reproducible retrieval index) through the connection secrets B4's `Postgres`/`SearchIndex` write — never branching on substrate. The non-negotiable invariants to enforce and test are: (1) agents reach Letta only via `memory.*`/the B11 adapter behind the `Memory` CRD; (2) the three `MemoryStore` access modes behave identically regardless of backend; (3) everything Letta writes to OpenSearch is reproducible from Postgres/object storage. Critical path: pin Letta → Postgres wiring → access-mode behavior → audit + reproducibility → deliverables. Build with fakes for A5 `Memory`, B4 XRs, B6 SDK, and B11 adapter until they land.
 
 ## 2. Ordered Task List
 
 - TASK-01: Select + pin Letta version; author namespace-scoped Helm values/manifests — produces: ArgoCD-syncable Letta install — depends-on: []
-- TASK-02: Wire Letta state to managed Postgres via `XPostgres` connection secret (kind + AWS, no substrate branch) — produces: durable state path — depends-on: [TASK-01]
-- TASK-03: Wire Letta retrieval index to OpenSearch (A11) via `XSearchIndex`; verify reproducibility from primaries — produces: retrieval path + reproducibility test — depends-on: [TASK-01]
+- TASK-02: Wire Letta state to managed Postgres via `Postgres` connection secret (kind + AWS, no substrate branch) — produces: durable state path — depends-on: [TASK-01]
+- TASK-03: Wire Letta retrieval index to OpenSearch (A11) via `SearchIndex`; verify reproducibility from primaries — produces: retrieval path + reproducibility test — depends-on: [TASK-01]
 - TASK-04: Enforce reach-only-via-`memory.*`/adapter (network policy + service exposure) — produces: locked-down access surface — depends-on: [TASK-01]
 - TASK-05: Implement access-mode behavior for private / namespace-shared / RBAC-OPA against `MemoryStore.accessMode` — produces: access-mode matrix — depends-on: [TASK-02, TASK-04]
 - TASK-06: Link audit adapter; emit memory read/write events with identity + access mode; emit `platform.lifecycle.*` via `MemoryStore` lifecycle — produces: audit + lifecycle events — depends-on: [TASK-05]
@@ -25,7 +25,7 @@ Install Letta unmodified at a pinned version (config + wrap, ADR 0005), namespac
 
 ### 3.1 Upstream pieces that must ship first (HARD)
 - **A11** (OpenSearch) — retrieval index host.
-- **B4 `XPostgres`** (effective HARD, `[PROPOSED]` — stated in §6.3/ADR 0005, not in CSV edge) — Postgres system of record.
+- **B4 `Postgres`** (effective HARD, `[PROPOSED]` — stated in §6.3/ADR 0005, not in CSV edge) — Postgres system of record.
 
 ### 3.2 Downstream pieces blocked on this
 - **B11** (memory backend adapter wraps Letta).
@@ -47,7 +47,7 @@ Install Letta unmodified at a pinned version (config + wrap, ADR 0005), namespac
 | AC-A10-11 (Headlamp plugin) | Playwright | memory-store inspector |
 | AC-A10-02/03/04/05/06/09/10/12 | PyTest | substrate-agnostic Postgres start, OpenSearch reproducibility rebuild, lockdown, access-mode matrix, audit attribution, restore, toolset, SDK-matrix entry |
 
-Fakes for not-yet-landed upstreams: A5 `Memory` CRD, B4 `XPostgres`/`XSearchIndex` + connection secrets, B6 SDK `memory.*`, B11 adapter, A18 audit sink, A7/B16 OPA bundle.
+Fakes for not-yet-landed upstreams: A5 `Memory` CRD, B4 `Postgres`/`SearchIndex` + connection secrets, B6 SDK `memory.*`, B11 adapter, A18 audit sink, A7/B16 OPA bundle.
 
 ## 6. PR / Branch Mapping
 

@@ -21,16 +21,17 @@ egress (ADR 0003) are honored by reusing those mechanisms, not re-inventing them
 - TASK-04: Verify kind degraded mode: Postgres-only SoR, batch disabled, no S3 — produces: Chainsaw kind-mode test — depends-on: [TASK-02]
 - TASK-05: Verify OpenSearch advisory: ingest survives OpenSearch outage; index rebuilds from S3/Postgres — produces: PyTest fault-injection test — depends-on: [TASK-02]
 - TASK-06: Verify `platform.audit.*` namespace carriage + distinctness from `platform.security.*` — produces: eventing conformance test — depends-on: [TASK-01]
-- TASK-07: Verify one `AuditLog` claim provisions endpoint + Postgres + (AWS) S3+lifecycle+indexer+batch — produces: Chainsaw XRD test — depends-on: []
+- TASK-07: Verify one `AuditLog` XR provisions endpoint + Postgres + (AWS) S3+lifecycle+indexer+batch — produces: Chainsaw XRD test — depends-on: []
 - TASK-08: Verify endpoint `LogLevel` toggle raises verbosity without caller redeploy; egress traverses Envoy — produces: integration test — depends-on: [TASK-02]
+- TASK-09: Encode the D-05 freeze-gate: assert the audit-adapter interface + `audit_events` schema are frozen and fail any pipeline emitting audit events before the gate passes — produces: CI freeze-gate check — depends-on: [TASK-01]
 
 ## 3. Dependency Map
 ### 3.1 Upstream pieces that must ship first (HARD)
-- B4 — Crossplane Compositions (`XPostgres`, `XObjectStore` that `AuditLog` composes).
+- B4 — Crossplane Compositions (`Postgres`, `ObjectStore` that `AuditLog` composes).
 - A11 — OpenSearch (advisory fanout target).
-- A7 — OPA/Gatekeeper (admits claim only on matching substrate Composition).
+- A7 — OPA/Gatekeeper (admits the XR only on matching substrate Composition).
 ### 3.2 Downstream pieces blocked on this
-- A18 (adapter + endpoint build), B4 (`AuditLog` Composition), A23 (Kargo claim promotion), B12 (`platform.audit.*` schemas).
+- A18 (adapter + endpoint build), B4 (`AuditLog` Composition), A23 (Kargo XR promotion), B12 (`platform.audit.*` schemas).
 ### 3.3 Continuous (non-blocking) inputs
 - B14 test framework (fault-injection harness); F1 (retention policy — attaches to S3 lifecycle later); ADR 0035 toggle mechanism.
 
@@ -46,6 +47,7 @@ TASK-07 runs concurrently with TASK-01. After TASK-02: TASK-03, TASK-04, TASK-05
 - AC-07 → eventing conformance (TASK-06).
 - AC-08 → Chainsaw `AuditLog` XRD provisioning (TASK-07); fake B4 Compositions until B4 lands.
 - AC-09, AC-10 → integration test on endpoint toggle + Envoy egress (TASK-08).
+- AC-11 → freeze-gate (D-05): CI check that the audit-adapter interface + `audit_events` schema are marked frozen and that any pipeline emitting audit events before the gate passes fails (TASK-09).
 
 ## 6. PR / Branch Mapping
 ### 6.1 Stack position — base branch = `wave/authoring`

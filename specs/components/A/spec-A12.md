@@ -1,7 +1,7 @@
 # SPEC A12 — OpenAPI→MCP converter
 
 > kind: COMPONENT · workstream: A · tier: T1
-> upstream: [] · downstream: [] · adrs: [0020, 0041, 0013, 0030, 0034, 0031] · views: [6.8]
+> upstream: [] · downstream: [] · adrs: [0020, 0044, 0013, 0030, 0034, 0031] · views: [6.8]
 > canon-glossary: b0edae10a2e6 · canon-interface: 0ce201d5d5af
 
 ## 1. Purpose & Problem Statement
@@ -61,7 +61,7 @@ consumed by Platform Agents via CapabilitySet inclusion — a runtime relationsh
 - **ADR 0020** — synthetic MCP from OpenAPI is part of the v1.0 capability story; per-service
   details (auth flows, scopes, secret shapes) deferred per backlog §1.11. A12 is generic; A17 owns
   the curated set.
-- **ADR 0041** — `SyntheticMCPServer` is an instance of the composition pattern; A12 honors the XR
+- **ADR 0044** — `SyntheticMCPServer` is an instance of the composition pattern; A12 honors the XR
   contract (`openApiSpecRef`, `authConfigRef`, `mcpServerRef`).
 - **ADR 0013** — the produced synthetic server is an approved capability via `MCPServer` CRD; it
   rides the standard CapabilitySet + OPA governance, no bypass path.
@@ -77,7 +77,7 @@ consumed by Platform Agents via CapabilitySet inclusion — a runtime relationsh
 - A12 **produces/maintains** (but does not define) the `SyntheticMCPServer` (Crossplane XR, owner
   B4) — `openApiSpecRef`, `authConfigRef`, `mcpServerRef` (back-link). A12 fills `mcpServerRef`
   once the synthetic server is registered.
-- A12 **produces** an `MCPServer` (kopf/B13-owned) — `endpoint`, `authMode` (system/user-cred),
+- A12 **produces** an `MCPServer` (kopf/B13-owned) — `endpoint`, `authMode` (`system`/`system-mediated`; the retired `user-cred` mode is not supported, D-01),
   `credentialsRef`, `tags`, `scopes`, `visibility` — for the synthetic server (registered by B13;
   A12 supplies the synthesized endpoint/spec). A12 invents no fields beyond this Canon set.
 - Consumes `LogLevel` (ADR 0035) and delivers a `GrafanaDashboard` XR (B4-owned XRD).
@@ -109,7 +109,7 @@ consumed by Platform Agents via CapabilitySet inclusion — a runtime relationsh
 - **Mode:** **wrap + harden** — custom hardening on top of an OSS converter (§9 OSS-gap table),
   plus configuration-heavy install (per-server specs + auth configs).
 - **Version:** pin the chosen OSS converter version `[PROPOSED — not in source]`.
-- **ADR linkage:** ADR 0020 (synthetic MCP in v1.0), ADR 0041 (`SyntheticMCPServer` composition),
+- **ADR linkage:** ADR 0020 (synthetic MCP in v1.0), ADR 0044 (`SyntheticMCPServer` composition),
   ADR 0013 (approved capability via `MCPServer`).
 - **Rationale:** no production-grade converter exists, so the platform hardens an OSS base rather
   than building from scratch or buying — consistent with the §9 stance.
@@ -200,7 +200,7 @@ consumed by Platform Agents via CapabilitySet inclusion — a runtime relationsh
   §6.8 (capability registries — approved capability, no bypass, lines ~632–685); §6.12
   (`SyntheticMCPServer` XR, line ~968); §9 (OSS-gap table, converter row ~1418); §10.1 (tutorial,
   line ~1444); §14.1 (A12 row, line ~1678).
-- ADR 0020 (initial MCP services / synthetic MCP); ADR 0041 (`SyntheticMCPServer` composition);
+- ADR 0020 (initial MCP services / synthetic MCP); ADR 0044 (`SyntheticMCPServer` composition);
   ADR 0013 (approved capability via `MCPServer`); ADR 0034 (audit); ADR 0031 (CloudEvents);
   ADR 0030 (versioning).
 - View V6-08 (Capability registries and approved primitives).

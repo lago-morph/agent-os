@@ -5,13 +5,13 @@
 > upstream-pieces: [B4, A7, A9] · downstream-pieces: [D1, D2, D3, B10, A14]
 
 ## 1. Implementation Strategy
-ADR 0021 is enforced, not built. The enforcement map: **B4** ships the `GrafanaDashboard` XRD + per-substrate Compositions and is the single owner; **A7 (OPA/Gatekeeper)** supplies the admission constraint and visibility restriction; **A9 (Headlamp)** surfaces XR state. Conformance is tested by proving (a) the XR shape is mandatory, (b) admission rejects malformed/raw dashboards, (c) RBAC+OPA gate visibility, (d) one claim reconciles on kind and AWS. Authoring components (D1/D2/D3, every A component, B10/A14) consume the XR; their conformance is "delivers dashboards only as `GrafanaDashboard` instances."
+ADR 0021 is enforced, not built. The enforcement map: **B4** ships the `GrafanaDashboard` XRD + per-substrate Compositions and is the single owner; **A7 (OPA/Gatekeeper)** supplies the admission constraint and visibility restriction; **A9 (Headlamp)** surfaces XR state. Conformance is tested by proving (a) the XR shape is mandatory, (b) admission rejects malformed/raw dashboards, (c) RBAC+OPA gate visibility, (d) one XR reconciles on kind and AWS. Authoring components (D1/D2/D3, every A component, B10/A14) consume the XR; their conformance is "delivers dashboards only as `GrafanaDashboard` instances."
 
 ## 2. Ordered Task List
 - TASK-01: Map each enforcing piece ID to the REQ it satisfies (B4→REQ-01/02/05/07; A7→REQ-03/04; agents B10/A14→REQ-06) — produces: enforcement matrix — depends-on: []
 - TASK-02: Define Gatekeeper constraint template requiring `dashboardJson`/`folder`/`visibility` — produces: admission test spec — depends-on: [TASK-01]
 - TASK-03: Define visibility OPA conformance scenarios (floor/restrict/cross-ns) — produces: OPA test spec — depends-on: [TASK-01]
-- TASK-04: Define cross-substrate claim-parity scenario — produces: Chainsaw test spec — depends-on: [TASK-01]
+- TASK-04: Define cross-substrate XR-parity scenario — produces: Chainsaw test spec — depends-on: [TASK-01]
 - TASK-05: Define agent-published-dashboard governance scenario — produces: e2e test spec — depends-on: [TASK-02, TASK-03]
 
 ## 3. Dependency Map

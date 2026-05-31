@@ -32,7 +32,7 @@ This is a T0 component: it is the authoring chokepoint for the platform's entire
 - **The policy simulator service itself** (aggregator + per-layer dry-run fan-out) — component A20 / ADR 0038. A22 only consumes its aggregator API.
 - **The OPA bundle content / Rego library** — B3 framework, B16 initial content. A22 edits bundles as artifacts; it does not author policy.
 - **CRD schema ownership / reconcilers** — each owning component (kopf B13 for capability CRDs, ARK A5 for `Agent`, Crossplane B4 for XRDs).
-- **Excluded from the v1.0 editor set:** `BudgetPolicy` (deferred per ADR 0039), `Memory`, `XAgentDatabase` (not in ADR 0039's initial list), and read-only CRDs (`AgentRun`, `Sandbox`, `Approval`, `VirtualKey`) which ship read views only.
+- **Excluded from the v1.0 editor set:** `BudgetPolicy` (deferred per ADR 0039), `Memory`, `AgentDatabase` (not in ADR 0039's initial list), and read-only CRDs (`AgentRun`, `Sandbox`, `Approval`, `VirtualKey`) which ship read views only.
 - **ArgoCD apply / reconcile** — the GitOps deployer; A22 stops at opening the PR.
 
 ## 3. Context & Dependencies
@@ -68,7 +68,7 @@ A22 **defines no CRD of its own.** It renders editors for existing Canon CRDs/XR
 
 | Target | Owner / reconciler | Canon key fields rendered |
 |---|---|---|
-| `MCPServer` | kopf (B13) | `endpoint`, `authMode` (system/user-cred), `credentialsRef`, `tags`, `scopes`, `visibility` |
+| `MCPServer` | kopf (B13) | `endpoint`, `authMode` (`system`/`system-mediated`; `user-cred` retired per D-01), `credentialsRef`, `tags`, `scopes`, `visibility` |
 | `A2APeer` | kopf (B13) | `endpoint`, `direction` (internal/external), `auth`, `tags` |
 | `RAGStore` | kopf (B13) | `backend`, `indexes[]`, `contentSourceRefs[]`, `ingestionPipelineRef` |
 | `EgressTarget` | kopf (B13) | `fqdn`, `port`, `scheme`, `allowedMethods` |
@@ -129,6 +129,9 @@ Per-event-type names within each namespace are deferred to B12's registry (inter
 - **REQ-A22-14:** Plugin actions SHALL be gated by the author's Keycloak claims (`platform_roles`, `tenant_roles`, `platform_namespaces`) in plugin code (§9 Headlamp gating is DIY).
 - **REQ-A22-15:** Every editor authoring action (PR open, simulation run) SHALL emit a structured audit event through the platform audit adapter (ADR 0034) — simulator runs under `platform.policy.*`, PR-submission actions under `platform.audit.*`.
 - **REQ-A22-16:** The `Agent` editor SHALL constrain the `sdk` field to the v1.0 allowed values `langgraph` and `deep-agents` (ADR 0019).
+- **REQ-A22-17 (TenantOnboarding quota editor, #5/#9 — reverses ADR-0037 deferral):** The `TenantOnboarding` editor SHALL require both a `cpu` and a `memory` quota entry before a PR can be opened; each entry SHALL be either a concrete limit OR an explicit `unlimited: true`, and the form SHALL reject submission if either is omitted (mirroring the A21 admission rule). `spec.quotas` SHALL be presented as an **extensible typed list** whose entries each carry a `quotaType` discriminator plus type-specific fields.
+- **REQ-A22-18 (distinct RBAC granularity, #23):** Editor plugin gating SHALL respect the distinct RBAC permissions at the proposed granularity (set-agent-type-default-budget vs per-instance-budget-override vs budget-maintainer; policy-change vs policy-maintain); field-level edit rules native RBAC cannot express are enforced via Gatekeeper (OPA) admission (A7), not by the editor.
+- **REQ-A22-19 (audit freeze-gate, D-05):** The editor's PR-open / simulation-run audit emissions (REQ-A22-15) ride the audit-adapter interface and are gated on the audit-adapter freeze-gate (D-05); the framework consumes event schemas from their owners (A7 policy/security, A18 audit) and co-owns no `platform.*` namespace.
 
 ## 7. Non-Functional Requirements
 

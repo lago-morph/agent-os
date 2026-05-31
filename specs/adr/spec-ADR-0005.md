@@ -20,7 +20,7 @@ ADR 0005 fixes Letta as the memory backend behind ARK's `Memory` CRD. This SPEC 
 - Per-store memory access-mode enforcement semantics — ADR 0025 (declared on `MemoryStore`).
 - `memory.*` SDK method signatures — B6 (not specified in source beyond the named surface).
 - OpenSearch retrieval tier — ADR 0009; Postgres-primary invariant — ADR 0014.
-- `MemoryStore` XR Composition mechanics — B4 / ADR 0041.
+- `MemoryStore` XR Composition mechanics — B4 / ADR 0044.
 
 ## 3. Context & Dependencies
 Upstream consumed: A11 (OpenSearch retrieval tier Letta indexes land in). Downstream consumers: B11 (memory backend adapter) wraps Letta.
@@ -39,7 +39,7 @@ Platform SDK `memory.*` (B6) is the **only** path Platform Agents use to reach L
 `MemoryStore` lifecycle (created/started/paused/resumed/completed/failed/deleted) under `platform.lifecycle.*`. Per-event-type names deferred to B12.
 
 ### 4.4 Data schemas / connection-secret contracts
-Letta state lives in managed Postgres (via the substrate `XPostgres` connection-secret shape: `host`, `port`, `user`, `password`, `dbname`). OpenSearch indexes Letta maintains are reproducible from Postgres/object storage and are never a system of record.
+Letta state lives in managed Postgres (via the substrate `Postgres` connection-secret shape: `host`, `port`, `user`, `password`, `dbname`). OpenSearch indexes Letta maintains are reproducible from Postgres/object storage and are never a system of record.
 
 ## 5. OSS-vs-Custom Decision
 Upstream project: **Letta** (fully OSS), installed as a memory service behind `Memory` CRD; B11 is a thin custom adapter. Mode: install + wrap (B11 adapter) + pin. Rationale per ADR 0005: fully-OSS posture (self-host, no vendor dependency) and OS-style tiered memory model. Rejected: Mem0, Zep/Graphiti, Cognee, LangMem (collective rationale, backlog §2.9). Multi-tenancy gaps mitigated by wrapping behind `Memory` CRD + namespace-scoped instances.
@@ -81,4 +81,4 @@ Decision honored when:
 - ADR 0005 (`adr/0005-letta-memory-backend.md`) — the decision.
 - Enforcing components: A10 (Letta install, owner), B11 (memory backend adapter), B4 (`MemoryStore` XR), B6 (SDK `memory.*` + compat matrix), A11 (OpenSearch indexes), A7 (admission).
 - architecture-overview.md §6.3, §6.7, §6.13, §9; architecture-backlog.md §2.9, §6.
-- Related: ADR 0009, 0014, 0025, 0041, 0002, 0030.
+- Related: ADR 0009, 0014, 0025, 0044, 0002, 0030.

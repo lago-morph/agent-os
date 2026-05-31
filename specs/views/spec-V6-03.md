@@ -1,7 +1,7 @@
 # SPEC V6-03 — Memory and data architecture `[PROPOSED]`
 
 > kind: VIEW · workstream: — · tier: T1
-> upstream: [] · downstream: [] · adrs: [0005, 0009, 0014, 0025, 0033, 0034, 0041] · views: [6.3]
+> upstream: [] · downstream: [] · adrs: [0005, 0009, 0014, 0025, 0033, 0034, 0044] · views: [6.3]
 > canon-glossary: 6aadcc2a4f38 · canon-interface: 54f5ede58e5f
 
 ## 1. Purpose & Problem Statement
@@ -16,7 +16,7 @@ The problem it solves: an agent platform accumulates state across many backends,
 - The reproducibility invariant: every OpenSearch index is re-derivable from a primary (object storage documents, Postgres checkpoints, S3/Postgres audit).
 - The memory access-mode contract on `MemoryStore`: private / namespace-shared / RBAC-OPA (ADR 0025).
 - The Letta memory service path: agent → Platform SDK `memory.*` → Letta → Postgres / OpenSearch / object storage (ADR 0005).
-- The substrate-abstraction contract (ADR 0041): substrate XRDs `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`; one Composition per substrate; uniform connection secret; substrate-agnostic status; label-driven, admission-validated selection.
+- The substrate-abstraction contract (ADR 0044): substrate XRs (Crossplane v2, namespace-scoped) `Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore`; one Composition per substrate; uniform connection secret; substrate-agnostic status; label-driven, admission-validated selection.
 - Dual-mode hosting (ADR 0033): in-cluster on kind, AWS managed on AWS, for Postgres and OpenSearch.
 - The audit-pipeline topology as it touches data stores: Postgres + S3 system of record, OpenSearch advisory fanout (ADR 0034) — wiring to stores only; full observability view is V6-05.
 
@@ -26,14 +26,14 @@ The problem it solves: an agent platform accumulates state across many backends,
 - Full observability / audit-emission view (adapter library, endpoint, dashboards) — view V6-05 / component A18.
 - Memory backend adapter internals — component B11 (consumed, not defined here).
 - Audit retention / redaction policy — Workstream F (F1).
-- `XAgentDatabase` per-agent DB provisioning detail — view V6-01 (initial MCP services) / ADR 0020.
+- `AgentDatabase` per-agent DB provisioning detail — view V6-01 (initial MCP services) / ADR 0020.
 
 ## 3. Context & Dependencies
 
 Realizing components and what each contributes to the slice:
 - **A10 Letta memory backend** — the memory service; persists to Postgres (state) and OpenSearch / object storage as appropriate (ADR 0005).
 - **A11 OpenSearch** — vectors + hybrid search + advisory audit fanout; never a system of record (ADR 0009).
-- **B4 Crossplane v2 Compositions** — owns the substrate XRDs and per-substrate Compositions; writes the uniform connection secret (ADR 0041).
+- **B4 Crossplane v2 Compositions** — owns the substrate XRDs and per-substrate Compositions; writes the uniform connection secret (ADR 0044).
 - **B11 Memory backend adapter** — adapts the Platform SDK `memory.*` surface to Letta.
 
 ADR decisions honored:
@@ -43,22 +43,22 @@ ADR decisions honored:
 - **ADR 0025** — memory access modes (private / namespace-shared / RBAC-OPA) live on `MemoryStore`.
 - **ADR 0033** — initial targets AWS (EKS) and GitHub; dual-mode hosting (kind in-cluster / AWS managed).
 - **ADR 0034** — audit system of record is Postgres + S3; OpenSearch advisory only (wiring to stores).
-- **ADR 0041** — substrate abstraction via Crossplane Compositions; uniform connection-secret contract; admission-validated substrate selection.
+- **ADR 0044** — substrate abstraction via Crossplane v2 Compositions (namespace-scoped XRs, no claims); uniform connection-secret contract; admission-validated substrate selection.
 
 ## 4. Interfaces & Contracts
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 Owned by Crossplane Compositions (B4):
 - `MemoryStore` (XR) — `accessMode` (private / namespace-shared / RBAC-OPA), `backendType` (ADR 0025).
-- `XPostgres` (XRD) — `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: CloudNativePG; AWS: RDS.
-- `XSearchIndex` (XRD) — `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass`. kind: in-cluster OpenSearch; AWS: managed OpenSearch.
-- `XObjectStore` (XRD) — `bucketName`, `lifecycle`, `connectionSecretRef`, `substrateClass`. kind: MinIO or no-op; AWS: S3.
-- `XMongoDocStore` (XRD) — `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: Bitnami MongoDB; AWS: DocumentDB or self-managed.
+- `Postgres` (XR, namespace-scoped) — `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: CloudNativePG; AWS: RDS.
+- `SearchIndex` (XR, namespace-scoped) — `version`, `nodeCount`, `storage`, `connectionSecretRef`, `substrateClass`. kind: in-cluster OpenSearch; AWS: managed OpenSearch.
+- `ObjectStore` (XR, namespace-scoped) — `bucketName`, `lifecycle`, `connectionSecretRef`, `substrateClass`. kind: MinIO or no-op; AWS: S3.
+- `MongoDocStore` (XR, namespace-scoped) — `version`, `size`, `storage`, `connectionSecretRef`, `substrateClass`. kind: Bitnami MongoDB; AWS: DocumentDB or self-managed.
 
 Consumed (owned by ARK, A5):
 - `Memory` — `memoryStoreRef` (binds an agent to a `MemoryStore`; access mode resolved from the store, ADR 0025).
 
-All namespaced; versioning per ADR 0030/0041 (conversion webhooks + deprecation windows on claim-shape changes); owner of versioning lifecycle = B4.
+All namespaced; versioning per ADR 0030/0044 (conversion webhooks + deprecation windows on XR schema changes); owner of versioning lifecycle = B4.
 
 ### 4.2 APIs / SDK surfaces
 - **Platform SDK (B6)** `memory.*` and `rag.*` — the only agent-facing surface for memory and retrieval; `memory.*` adapts to Letta via B11; `rag.*` goes through LiteLLM (defined in V6-01/V6-04; consumed here).
@@ -72,8 +72,8 @@ Emitted by the data slice (per-event-type names deferred to B12 registry):
 ### 4.4 Data schemas / connection-secret contracts
 - **Uniform connection-secret contract (architectural invariant, tested):** every Composition writes `host`, `port`, `user`, `password`, `dbname` (or the equivalent per primitive). Per-primitive field lists beyond these five are not enumerated in source — `[PROPOSED — not in source]` for any addition.
 - **XR status is substrate-agnostic:** `ready`, `endpoint`, `version`; substrate-specific fields (RDS ARN, in-cluster Service paths) are deliberately absent.
-- **Substrate selection:** every cluster carries `platform.io/environment=kind|aws`; a Gatekeeper admission policy rejects any claim with no matching Composition for the cluster's label.
-- **Capability-parity is not promised:** claim shape is consistent; runtime behaviour may differ per substrate (e.g. kind `XObjectStore` may produce "no archive").
+- **Substrate selection:** every cluster carries `platform.io/environment=kind|aws`; a Gatekeeper admission policy rejects any XR with no matching Composition for the cluster's label.
+- **Capability-parity is not promised:** XR schema is consistent; runtime behaviour may differ per substrate (e.g. kind `ObjectStore` may produce "no archive").
 - Audit `audit_events` table is the in-flight Postgres row store; on AWS a ~5-min batch CronJob aggregates rows → immutable S3 object (verified) then deletes Postgres rows; on kind, Postgres alone is the system of record (ADR 0034).
 
 ## 5. OSS-vs-Custom Decision
@@ -86,17 +86,17 @@ Each requirement is an **invariant/constraint this view imposes** on every parti
 - **REQ-V6-03-02:** Anything stored in OpenSearch MUST be reproducible from a primary source — vectors/embeddings re-derivable from object-storage documents, audit indexes re-derivable from S3 (AWS) or Postgres (kind). (§6.3, line ~325)
 - **REQ-V6-03-03:** Every `MemoryStore` MUST declare exactly one access mode — private / namespace-shared / RBAC-OPA — and the platform MUST enforce visibility from that declaration; RBAC-OPA mode follows RBAC-as-floor / OPA-as-restrictor (ADR 0025). (§6.3, lines ~327–333)
 - **REQ-V6-03-04:** Agents MUST reach memory and RAG only through the Platform SDK `memory.*` / `rag.*` surface (memory via Letta, RAG via LiteLLM); no direct backend access. (§6.3, lines ~300–319)
-- **REQ-V6-03-05:** Each substrate-asymmetric primitive MUST be wrapped in one XRD with one Composition per supported substrate (kind + AWS), and both Compositions MUST write the same connection-secret shape (`host`, `port`, `user`, `password`, `dbname` or equivalent) (ADR 0041). (§6.3, line ~339; interface-contract §4)
-- **REQ-V6-03-06:** XR status MUST be substrate-agnostic (`ready`, `endpoint`, `version`); substrate-specific status fields MUST NOT appear in user-visible status (ADR 0041). (§6.3, line ~339; interface-contract §4)
-- **REQ-V6-03-07:** Substrate selection MUST be driven by the `platform.io/environment=kind|aws` label, and Gatekeeper admission MUST reject any claim with no matching Composition for the cluster's label (ADR 0041 + ADR 0002). (§6.3, line ~339)
-- **REQ-V6-03-08:** The v1.0 committed substrate XRDs MUST be `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`; Postgres and OpenSearch MUST be dual-mode hosted (kind in-cluster / AWS managed) (ADR 0033, ADR 0041). (§6.3, lines ~335–339)
+- **REQ-V6-03-05:** Each substrate-asymmetric primitive MUST be wrapped in one XRD with one Composition per supported substrate (kind + AWS), and both Compositions MUST write the same connection-secret shape (`host`, `port`, `user`, `password`, `dbname` or equivalent) (ADR 0044). (§6.3, line ~339; interface-contract §4)
+- **REQ-V6-03-06:** XR status MUST be substrate-agnostic (`ready`, `endpoint`, `version`); substrate-specific status fields MUST NOT appear in user-visible status (ADR 0044). (§6.3, line ~339; interface-contract §4)
+- **REQ-V6-03-07:** Substrate selection MUST be driven by the `platform.io/environment=kind|aws` label, and Gatekeeper admission MUST reject any XR with no matching Composition for the cluster's label (ADR 0044 + ADR 0002). (§6.3, line ~339)
+- **REQ-V6-03-08:** The v1.0 committed substrate XRs MUST be `Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore` (Crossplane v2, namespace-scoped); Postgres and OpenSearch MUST be dual-mode hosted (kind in-cluster / AWS managed) (ADR 0033, ADR 0044). (§6.3, lines ~335–339)
 - **REQ-V6-03-09:** Capability-parity MUST NOT be promised — reduced-capability substrate gaps (e.g. kind no-archive object store) MUST be documented explicitly in the Composition docs, not silent. (§6.3, line ~339)
 
 ## 7. Non-Functional Requirements
 - **Security/multi-tenancy (§6.9):** `MemoryStore` access modes are the per-store isolation boundary; RBAC-OPA mode enforces cross-namespace sharing under the platform-wide enforcement model; all stores are namespaced.
 - **Observability (§6.5):** `MemoryStore` lifecycle emits `platform.lifecycle.*`; data-store audit flows via the adapter into the Postgres + S3 system of record with OpenSearch advisory fanout.
 - **Scale / DR:** AWS RDS provides backup/PITR/replication; DR procedures tested in Workstream F; kind path is functionally complete without cloud services.
-- **Versioning (ADR 0030/0041):** XRD/claim shape changes go through conversion webhooks + deprecation windows; versioning owned per-component by B4.
+- **Versioning (ADR 0030/0044):** XRD / XR schema changes go through conversion webhooks + deprecation windows; versioning owned per-component by B4.
 
 ## 8. Cross-Cutting Deliverable Checklist
 N/A — VIEW (cross-cutting deliverables are owned by realizing components A10, A11, B4, B11).
@@ -107,11 +107,11 @@ The view holds when:
 - **AC-V6-03-02:** Dropping the OpenSearch vector index and re-ingesting from object-storage documents reproduces the index; dropping the audit index and rebuilding from S3 (AWS) / Postgres (kind) reproduces it. (→ REQ-02)
 - **AC-V6-03-03:** A `MemoryStore` in each access mode enforces the expected read/write visibility (private isolates to the writer; namespace-shared visible in-namespace; RBAC-OPA gated by RBAC + OPA). (→ REQ-03)
 - **AC-V6-03-04:** An agent reaching memory/RAG outside the SDK surface has no working path; the only working path is `memory.*` → Letta and `rag.*` → LiteLLM. (→ REQ-04)
-- **AC-V6-03-05:** A `Postgres` claim on kind and on AWS both yield a connection secret with the identical field shape; the agent consumes it without substrate branching. (→ REQ-05)
+- **AC-V6-03-05:** A `Postgres` XR on kind and on AWS both yield a connection secret with the identical field shape; the agent consumes it without substrate branching. (→ REQ-05)
 - **AC-V6-03-06:** The XR status surface exposes only `ready`/`endpoint`/`version`; no RDS ARN or in-cluster Service path leaks into user-visible status. (→ REQ-06)
-- **AC-V6-03-07:** A claim with no matching Composition for the cluster's `platform.io/environment` label is rejected at admission, not at runtime. (→ REQ-07)
-- **AC-V6-03-08:** All four substrate XRDs exist and resolve on both kind and AWS; Postgres and OpenSearch run in-cluster on kind and managed on AWS. (→ REQ-08)
-- **AC-V6-03-09:** The kind `XObjectStore` no-archive gap (and any other reduced-capability gap) is documented in the Composition docs. (→ REQ-09)
+- **AC-V6-03-07:** An XR with no matching Composition for the cluster's `platform.io/environment` label is rejected at admission, not at runtime. (→ REQ-07)
+- **AC-V6-03-08:** All four substrate XRs exist and resolve on both kind and AWS; Postgres and OpenSearch run in-cluster on kind and managed on AWS. (→ REQ-08)
+- **AC-V6-03-09:** The kind `ObjectStore` no-archive gap (and any other reduced-capability gap) is documented in the Composition docs. (→ REQ-09)
 
 ## 10. Risks & Open Questions
 - **OQ-1 (med):** Per-primitive connection-secret field lists beyond `host/port/user/password/dbname` are not in source; resolved in B4 component SPEC (`[PROPOSED — not in source]` for additions).
@@ -121,6 +121,6 @@ The view holds when:
 
 ## 11. References
 - architecture-overview.md §6.3 Memory and data architecture (lines ~294–347); §6.5 (audit pipeline cross-ref); interface-contract.md §1.6 (XRDs), §4 (connection-secret), §5 (audit adapter).
-- ADRs: 0005 (Letta), 0009 (OpenSearch), 0014 (Postgres primary / OpenSearch optimization), 0025 (memory access modes), 0033 (AWS+GitHub targets / dual-mode), 0034 (audit pipeline), 0041 (substrate abstraction).
+- ADRs: 0005 (Letta), 0009 (OpenSearch), 0014 (Postgres primary / OpenSearch optimization), 0025 (memory access modes), 0033 (AWS+GitHub targets / dual-mode), 0034 (audit pipeline), 0044 (substrate abstraction, Crossplane v2).
 - Realizing components: A10 (Letta), A11 (OpenSearch), B4 (Crossplane Compositions), B11 (memory adapter).
 - Related views: V6-01, V6-04, V6-05, V6-06.

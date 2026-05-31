@@ -2,9 +2,11 @@
 
 > kind: COMPONENT · workstream: B · tier: T0
 > upstream: [A1] · downstream: [A17, B16, B17] · adrs: [0006, 0013, 0032, 0030, 0031, 0034, 0018, 0002] · views: [6.8, 6.6, 6.12, 6.13]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+B13 **owns the `platform.capability` event namespace** (QN-03): it authors the `platform.capability.*` CloudEvent schemas and registers them in the event catalogue (B12). Consumers (dashboard, SDK, profile library) take an explicit dependency on B13 and do not co-own the namespace. Any security-relevant event B13 detects (e.g. rejected/unauthorized capability references) MUST also be emitted under `platform.security` (schema owned by A7), in addition to local handling.
 
 B13 is the **custom Python kopf operator** that reconciles the LiteLLM-facing capability, key, and
 budget CRDs into LiteLLM's admin API (and adjacent components) so the platform's capability surface is
@@ -144,7 +146,7 @@ status/condition subresource field names — source states the field *sets* abov
 - B13 reads **`credentialsRef`** (`MCPServer`) and `auth` (`A2APeer`) via **ESO / Kubernetes Secrets**
   — ADR 0006 states the operator implements equivalent secret wiring (ESO / Secrets) since Crossplane's
   connection-secret handling is unavailable for LiteLLM-specific CRDs. It does **not** consume the
-  substrate connection-secret shape (ADR 0041) — that is for cloud-shaped XRs (B4), out of B13's scope.
+  substrate connection-secret shape (ADR 0044) — that is for cloud-shaped XRs (B4), out of B13's scope.
 - B13 owns **no datastore of its own**; state lives in the CRDs (Kubernetes API) and LiteLLM's registry.
 
 ## 5. OSS-vs-Custom Decision

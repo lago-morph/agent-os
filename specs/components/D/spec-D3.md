@@ -27,7 +27,7 @@ Each dashboard is delivered as a namespaced `GrafanaDashboard` Crossplane XR (AD
 ## 3. Context & Dependencies
 
 Upstream consumed:
-- **B4** — `GrafanaDashboard` XRD + Composition + Grafana provider path; D3 manifests are claims against it.
+- **B4** — `GrafanaDashboard` XRD + Composition + Grafana provider path; D3 manifests are namespace-scoped XRs against it (Crossplane v2, ADR 0044).
 - **B14** — the `agent-platform test` framework: the OpenSearch advisory test-result index and OTel metrics D3 queries; pass/fail/per-layer results and run metadata.
 - **A11 (OpenSearch)** — backend hosting the advisory test-result index.
 - **A13 (Tempo + Mimir)** — Mimir hosts OTel test metrics; Grafana data source.
@@ -42,7 +42,7 @@ ADRs honored:
 ## 4. Interfaces & Contracts
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
-- `GrafanaDashboard` (XR, namespaced; XR form `XGrafanaDashboard`) — fields used: `dashboardJson`, `folder`, `visibility`. One XR per dashboard (two total). Version tracks the B4-owned XRD.
+- `GrafanaDashboard` (namespace-scoped XR, Crossplane v2) — fields used: `dashboardJson`, `folder`, `visibility`. One XR per dashboard (two total). Version tracks the B4-owned XRD.
 
 ### 4.2 APIs / SDK surfaces
 - Grafana data-source query APIs against **OpenSearch** (B14 advisory test-result index) and **Mimir** (OTel test metrics). Concrete index field names (test id, layer, outcome, run id, commit, duration) and metric names are **[PROPOSED — not in source]**; source names the index and the dashboards' intent (pass/fail trends, flake detection), not the field identifiers.

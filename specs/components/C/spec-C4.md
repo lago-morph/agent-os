@@ -1,7 +1,7 @@
 # SPEC C4 — Diataxis reference
 
 > kind: COMPONENT · workstream: C · tier: T1
-> upstream: [C1] · downstream: [C8] · adrs: [0019, 0030, 0031, 0034, 0013, 0041, 0008, 0024, 0007] · views: [6.4]
+> upstream: [C1] · downstream: [C8] · adrs: [0019, 0030, 0031, 0034, 0013, 0044, 0008, 0024, 0007] · views: [6.4]
 > canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
 
 ## 1. Purpose & Problem Statement
@@ -31,8 +31,8 @@ information-oriented corpus.
     CRDs (interface-contract §1.4) reasonably documented in the same reference, but are
     `[PROPOSED — not in source]` as members of the §10.3 capability-CRD-reference bullet.
   - Crossplane XR catalog (`MemoryStore`, `AgentEnvironment`, `SyntheticMCPServer`,
-    `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `XAgentDatabase`, `XPostgres`,
-    `XSearchIndex`, `XObjectStore`, `XMongoDocStore`).
+    `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `AgentDatabase`, `Postgres`,
+    `SearchIndex`, `ObjectStore`, `MongoDocStore`).
   - LiteLLM gateway and admin API reference.
   - Platform SDK reference (Python, TypeScript) — the named surfaces `memory.*`, `rag.*`, OTel
     emission, A2A registration helpers.
@@ -89,7 +89,7 @@ ADR decisions honored:
   per-event-type names/schemas are deferred to B12 and recorded as such, not invented.
 - **ADR 0034** — audit event schema reference reflects the Postgres + S3 system of record,
   OpenSearch advisory fanout; retention/redaction deferred to F1.
-- **ADR 0013 / 0041** — capability-CRD and substrate-XRD reference matches the interface contract;
+- **ADR 0013 / 0044** — capability-CRD and substrate-XRD reference matches the interface contract;
   connection-secret reference uses the canonical `host`/`port`/`user`/`password`/`dbname` shape.
 - **ADR 0007** — LibreChat configuration reference documents the locked-down profile.
 - **ADR 0008** — docs-as-code Markdown-in-repo, PR review, re-indexable by C8. **ADR 0024** — vendor
@@ -146,7 +146,7 @@ components. No OSS project is forked, wrapped, or built.
   per-event-type schemas to B12.
 - REQ-C4-06: The connection-secret reference SHALL document the canonical
   `host`/`port`/`user`/`password`/`dbname` shape and the substrate-agnostic status fields
-  `ready`/`endpoint`/`version` (ADR 0041).
+  `ready`/`endpoint`/`version` (ADR 0044).
 - REQ-C4-07: Reference SHALL be version-pinned via C1 per-version builds and document per-component
   versioning ownership (ADR 0030).
 - REQ-C4-08: Reference Markdown SHALL be docs-as-code (in-repo, PR-reviewed, passing the C1 check)
@@ -221,7 +221,7 @@ components. No OSS project is forked, wrapped, or built.
 - architecture-overview.md §6.4 Knowledge Base (`platform-knowledge-base` RAGStore); §6.12 CRD
   inventory; §6.13 versioning; §6.7 eventing.
 - ADR 0019 (LangGraph + Deep Agents, both covered), ADR 0030 (versioning), ADR 0031 (CloudEvent
-  taxonomy), ADR 0034 (audit pipeline / schema), ADR 0013 (capability CRDs), ADR 0041 (substrate
+  taxonomy), ADR 0034 (audit pipeline / schema), ADR 0013 (capability CRDs), ADR 0044 (substrate
   XRDs / connection-secret), ADR 0007 (LibreChat locked-down profile), ADR 0008 (Material for
   MkDocs), ADR 0024 (vendor docs separate).
 - _meta/glossary.md (all CRD/XRD kinds, products, `platform-knowledge-base`).

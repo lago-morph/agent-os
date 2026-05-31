@@ -33,7 +33,7 @@ A4 is **T0, contract-owning** — it owns the broker contract that the CloudEven
 - **Audit endpoint / adapter library** — **A18**; the `platform.audit.*` Trigger sinks into the audit pipeline, but A4 does not own the pipeline.
 - **Mattermost bidirectional bridge + channel-routing OPA filter library** — **A19**.
 - **OPA engine + Rego** — **A7** / **B16**.
-- **Substrate XRD wrapping of the broker** — explicitly **not** wrapped; event sources are documented exceptions to ADR 0041, and NATS itself is the same install both substrates.
+- **Substrate XRD wrapping of the broker** — explicitly **not** wrapped; event sources are documented exceptions to ADR 0044, and NATS itself is the same install both substrates.
 
 ## 3. Context & Dependencies
 
@@ -48,7 +48,7 @@ A4 is **T0, contract-owning** — it owns the broker contract that the CloudEven
 **ADR decisions honored:**
 - **ADR 0004** — NATS JetStream is the broker backend; same install dev + prod; at-least-once delivery → consumers must be idempotent; broker selection is encapsulated below the Trigger layer (swappable without rewriting triggers/adapters).
 - **ADR 0031** — the ten top-level CloudEvent namespaces are an architectural invariant; Triggers filter on namespace prefix; introducing a new top-level namespace is a breaking change requiring a new ADR. Every event carries `specversion` + `schemaVersion`.
-- **ADR 0023** — environment-specific Knative sources are documented exceptions to ADR 0041; A4 does not unify source kinds behind a Composition.
+- **ADR 0023** — environment-specific Knative sources are documented exceptions to ADR 0044; A4 does not unify source kinds behind a Composition.
 - **ADR 0034** — `platform.audit.*` is the namespace the audit adapter consumes into Postgres + S3; OpenSearch indexing is advisory fanout. A4 routes; it does not store.
 - **ADR 0002** — OPA-driven Trigger filtering (e.g. Mattermost channel routing) evaluates against OPA; admission of Knative/Trigger CRs goes through Gatekeeper.
 - **ADR 0030** — CloudEvent schema versioning policy (`specversion` + `schemaVersion`); CRD versioning for any A4-owned config CRDs.
@@ -84,7 +84,7 @@ Consumed: A4 transports **all** namespaces (`platform.lifecycle.*`, `platform.au
 ### 4.4 Data schemas / connection-secret contracts
 
 - JetStream is durable transport, **not** a system of record; events in flight only. The reproducibility invariant (ADR 0014) means anything durable must live in a primary store (Postgres/S3/object) elsewhere.
-- No connection-secret XRD (event sources are documented exceptions to ADR 0041). NATS auth/credentials are install-config. `[PROPOSED — not in source]` NATS client-credential secret shape — not specified.
+- No connection-secret XRD (event sources are documented exceptions to ADR 0044). NATS auth/credentials are install-config. `[PROPOSED — not in source]` NATS client-credential secret shape — not specified.
 
 ## 5. OSS-vs-Custom Decision
 

@@ -12,7 +12,7 @@ This view is realized, not built. The realization map follows the wave layering:
 - **TASK-02:** Confirm environment-specific sources (PingSource/ApiServerSource/AwsSqsSource/webhook) are NOT Crossplane-wrapped (ADR 0023) — produces: source-exception checklist — depends-on: [TASK-01]
 - **TASK-03:** Confirm B8 adapters are pure field-mapping (CloudEvent→`AgentRun` CR; CloudEvent→Argo Workflow) with no decision logic — produces: adapter-purity checklist — depends-on: [TASK-01]
 - **TASK-04:** Confirm B12 registry holds schemas under the closed ten namespaces, every event carries `specversion`+`schemaVersion`, breaking changes mint new event types (ADR 0030/0031) — produces: taxonomy+versioning checklist — depends-on: [TASK-03]
-- **TASK-05:** Confirm the two initial trigger flows (AlertManager→HolmesGPT; budget-exceeded→email) and bidirectional Mattermost with OPA Trigger filtering (ADR 0036) — produces: initial-flows checklist — depends-on: [TASK-02, TASK-03]
+- **TASK-05:** Confirm the two initial trigger flows (AlertManager publishes to the bus under `platform.observability.*` (owner A13) → HolmesGPT consumes via the bus, no direct wire; budget-exceeded→email) and bidirectional Mattermost with OPA Trigger filtering (ADR 0036) — produces: initial-flows checklist — depends-on: [TASK-02, TASK-03]
 - **TASK-06:** Define end-to-end view verification mapping AC-01..08 — produces: view acceptance suite mapping — depends-on: [TASK-04, TASK-05]
 
 ## 3. Dependency Map
@@ -31,7 +31,7 @@ This view is realized, not built. The realization map follows the wave layering:
 ## 5. Test Strategy
 - **Chainsaw (operator/CRD):** Trigger filter change reroutes events via GitOps without adapter changes (AC-03); CloudEvent→`AgentRun` adapter creates the CR (AC-04).
 - **Playwright (UI/e2e):** Mattermost message in / platform event out through the same broker with OPA channel routing (AC-08).
-- **PyTest (logic):** broker parity kind/AWS (AC-01); source not Crossplane-wrapped (AC-02); adapter no-logic assertion (AC-04); namespace-membership conformance + reject-outside-set (AC-05); `specversion`+`schemaVersion` + new-event-type-on-break (AC-06); AlertManager→HolmesGPT + budget→email flows (AC-07).
+- **PyTest (logic):** broker parity kind/AWS (AC-01); source not Crossplane-wrapped (AC-02); adapter no-logic assertion (AC-04); namespace-membership conformance + reject-outside-set (AC-05); `specversion`+`schemaVersion` + new-event-type-on-break (AC-06); bus-mediated alert→HolmesGPT (no direct wire) + budget→email flows (AC-07).
 - Fixtures/fakes: in-memory broker or kind NATS JetStream; fake AlertManager alert; fake LiteLLM budget callback CloudEvent; stub OPA for Trigger filtering; B12 schema fixtures.
 
 ## 6. PR / Branch Mapping

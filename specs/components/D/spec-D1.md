@@ -29,7 +29,7 @@ Each dashboard is delivered as a namespaced `GrafanaDashboard` Crossplane XR (AD
 ## 3. Context & Dependencies
 
 Upstream consumed:
-- **B4** — the `GrafanaDashboard` XRD + Composition + Grafana provider path; D1 manifests are claims against it.
+- **B4** — the `GrafanaDashboard` XRD + Composition + Grafana provider path; D1 manifests are namespace-scoped XRs against it (Crossplane v2, ADR 0044).
 - **A13 (Tempo + Mimir)** — metrics (Mimir) and traces (Tempo) backends queried by panels.
 - **A2 (Langfuse)** — LLM trace/cost data and deep-link target for request-flow and cost dashboards.
 - **A1 (LiteLLM)** — gateway routing/cost/failover metrics and `platform.gateway.*` events.
@@ -52,7 +52,7 @@ ADRs honored:
 ## 4. Interfaces & Contracts
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
-- `GrafanaDashboard` (XR, namespaced; XR form `XGrafanaDashboard`) — fields used: `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled). One XR per dashboard. Version tracks the XRD owned by B4 (per ADR 0030/0041 conversion-webhook policy).
+- `GrafanaDashboard` (namespace-scoped XR, Crossplane v2) — fields used: `dashboardJson`, `folder`, `visibility` (RBAC + OPA-controlled). One XR per dashboard. Version tracks the XRD owned by B4 (per ADR 0030/0044 conversion-webhook policy).
 
 ### 4.2 APIs / SDK surfaces
 - Grafana data-source query APIs against **Mimir** (PromQL), **Tempo** (trace queries), **OpenSearch** (advisory index), and **Langfuse** as panel/deep-link target. Concrete PromQL metric names and OpenSearch index fields are **[PROPOSED — not in source]**; source names the dashboards and their intent, not metric identifiers.

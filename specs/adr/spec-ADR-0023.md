@@ -25,7 +25,7 @@ The problem the decision solves: standardizing one source set across all environ
 - CloudEvent schema registry — component **B12** SPEC; per-event-type names/schemas deferred (ADR 0031, backlog §4).
 - CloudEvent top-level taxonomy itself — **ADR 0031**.
 - The canonical kind-side source pattern ("webhook receivers for everything, synthetic generators, or both") — deliberately left **open** (backlog §5); not fixed here.
-- Substrate abstraction — **ADR 0041**; ADR 0023's source boundary is a documented exception to that pattern.
+- Substrate abstraction — **ADR 0044**; ADR 0023's source boundary is a documented exception to that pattern.
 
 ## 3. Context & Dependencies
 
@@ -38,7 +38,7 @@ ADR decisions honored:
 - **ADR 0031** — the closed CloudEvent taxonomy is the load-bearing contract making the broker uniform across installs.
 - **ADR 0026** — each cluster is an independent install owning its own eventing; sources are per-cluster.
 - **ADR 0033** — AWS source set is shipped/exercised in v1.0; Azure documented-as-supported; kind kept viable without mimicking a cloud.
-- **ADR 0041** — the source shape difference is a documented exception to substrate abstraction.
+- **ADR 0044** — the source shape difference is a documented exception to substrate abstraction.
 
 ## 4. Interfaces & Contracts
 
@@ -54,7 +54,7 @@ N/A — ADR 0023 introduces no CRD/XRD. It governs the placement of Knative `Tri
 - Per-event-type names within each namespace are deferred to B12's registry; `[PROPOSED — not in source]` any concrete event-type name.
 
 ### 4.4 Data schemas / connection-secret contracts
-N/A — no connection secret introduced. Cloud sources (e.g. an SQS-fed flow) configure their own credentials in environment overlays; this is outside the uniform connection-secret contract (ADR 0041) by design.
+N/A — no connection secret introduced. Cloud sources (e.g. an SQS-fed flow) configure their own credentials in environment overlays; this is outside the uniform connection-secret contract (ADR 0044) by design.
 
 ## 5. OSS-vs-Custom Decision
 N/A — ADR. (Enforcement note: the ADR names upstream **Knative** Eventing, **NATS JetStream**, and upstream source kinds; the custom pieces are the **B8** adapters and **B12** registry, which are unchanged across environments. No fork.)
@@ -96,4 +96,4 @@ N/A — ADR (verification map lives in the PLAN). The §14.1 standard set applie
 - architecture-overview.md §6.7 (eventing architecture).
 - architecture-backlog.md §5 (open question: kind-side source pattern).
 - Enforcing/related components: A4 (broker), B8 (adapters), B12 (schema registry), A19 (Mattermost adapter), A14 (HolmesGPT).
-- ADR 0004 (broker backend), 0026 (independent cluster), 0031 (taxonomy), 0033 (AWS target), 0041 (substrate exception).
+- ADR 0004 (broker backend), 0026 (independent cluster), 0031 (taxonomy), 0033 (AWS target), 0044 (substrate exception).

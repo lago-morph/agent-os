@@ -29,7 +29,7 @@ Keycloak runbook. Modelling the tenant as a Crossplane resource makes it a Git-t
 ### 2.2 Out of scope (and where it lives instead)
 - Upstream-IdP mapper authoring — install-administrator responsibility (ADR 0028); only the cluster-OIDC-side mapper is composition-owned.
 - The concrete `platform_roles` catalog — deferred (architecture-backlog §4); the XRD records claim-value→tenant mapping, not role names.
-- Tenant-scoped quotas (max agents, sandboxes, virtual keys, budget, rate limits) — deferred (architecture-backlog §1.2); compose onto the XRD when designed.
+- The per-resource detail of individual quota entries beyond the mandatory `cpu`/`memory` presence rule (additional resource classes such as max agents, sandboxes, virtual keys, budget, rate limits) — deferred (architecture-backlog §1.2); compose onto the XRD when designed. Note: `spec.quotas` *presence* is NOT deferred — it is mandatory (REQ-09/10 below), reversing the earlier deferral.
 - The Headlamp graphical-editor framework itself — owned by ADR 0039 / components A9, A22.
 - Audit retention of archived references — deferred to Workstream F (architecture-backlog §1.13).
 - The tenant-onboarding reconciler/plugin component builds — owned by components A21 (reconciler) and A22/B5 (plugin).
@@ -54,7 +54,10 @@ ADR decisions honored:
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 - **`TenantOnboarding` (XRD)**, namespaced. Source-stated fields: `tenantId`, `namespaces[]`,
-  `defaultServiceAccounts[]`, `clusterOIDCClaimMapping`. Reconciling an instance creates: the tenant's
+  `defaultServiceAccounts[]`, `spec.quotas`, `clusterOIDCClaimMapping`. `spec.quotas` is a **required
+  extensible typed list** of quota entries; the `TenantOnboarding` admission controller MUST verify a
+  `cpu` and a `memory` entry are present (each value is either a concrete limit or `unlimited: true`);
+  omission of either is rejected at admission. Reconciling an instance creates: the tenant's
   Kubernetes namespace (labelled with platform tenancy metadata so OPA/Gatekeeper/observability scoping
   pick it up), the templated default ServiceAccounts (baseline to host Platform Agents, run Sandboxes,
   emit audit events), and a record of which Keycloak claim values map to that tenant (the cluster-OIDC-side
@@ -93,12 +96,14 @@ in the A21 / A22 SPECs.
 - REQ-ADR-0037-06: The Headlamp plugin MUST be the primary onboarding surface and MUST submit changes as Git PRs (form → schema-validate → propose claim-mapping → PR); there MUST be no direct cluster writes from the plugin.
 - REQ-ADR-0037-07: The plugin MAY recommend deploying at least one CapabilitySet at onboarding as a UX prompt only, with no code-level coupling between `TenantOnboarding` and any CapabilitySet.
 - REQ-ADR-0037-08: Offboarding MUST be the inverse: deleting the resource reconciles namespace teardown + ServiceAccount cleanup, archives audit references, and notifies the operator via the standard Headlamp suggestion-card / Mattermost channel; offboarding MUST NOT delete CapabilitySets the tenant referenced.
+- REQ-ADR-0037-09: `TenantOnboarding.spec.quotas` MUST be a required extensible typed list (mandatory presence, reversing the earlier deferral); a `TenantOnboarding` with no `spec.quotas` MUST be rejected at admission.
+- REQ-ADR-0037-10: The `TenantOnboarding` admission controller MUST verify that `spec.quotas` contains both a `cpu` and a `memory` entry; each entry's value MUST be either a concrete limit or `unlimited: true`; omission of either entry MUST be rejected.
 
 ## 7. Non-Functional Requirements
 - Security/multi-tenancy (§6.9): tenancy-labelled namespaces drive OPA/Gatekeeper/observability scoping; identity and capability decoupled by construction in both directions.
 - Auditability: tenant existence and offboarding are Git-tracked, ArgoCD-applied, auditable artifacts; archived audit references survive deletion until the deferred retention policy expires them.
 - GitOps invariant: no direct cluster writes from the plugin — Git is the source of truth.
-- Versioning (ADR 0030): `TenantOnboarding` claim-shape changes are versioning events; quotas compose on later without breaking the shape.
+- Versioning (ADR 0030): `TenantOnboarding` XR schema changes are versioning events; quotas are a required part of the shape (REQ-07/08).
 
 ## 8. Cross-Cutting Deliverable Checklist
 N/A — ADR. The realizing components A21 (reconciler) and A22/B5 (Headlamp plugin) carry the §14.1
@@ -113,9 +118,11 @@ decision is verified per §9.
 - AC-ADR-0037-04: Honored when a Headlamp onboarding submission produces a Git PR (not a cluster write), validated against the XRD schema, with a proposed claim-mapping record. (→ REQ-06)
 - AC-ADR-0037-05: Honored when the CapabilitySet recommendation is shown to be a dismissible UX prompt with no effect on whether the tenant is created. (→ REQ-07)
 - AC-ADR-0037-06: Honored when deleting a `TenantOnboarding` instance tears down the namespace + ServiceAccounts, archives audit references, notifies the operator, and leaves referenced CapabilitySets intact. (→ REQ-08)
+- AC-ADR-0037-07: Honored when applying a `TenantOnboarding` with no `spec.quotas` is rejected at admission, and one with a populated `spec.quotas` is admitted. (→ REQ-09)
+- AC-ADR-0037-08: Honored when a `TenantOnboarding` whose `spec.quotas` omits the `cpu` or `memory` entry is rejected at admission, while one carrying both (each a concrete limit or `unlimited: true`) is admitted. (→ REQ-10)
 
 ## 10. Risks & Open Questions
-- (med) Tenant-scoped quotas are deferred (architecture-backlog §1.2) — a tenant can currently be created without resource bounds; quotas compose onto the XRD when designed.
+- (med) Quota *presence* is now mandatory (REQ-09/10): `spec.quotas` must carry `cpu` and `memory` (concrete or `unlimited: true`) or admission rejects the tenant. Additional per-resource quota classes (max agents, sandboxes, virtual keys, budget, rate limits) remain deferred (architecture-backlog §1.2) and compose onto the list when designed.
 - (low) The `platform_roles` catalog is deferred (architecture-backlog §4); the XRD records claim-value→tenant mapping, not role names.
 - (low) `[PROPOSED]` — whether the reconciler emits `platform.tenant.*` events itself vs. relies on standard lifecycle emission, and plugin/reconciler method signatures, are not specified in source; flagged for A21 / B12 design.
 

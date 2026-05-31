@@ -20,7 +20,7 @@ components, then finalize each multi-component doc with the last component in it
 - TASK-02: ARK CRD reference (`Agent`/`AgentRun`/`Team`/`Tool`/`Memory`/`Evaluation`/`Query`) — produces: reference doc — depends-on: [TASK-01]
 - TASK-03: Sandbox CRD reference (`Sandbox`/`SandboxTemplate`) — produces: reference doc — depends-on: [TASK-01]
 - TASK-04: Capability CRD reference (`MCPServer`/`A2APeer`/`RAGStore`/`EgressTarget`/`Skill`/`CapabilitySet`/`VirtualKey`/`BudgetPolicy`) — produces: reference doc — depends-on: [TASK-01]
-- TASK-05: Crossplane XR catalog (MemoryStore/AgentEnvironment/SyntheticMCPServer/GrafanaDashboard/AuditLog/TenantOnboarding/XAgentDatabase/XPostgres/XSearchIndex/XObjectStore/XMongoDocStore) — produces: reference doc — depends-on: [TASK-01]
+- TASK-05: Crossplane XR catalog (MemoryStore/AgentEnvironment/SyntheticMCPServer/GrafanaDashboard/AuditLog/TenantOnboarding/AgentDatabase/Postgres/SearchIndex/ObjectStore/MongoDocStore) — produces: reference doc — depends-on: [TASK-01]
 - TASK-06: LiteLLM gateway + admin API reference — produces: reference doc — depends-on: [TASK-01]
 - TASK-07: Platform SDK reference (Python/TypeScript; `memory.*`/`rag.*`/OTel/A2A helpers) — produces: reference doc — depends-on: [TASK-01]
 - TASK-08: SDK surface reference — LangGraph + Deep Agents (ADR 0019) — produces: reference doc — depends-on: [TASK-01]

@@ -15,6 +15,7 @@ B5/B19-ui later renders, then the Kargo integration contract and the dry-run sur
 simulator (A20). A UI-less end-to-end acceptance test (REQ-B19-11) is the guard that the split holds.
 
 ## 2. Ordered Task List
+- **TASK-EVT:** Author CloudEvent schemas for `platform.approval.*` and register them in the event catalogue (B12); B19 is the sole owner of the `platform.approval` namespace (D-02 / QN-03).
 - **TASK-01:** Define the `Approval` CRD (namespaced) with source-stated fields + a `status` carrying
   resolved level / workflow ref / timeout deadline `[PROPOSED]` — produces: `Approval` CRD — depends-on: []
 - **TASK-02:** Argo Workflow template beneath each `Approval` (suspend/resume, timeout, decision-emit);
@@ -37,7 +38,7 @@ simulator (A20). A UI-less end-to-end acceptance test (REQ-B19-11) is the guard 
 - **TASK-09:** UI-less end-to-end test (create→elevate→enqueue→decide-via-Argo-resume→emit) proving the
   W3/W4 split (REQ-B19-11) — produces: e2e test — depends-on: [TASK-04, TASK-05, TASK-06]
 - **TASK-10:** CRD versioning (ADR 0030), runbook (stuck/suspended-workflow recovery, timeout tuning),
-  operability `GrafanaDashboard` claim (queue depth / decision latency), alerts, how-tos — produces:
+  operability `GrafanaDashboard` XR (queue depth / decision latency), alerts, how-tos — produces:
   versioning + docs + dashboard — depends-on: [TASK-09]
 
 ## 3. Dependency Map

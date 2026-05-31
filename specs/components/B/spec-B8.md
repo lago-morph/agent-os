@@ -6,6 +6,8 @@
 
 ## 1. Purpose & Problem Statement
 
+B8 is purely a **consumer** of event namespaces: it takes explicit consumer dependencies on the owning components for each namespace it emits to or subscribes from — B13 (`platform.capability`), B19 (`platform.approval`), B14 (`platform.evaluation`), A5 (`platform.lifecycle`), A1 (`platform.gateway`), A7 (`platform.policy`/`platform.security`), A18 (`platform.audit`), A21 (`platform.tenant`), A13 (`platform.observability`). Schemas are authored and registered (in B12) by those owners; B8 never co-owns a namespace. Any security-relevant event the SDK detects MUST also be emitted under `platform.security` (schema owned by A7), in addition to local handling.
+
 Knative Eventing has no native sink for `AgentRun` CRs or for Argo Workflows (§9). B8 supplies the two **thin Python adapter services** that bridge CloudEvents into platform resources: **CloudEvent → AgentRun** (creates an `AgentRun` CR for ARK) and **CloudEvent → Workflow** (submits an Argo Workflow). These are the two initial trigger-flow sinks in the eventing architecture (§6.7 diagram: `ARC[CloudEvent → AgentRun CR]`, `WFC[CloudEvent → Argo Workflow]`).
 
 The adapters are **pure field-mapping services with no decision logic** — all filtering happens upstream at the Knative Trigger (declarative, GitOps-able, audited and policy-checked through Knative), so every event flows through Knative's audit and policy layer rather than through adapter-internal branching (§6.7). Sources differ per environment (AwsSqsSource on AWS, webhook receivers on kind) and are documented exceptions to substrate abstraction (ADR 0023); B8's adapters sit downstream of the Trigger and are source-agnostic.

@@ -23,14 +23,14 @@ documentation-before-implementation / mock-out process. Deliver the §14.1 set.
 - **TASK-06:** Approval-step invocation on scan-then-allow (ADR 0017) — produces: approval wiring — depends-on: [TASK-05].
 - **TASK-07:** OpenAI ↔ A2A adapter (conditional Python service) + install-time selection logic — produces: adapter + selector — depends-on: [TASK-01].
 - **TASK-08:** Streaming preservation validation across OpenAI-compat ↔ A2A — produces: streaming test — depends-on: [TASK-07].
-- **TASK-09:** LibreChat state on `XPostgres` + backup/PITR inheritance — produces: state wiring — depends-on: [TASK-01].
+- **TASK-09:** LibreChat state on `Postgres` + backup/PITR inheritance — produces: state wiring — depends-on: [TASK-01].
 - **TASK-10:** Audit emission of conversation events; dashboard XR + alerts — produces: audit + dashboard/alerts — depends-on: [TASK-02].
 - **TASK-11:** Three-layer tests + docs/runbook/tutorial — produces: tests + docs — depends-on: [TASK-03, TASK-05, TASK-06, TASK-08, TASK-09, TASK-10].
 
 ## 3. Dependency Map
 ### 3.1 Upstream pieces that must ship first (HARD)
 - None declared (W0). Functional bindings (mock until landed): A1 LiteLLM (translation),
-  A5 `Memory` CRD, B4 `XPostgres`, Keycloak baseline, B19 approval, B3/B16 upload OPA bundle.
+  A5 `Memory` CRD, B4 `Postgres`, Keycloak baseline, B19 approval, B3/B16 upload OPA bundle.
 ### 3.2 Downstream pieces blocked on this
 - B1 (SSO/auth proxy in front of LibreChat).
 ### 3.3 Continuous (non-blocking) inputs

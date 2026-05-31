@@ -1,7 +1,7 @@
 # SPEC V6-13 — Versioning policy [PROPOSED]
 
 > kind: VIEW · workstream: — · tier: T0
-> upstream: [] · downstream: [] · adrs: [0030, 0031, 0041] · views: [6.13]
+> upstream: [] · downstream: [] · adrs: [0030, 0031, 0044] · views: [6.13]
 > canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
 
 ## 1. Purpose & Problem Statement
@@ -37,7 +37,7 @@ each component binds to*.
   registry — **component B12**.
 - **Per-component bump/deprecation timing** and the concrete compatibility-matrix contents — each
   owning component's spec + per-product docs (§10.5).
-- Substrate Composition versioning specifics — **ADR 0041 / V6-03** (this view asserts XRDs are
+- Substrate Composition versioning specifics — **ADR 0044 / V6-03** (this view asserts XRDs are
   governed identically to CRDs).
 - The Platform SDK / agent SDK / CLI **method/subcommand surfaces** — components B6 / B7 / B9.
 
@@ -55,8 +55,8 @@ Realizing components — **all CRD/XRD/SDK/CLI/interface/HTTP-API owners** bind 
 ADR decisions honored:
 - **ADR 0030** — the CRD/API versioning policy with per-component ownership (this view's spine).
 - **ADR 0031** — CloudEvent versioning (`specversion` + `schemaVersion`; breaking → mint new type).
-- **ADR 0041** — XRDs are versioned identically to CRDs (conversion webhooks + deprecation windows on
-  both Compositions when a claim shape changes).
+- **ADR 0044** — Crossplane v2 XRDs are versioned identically to CRDs (conversion webhooks + deprecation windows on
+  both Compositions when an XR schema changes).
 
 ## 4. Interfaces & Contracts
 
@@ -64,8 +64,8 @@ ADR decisions honored:
 This view introduces no CRD. It governs the versioning of the entire V6-12 inventory:
 - **CRDs/XRDs:** Kubernetes API versioning (`v1alpha1`, `v1beta1`, `v1`); breaking changes go through
   a **new `vN` API group with conversion webhooks**; `vN-1` is **deprecated for ≥1 minor platform
-  release** before removal. Owner = the reconciler-owning component (V6-12 §3). ADR 0041 applies the
-  same rule to XRDs (both Compositions get conversion webhooks + deprecation windows on a claim-shape
+  release** before removal. Owner = the reconciler-owning component (V6-12 §3). ADR 0044 applies the
+  same rule to Crossplane v2 XRDs (both Compositions get conversion webhooks + deprecation windows on an XR-schema
   change).
 
 ### 4.2 APIs / SDK surfaces
@@ -86,8 +86,8 @@ This view introduces no CRD. It governs the versioning of the entire V6-12 inven
   breaking change requiring a new ADR. Owner = B12 registry; each component owns its event types.
 
 ### 4.4 Data schemas / connection-secret contracts
-The connection-secret shape (ADR 0041) is itself a versioned interface; a breaking change to it is
-governed as an XRD claim-shape change (conversion + deprecation window). Detailed in V6-03.
+The connection-secret shape (ADR 0044) is itself a versioned interface; a breaking change to it is
+governed as an XR-schema change (conversion + deprecation window). Detailed in V6-03.
 
 ## 5. OSS-vs-Custom Decision
 N/A — VIEW. The policy is realized by component-owned versioning machinery (Kubernetes conversion
@@ -174,6 +174,6 @@ The view holds when:
 - architecture-overview.md §6.13 (versioning policy table + component-responsibility, ~L981–1001);
   interface-contract.md §1.1 (CRD versioning), §2 (event versioning), §3 (SDK surfaces).
 - ADR 0030 (CRD + API versioning, per-component ownership), ADR 0031 (CloudEvent versioning),
-  ADR 0041 (XRD versioning parity).
+  ADR 0044 (Crossplane v2 XRD versioning parity).
 - Realizing components: all CRD/SDK owners — A5, A6, B13, B19, B4, B12, B6, B9, B17, B18 + custom-HTTP
   owners. Related views: V6-12 (CRD inventory), V6-07 (eventing taxonomy), V6-03 (substrate/secret).

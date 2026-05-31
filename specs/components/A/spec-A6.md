@@ -87,10 +87,10 @@ A6 **consumes** (does not own) — reconciled by B13 into Envoy config:
 ### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
 
 Emitted (per-event-type names deferred to B12):
-- `platform.audit.*` — every egress connection; Sandbox create/destroy/hibernate.
-- `platform.security.*` — **sandbox-escape signal** (the §6.7 example), repeated egress-policy-bypass attempts.
-- `platform.policy.*` — egress OPA decisions / policy violations (decision authored by OPA; A6 is the egress emit point).
-- `platform.lifecycle.*` — Sandbox lifecycle (created/started/paused/resumed/deleted) — note Sandbox lifecycle is owned by agent-sandbox, **not** ARK (§6.6). `[PROPOSED — not in source]` whether sandbox lifecycle events go under `lifecycle.*` (the namespace covers "Sandbox … lifecycle") vs `audit.*` — both apply per their definitions; B12 fixes per-type names.
+- `platform.audit.*` — every egress connection; Sandbox create/destroy/hibernate. Audit emission is gated on the audit-adapter freeze-gate (D-05).
+- `platform.security.*` — **sandbox-escape signal** (the §6.7 example), repeated egress-policy-bypass attempts. The `platform.security` schema is **owned by A7** (QN-03); A6 is a dependent emitter, not an owner. **Cross-cutting security contract:** for any security-relevant event A6 detects, A6 MUST perform its existing local handling AND additionally emit the event under `platform.security` against A7's schema.
+- `platform.policy.*` — egress OPA decisions / policy violations (schema **owned by A7**; A6 is the egress emit point and a dependent on A7's `platform.policy`, not an owner). A6 is a **consumer of the OPA decision-document format defined by B3** (D-03); it reads OPA decisions but does not own or define the format.
+- `platform.lifecycle.*` — Sandbox lifecycle (created/started/paused/resumed/deleted) — **owned by A5/ARK** (QN-03); A6 takes a dependency on A5 as the owner and does not co-own the namespace. `[PROPOSED — not in source]` whether sandbox lifecycle events go under `lifecycle.*` (the namespace covers "Sandbox … lifecycle") vs `audit.*` — both apply per their definitions; B12 fixes per-type names.
 
 Consumed: `platform.capability.changed` indirectly (Envoy config is updated by B13 reconcile, not by A6 subscribing).
 
@@ -115,7 +115,10 @@ Every event carries `specversion` + `schemaVersion` (ADR 0031/0030).
 - **REQ-A6-02:** Agent pods SHALL run under **gVisor or Kata** kernel isolation as declared by `Sandbox.runtime` / `SandboxTemplate.runtime`.
 - **REQ-A6-03:** A6 SHALL support a warm-pod pool (`SandboxTemplate.warmPoolSize`) and hibernation (`hibernationEnabled`), honoring `resourceLimits`.
 - **REQ-A6-04:** Skills SHALL be delivered into the agent pod via a skill init-container → skill-volume mount (served via LiteLLM's skill gateway).
-- **REQ-A6-05:** A6 SHALL deploy the Envoy egress proxy via Helm as the single chokepoint for all non-LiteLLM agent outbound HTTP; no other egress path to external services SHALL exist for Platform Agents.
+- **REQ-A6-05:** A6 SHALL deploy the Envoy egress proxy via Helm as the single **L7** chokepoint for all non-LiteLLM agent outbound HTTP; no other egress path to external services SHALL exist for Platform Agents.
+- **REQ-A6-05a (two-layer egress, D-08):** Egress control SHALL be expressed in two layers: the sandbox **`NetworkPolicy`** provides an **L3/L4 default-deny baseline** for in-cluster traffic, and **Envoy** provides **L7** control (FQDN / method) for external egress via `EgressTarget`/`CapabilitySet`. `NetworkPolicy` is L3/L4 only — FQDN/method-level enforcement requires Envoy and SHALL NOT be attempted in `NetworkPolicy`. Envoy stays as the L7 egress proxy (NetworkPolicy does not replace it).
+- **REQ-A6-05b (default sandbox egress allow-set, D-08 — a FLOOR, not a ceiling):** The sandbox `NetworkPolicy` SHALL ship a **default allow-set that is a minimum baseline and is explicitly extensible** — it is a starting set, never a closed list, and membership is neither mandatory nor forbidden beyond what is stated. The initial floor is: the LiteLLM gateway (A1), the Envoy egress proxy (A6), the audit endpoint (A18), cluster DNS (CoreDNS), the memory backend (A10), the telemetry/trace collector (A2/OTel), and the event broker (B8). Additional targets are added as design work surfaces them.
+- **REQ-A6-05c (no credential holding, D-01):** Neither the sandbox nor the agent inside it SHALL hold or manage credentials directly; a system agent needing direct access uses a platform-granted **workload identity (service account)**, separate from `authMode`. OAuth credentials are operator-entered secrets via the LiteLLM GUI — there is no OAuth-lifecycle machinery in A6 (D-08).
 - **REQ-A6-06:** Envoy SHALL enforce a per-agent-class FQDN allowlist derived from the agent's resolved `EgressTarget` capabilities (`fqdn`, `port`, `scheme`, `allowedMethods`).
 - **REQ-A6-07:** On each outbound connection Envoy SHALL consult OPA for a runtime decision and SHALL act as a restrictor only (never grant beyond RBAC; ADR 0018).
 - **REQ-A6-08:** Envoy SHALL emit a structured audit event on **every** outbound connection via the platform audit adapter (ADR 0034); A6 SHALL NOT write audit directly to any store.

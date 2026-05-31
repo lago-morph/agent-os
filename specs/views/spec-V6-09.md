@@ -16,7 +16,7 @@ minted by Keycloak (the claim schema is owned by V6-11 / ADR 0029; this view con
 The slice is realized by several components — the `TenantOnboarding` XRD that provisions namespaces
 and ServiceAccounts (B4 Composition, A21 reconciler), the SSO/auth proxy that scopes UI sessions
 (B1), and the policy enforcement that gates cross-tenant calls (OPA via A7/B16). This SPEC does
-**not** build any of them; it fixes the invariants, the spanning claim-consumption contract, the
+**not** build any of them; it fixes the invariants, the spanning XR-API contract, the
 three-layer visibility-enforcement model, and the tenant/capability lifecycle decoupling that each
 participating component must honor so tenancy presents one coherent isolation surface.
 
@@ -89,7 +89,7 @@ Versioning: all follow ADR 0030 (per-component reconciler owns lifecycle).
 
 ### 4.4 Data schemas / connection-secret contracts
 N/A — this view introduces no substrate-backed primitive. Tenant databases are provisioned via
-`XAgentDatabase` (scope `tenant`) under V6-03's data architecture, not here.
+`AgentDatabase` (scope `tenant`) under V6-03's data architecture, not here.
 
 ## 5. OSS-vs-Custom Decision
 N/A — VIEW. Realizing components carry their own OSS-vs-custom decisions (Keycloak per ADR 0028/0029;
@@ -152,15 +152,15 @@ The view holds when:
   OPA-allowed dynamic registration; a denied registration yields no discoverable interface.
 - **AC-V6-09-05** (→REQ-08): A `CapabilitySet` referenced cross-namespace without an OPA-checked
   publication is rejected.
-- **AC-V6-09-06** (→REQ-09): Applying a `TenantOnboarding` claim provisions the namespace(s),
-  default ServiceAccounts wired to the cluster OIDC issuer, and the claim-to-tenant binding.
+- **AC-V6-09-06** (→REQ-09): Applying a `TenantOnboarding` XR provisions the namespace(s),
+  default ServiceAccounts wired to the cluster OIDC issuer, and the tenant onboarding binding.
 - **AC-V6-09-07** (→REQ-10): A tenant can be onboarded with zero CapabilitySets, and a CapabilitySet
   can be removed without re-running onboarding.
 
 ## 10. Risks & Open Questions
 - **[PROPOSED]** This SPEC is `[PROPOSED]` pending Canon review; it coins no new names.
 - **(med)** The concrete `platform_roles` role catalog (`platform-admin`, `operator`, etc.) is
-  design-time; this view fixes only the claim's presence/shape, not the catalog. Routed to V6-11 /
+  design-time; this view fixes only the XR schema's presence, not the catalog. Routed to V6-11 /
   design specs.
 - **(med)** Self-red-team: an agent that registers in a namespace it has admission rights for but
   should not expose cross-tenant — mitigated because REQ-07/06 require OPA to decide both admission

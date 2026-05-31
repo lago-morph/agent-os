@@ -1,20 +1,20 @@
 # SPEC F2 — DR testing
 
 > kind: COMPONENT · workstream: F · tier: T2
-> upstream: [A18, A11, B4, A10, A23] · downstream: [] · adrs: [0034, 0041, 0009, 0014, 0026, 0040] · views: [6.3, 6.5]
+> upstream: [A18, A11, B4, A10, A23] · downstream: [] · adrs: [0034, 0044, 0009, 0014, 0026, 0040] · views: [6.3, 6.5]
 > canon-glossary: b0edae10a2e6 · canon-interface: 0ce201d5d5af
 
 ## 1. Purpose & Problem Statement
 
-F2 is the one-time **disaster-recovery drill** that future-enhancements.md §1 commits to: exercise, on a real substrate, the restore paths for every stateful platform store before v1.0 is declared production-ready. It proves that the platform's stated durability invariants (ADR 0034's Postgres + S3 system of record; ADR 0009/0014's "OpenSearch is rebuildable retrieval optimization, never authoritative"; the ADR 0041 connection-secret contract) actually recover data, not just that they were configured.
+F2 is the one-time **disaster-recovery drill** that future-enhancements.md §1 commits to: exercise, on a real substrate, the restore paths for every stateful platform store before v1.0 is declared production-ready. It proves that the platform's stated durability invariants (ADR 0034's Postgres + S3 system of record; ADR 0009/0014's "OpenSearch is rebuildable retrieval optimization, never authoritative"; the ADR 0044 connection-secret contract) actually recover data, not just that they were configured.
 
 F2 does not build backup/restore *automation* and it does not establish an ongoing DR cadence with measured RTO/RPO — both are explicitly deferred to future-enhancements.md §1. F2 is a verification deliverable: a documented, repeatable drill that runs Postgres restore, OpenSearch reindex from primary sources, cloud secret-store recovery, and a full end-to-end platform restore, capturing observed (not contractual) recovery behavior and feeding any gaps into F6 runbooks.
 
 ## 2. Scope
 
 ### 2.1 In scope
-- **Postgres restore drill**: restore the substrate-managed Postgres (`XPostgres` — RDS on AWS, CloudNativePG on kind) from its backup/snapshot, including the `audit_events`-bearing instance and per-agent/tenant databases (`XAgentDatabase`), verifying the connection-secret contract still resolves post-restore.
-- **OpenSearch reindex drill**: rebuild the OpenSearch (`XSearchIndex`) advisory index from its primary source — S3 archive on AWS, Postgres on kind — proving ADR 0034's "rebuildable" claim and ADR 0009/0014's advisory-only stance.
+- **Postgres restore drill**: restore the substrate-managed Postgres (`Postgres` — RDS on AWS, CloudNativePG on kind) from its backup/snapshot, including the `audit_events`-bearing instance and per-agent/tenant databases (`AgentDatabase`), verifying the connection-secret contract still resolves post-restore.
+- **OpenSearch reindex drill**: rebuild the OpenSearch (`SearchIndex`) advisory index from its primary source — S3 archive on AWS, Postgres on kind — proving ADR 0034's "rebuildable" claim and ADR 0009/0014's advisory-only stance.
 - **Secret recovery drill**: recover secrets from the cloud secret store (AWS Secrets Manager via ESO) and confirm ESO re-injection restores `connection secret` material and MCP-service credentials.
 - **Full restore drill**: a from-cold rebuild of a cluster's platform state — GitOps re-sync (ArgoCD), stateful-store restore, secret recovery, capability-registry reconciliation — to a working platform, on the ADR 0026 independent-cluster topology.
 - **Gap capture**: documented observed recovery behavior + a defect/gap list routed to F6 (runbooks) and future-enhancements.md §1 (automation/cadence).
@@ -22,7 +22,7 @@ F2 does not build backup/restore *automation* and it does not establish an ongoi
 ### 2.2 Out of scope (and where it lives instead)
 - **Backup-restore automation + ongoing DR cadence with RTO/RPO targets** → future-enhancements.md §1 (explicitly deferred).
 - **Cross-region / cross-AZ replication** → future-enhancements.md §1, §10; ADR 0026 (single region per environment in v1.0).
-- **The stateful stores / XRDs themselves** → **B4** (Crossplane Compositions: `XPostgres`, `XSearchIndex`, `XObjectStore`, `XAgentDatabase`, `AuditLog`).
+- **The stateful stores / XRDs themselves** → **B4** (Crossplane Compositions: `Postgres`, `SearchIndex`, `ObjectStore`, `AgentDatabase`, `AuditLog`).
 - **Audit retention/redaction policy that governs what is in the archive** → **F1**.
 - **Multi-cluster federation / failover** → future-enhancements.md §14 (backlog 3.13).
 - **The runbooks themselves** (final form) → **C6 / F6**; F2 produces the *drill record* that F6 verifies has been exercised.
@@ -33,14 +33,14 @@ F2 does not build backup/restore *automation* and it does not establish an ongoi
 - **A18 (audit endpoint + adapter)** — the `audit_events` Postgres table and the S3 archive + OpenSearch indexer whose restore/rebuild F2 exercises; F2 consumes the durability invariants, does not change them.
 - **A11 (OpenSearch)** — the advisory index F2 rebuilds; F2 uses the documented reindex path, not a new one.
 - **A10 (Letta memory backend)** — memory store(s) on Postgres/`MemoryStore` whose restore is part of the full drill.
-- **B4 (Crossplane Compositions)** — owns `XPostgres`, `XSearchIndex`, `XObjectStore`, `XAgentDatabase`; F2 drives their restore behavior and verifies the connection-secret contract (Canon §4) survives restore.
+- **B4 (Crossplane Compositions)** — owns `Postgres`, `SearchIndex`, `ObjectStore`, `AgentDatabase`; F2 drives their restore behavior and verifies the connection-secret contract (Canon §4) survives restore.
 - **A23 (Kargo)** — the promotion fabric whose Git-sourced desired state drives the GitOps half of the full restore.
 
 **Downstream consumers:** none directly; F6 consumes the drill record to confirm DR runbooks were exercised.
 
 **ADRs honored:**
 - **ADR 0034** — Postgres + S3 are the system of record; OpenSearch is rebuildable advisory fanout. F2 *proves* rebuildability and that audit ingestion does not depend on OpenSearch.
-- **ADR 0041** — restore must yield the same substrate-agnostic connection-secret shape (`host`,`port`,`user`,`password`,`dbname`) and status (`ready`,`endpoint`,`version`); kind vs AWS recovery paths differ and are documented per the capability-parity caveat (kind `XObjectStore` may have no archive → reindex source is Postgres).
+- **ADR 0044** — restore must yield the same substrate-agnostic connection-secret shape (`host`,`port`,`user`,`password`,`dbname`) and status (`ready`,`endpoint`,`version`); kind vs AWS recovery paths differ and are documented per the capability-parity caveat (kind `ObjectStore` may have no archive → reindex source is Postgres).
 - **ADR 0009 / 0014** — OpenSearch reindex never makes OpenSearch authoritative; primary source is S3 (AWS) / Postgres (kind).
 - **ADR 0026** — independent-cluster topology, no v1.0 federation; restore is per-cluster.
 - **ADR 0040** — full restore re-syncs Git desired state through ArgoCD/Kargo.
@@ -48,7 +48,7 @@ F2 does not build backup/restore *automation* and it does not establish an ongoi
 ## 4. Interfaces & Contracts
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
-F2 introduces **no new CRD/XRD**. It exercises restore of existing Canon XRDs: `XPostgres`, `XSearchIndex`, `XObjectStore`, `XAgentDatabase`, `AuditLog` (XRD), `MemoryStore` (XR) (Canon §1.6). It asserts post-restore that each XR re-reports `ready`/`endpoint`/`version` and re-writes its connection secret. A declarative `ScheduledTest`/`HealthCheck` XRD for *recurring* drills is **out of scope** (future-enhancements.md §5).
+F2 introduces **no new CRD/XRD**. It exercises restore of existing Canon XRDs: `Postgres`, `SearchIndex`, `ObjectStore`, `AgentDatabase`, `AuditLog` (XRD), `MemoryStore` (XR) (Canon §1.6). It asserts post-restore that each XR re-reports `ready`/`endpoint`/`version` and re-writes its connection secret. A declarative `ScheduledTest`/`HealthCheck` XRD for *recurring* drills is **out of scope** (future-enhancements.md §5).
 
 ### 4.2 APIs / SDK surfaces
 N/A — F2 introduces no API/SDK surface. The drill is orchestrated through the `agent-platform` CLI / test framework (B9/B14) and substrate-native restore tooling (RDS snapshot restore, CloudNativePG restore, ESO resync, ArgoCD sync). `[PROPOSED — not in source]` — the specific CLI subcommand for a DR drill is design-time.
@@ -63,8 +63,8 @@ F2's central assertion is the **connection-secret contract** (Canon §4): after 
 **Verification using substrate-native tooling + the platform test harness — no new build.** Restore uses RDS automated snapshots / point-in-time restore (AWS), CloudNativePG backup restore (kind), ESO resync against AWS Secrets Manager, ArgoCD re-sync, and OpenSearch's documented reindex. Orchestration is **config/wrap** of B9/B14 (drill scripts as test cases). No fork, no new service. Rationale: future-enhancements.md §1 scopes F2 as a *one-time drill*, not automation; building restore machinery would pre-empt the deferred automation work.
 
 ## 6. Functional Requirements
-- **REQ-F2-01:** F2 MUST execute a Postgres restore of the `audit_events`-bearing instance (and at least one `XAgentDatabase`) from substrate backup, and verify row-level data recovery against a pre-drill fixture.
-- **REQ-F2-02:** After Postgres restore, the `XPostgres`/`XAgentDatabase` connection secret MUST resolve to the Canon §4 shape and dependent components MUST reconnect without config change.
+- **REQ-F2-01:** F2 MUST execute a Postgres restore of the `audit_events`-bearing instance (and at least one `AgentDatabase`) from substrate backup, and verify row-level data recovery against a pre-drill fixture.
+- **REQ-F2-02:** After Postgres restore, the `Postgres`/`AgentDatabase` connection secret MUST resolve to the Canon §4 shape and dependent components MUST reconnect without config change.
 - **REQ-F2-03:** F2 MUST rebuild the OpenSearch advisory index from its primary source — S3 on AWS, Postgres on kind — and verify the rebuilt index matches the source record set.
 - **REQ-F2-04:** F2 MUST demonstrate that audit ingestion succeeds while OpenSearch is unavailable/rebuilding (ADR 0034 advisory-only invariant).
 - **REQ-F2-05:** F2 MUST recover platform secrets from the cloud secret store via ESO and confirm re-injection into the consuming workloads (gateway, agents, MCP services).
@@ -75,7 +75,7 @@ F2's central assertion is the **connection-secret contract** (Canon §4): after 
 
 ## 7. Non-Functional Requirements
 - **Security:** secret-recovery drill MUST NOT print recovered secret material to logs/drill records; only success/failure of re-injection is recorded. Restored stores MUST re-apply RBAC/OPA gating before being declared serviceable.
-- **Multi-tenancy (§6.9):** restore MUST preserve tenant/namespace boundaries; an `XAgentDatabase` restore MUST land in the owning tenant's namespace with original `ownerRef`.
+- **Multi-tenancy (§6.9):** restore MUST preserve tenant/namespace boundaries; an `AgentDatabase` restore MUST land in the owning tenant's namespace with original `ownerRef`.
 - **Observability (§6.5):** drill steps MUST be observable (trace/metric/log) so a failed restore is diagnosable; archive-lag / reindex-progress signals reused from F1 where present.
 - **Scale:** reindex drill SHOULD be run against a realistic record count (coordinated with F5 volume numbers) so rebuild time is representative, even though the *time* is recorded informationally only (no RTO target in v1.0).
 - **Versioning (ADR 0030):** restore MUST tolerate a stored backup taken at the then-current CRD/XRD version; if a version skew is found, it is logged as a gap (conversion-webhook coverage), not silently reconciled.
@@ -116,6 +116,6 @@ F2's central assertion is the **connection-secret contract** (Canon §4): after 
 ## 11. References
 - architecture-overview.md §6.3 (data architecture / Postgres-primary, audit dual-mode), §6.5 (observability/audit emission points), §14.6 line 1758 (F2 scope), §6.7 (eventing — OpenSearch-independent audit).
 - future-enhancements.md §1 (one-time DR drill is F2; automation + RTO/RPO + cross-region deferred), §5 (recurring tests deferred), §14 (multi-cluster federation deferred).
-- Canon interface-contract §1.6 (`XPostgres`/`XSearchIndex`/`XObjectStore`/`XAgentDatabase`/`AuditLog`/`MemoryStore`), §4 (connection-secret contract), §5 (audit adapter durability invariants), §2 (`platform.observability.*`).
-- ADR 0034 (system of record + rebuildable OpenSearch + verified-write), ADR 0041 (substrate abstraction + connection secret), ADR 0009/0014 (OpenSearch advisory), ADR 0026 (independent cluster), ADR 0040 (Kargo/GitOps re-sync).
+- Canon interface-contract §1.6 (`Postgres`/`SearchIndex`/`ObjectStore`/`AgentDatabase`/`AuditLog`/`MemoryStore`), §4 (connection-secret contract), §5 (audit adapter durability invariants), §2 (`platform.observability.*`).
+- ADR 0034 (system of record + rebuildable OpenSearch + verified-write), ADR 0044 (substrate abstraction + connection secret), ADR 0009/0014 (OpenSearch advisory), ADR 0026 (independent cluster), ADR 0040 (Kargo/GitOps re-sync).
 - Related pieces: A18, A11, A10, B4, A23, F1, F6.

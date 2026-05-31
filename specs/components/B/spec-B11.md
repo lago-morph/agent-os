@@ -1,10 +1,12 @@
 # SPEC B11 — Memory backend adapter
 
 > kind: COMPONENT · workstream: B · tier: T1
-> upstream: [A10] · downstream: [] · adrs: [0005, 0025, 0014, 0016, 0018, 0030, 0034, 0041] · views: [6.3, 6.2]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> upstream: [A10] · downstream: [] · adrs: [0005, 0025, 0014, 0016, 0018, 0030, 0034, 0044] · views: [6.3, 6.2]
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+B11 **owns the abstract memory interface** (D-04): each provider (Letta first) is a concrete subclass behind that abstraction. Connection details are negotiated at design time with the provider and are intentionally NOT pinned in Canon; concrete connection-secret field lists live behind the B11 abstraction. No other component owns the memory interface.
 
 B11 is the **thin memory backend adapter** that wraps Letta-specific calls behind the platform's
 stable memory contract (ADR 0005: "a thin memory backend adapter (B11) wraps Letta-specific
@@ -35,13 +37,13 @@ enforces the per-store **access modes** (ADR 0025) at the backend boundary.
 - **Namespace-scoped Letta instances** (the §9 multi-tenancy mitigation for Letta).
 - **Audit emission** for memory reads/writes attributed to agent identity + store mode (ADR 0025,
   ADR 0034).
-- Consuming the `MemoryStore` **connection secret** (uniform shape, ADR 0041) rather than
+- Consuming the `MemoryStore` **connection secret** (uniform shape, ADR 0044) rather than
   hand-wiring Letta to a database.
 
 ### 2.2 Out of scope (and where it lives instead)
 - **Letta install / operation / Helm** → **A10** (Letta memory backend).
-- **The `MemoryStore` XR + per-substrate Compositions + `XPostgres`/`XSearchIndex`/`XObjectStore`**
-  → **B4** (Crossplane Compositions, ADR 0041). B11 *consumes* the composed store + connection secret.
+- **The `MemoryStore` XR + per-substrate Compositions + `Postgres`/`SearchIndex`/`ObjectStore`**
+  → **B4** (Crossplane Compositions, ADR 0044). B11 *consumes* the composed store + connection secret.
 - **The `Memory` CRD definition** → **ARK / A5** (`Memory.memoryStoreRef`); B11 implements the
   backend behind it.
 - **The SDK `memory.*` method surface** → **B6** (Platform SDK). B11 is the backend the SDK targets.
@@ -70,7 +72,7 @@ that uses memory reaches B11 *through* the SDK/`Memory` CRD, but no build piece 
   no platform-wide override.
 - **ADR 0014** — Postgres is the system of record; OpenSearch retrieval indexes must be reproducible.
 - **ADR 0016 / 0018** — namespace-as-tenant; RBAC-floor / OPA-restrictor for the RBAC/OPA mode.
-- **ADR 0041** — substrate abstraction: B11 consumes the composed store + uniform connection
+- **ADR 0044** — substrate abstraction: B11 consumes the composed store + uniform connection
   secret (`host`/`port`/`user`/`password`/`dbname`), never branching on kind-vs-AWS.
 - **ADR 0030** — versioning of any adapter-exposed interface.
 - **ADR 0034** — audit emission via the adapter/endpoint for memory operations.
@@ -110,14 +112,14 @@ extending the CRD schema.
   *decision* event is emitted by the OPA decision point (B2/A7), not by B11.
 
 ### 4.4 Data schemas / connection-secret contracts
-- **Connection secret (ADR 0041, interface-contract §4):** B11 consumes the uniform shape
+- **Connection secret (ADR 0044, interface-contract §4):** B11 consumes the uniform shape
   `host`, `port`, `user`, `password`, `dbname` (or per-primitive equivalents) written by the
-  `XPostgres`/`XSearchIndex`/`XObjectStore` Compositions that back the `MemoryStore`. B11 MUST NOT
+  `Postgres`/`SearchIndex`/`ObjectStore` Compositions that back the `MemoryStore`. B11 MUST NOT
   branch on substrate (kind vs AWS) — it reads the secret and connects.
 - **State of record:** Letta state persists to **Postgres** (`audit_events` is the audit table;
   memory state tables are Letta's own schema — `[PROPOSED — not in source]` for table names).
   OpenSearch retrieval indexes MUST be **rebuildable** from Postgres/object storage (ADR 0014).
-- **Capability-parity caveat (ADR 0041):** on kind, object-storage archive may be reduced/no-op;
+- **Capability-parity caveat (ADR 0044):** on kind, object-storage archive may be reduced/no-op;
   B11 MUST tolerate the documented reduced-capability path without losing the system of record.
 
 ## 5. OSS-vs-Custom Decision
@@ -145,7 +147,7 @@ scoped instances rather than forking Letta.
 - **REQ-B11-06:** B11 MUST persist Letta state to **Postgres** (system of record) and keep any
   OpenSearch retrieval indexes **reproducible** from Postgres/object storage (ADR 0014, §6.3).
 - **REQ-B11-07:** B11 MUST consume the **uniform connection secret** from the B4-composed
-  `MemoryStore` and MUST NOT branch on substrate (kind vs AWS) (ADR 0041).
+  `MemoryStore` and MUST NOT branch on substrate (kind vs AWS) (ADR 0044).
 - **REQ-B11-08:** B11 MUST run Letta **namespace-scoped** (one instance per the multi-tenancy
   mitigation, §9), respecting the namespace-as-tenant boundary (ADR 0016).
 - **REQ-B11-09:** B11 MUST emit **audit events** for memory reads/writes attributed to the agent
@@ -240,7 +242,7 @@ scoped instances rather than forking Letta.
   `Memory` CRD; namespace-scoped instances"), §6.13 (compat matrix).
 - ADR 0005 (Letta backend; B11 thin adapter as isolation seam), ADR 0025 (memory access modes),
   ADR 0014 (Postgres primary / OpenSearch derived), ADR 0016 (namespaces), ADR 0018 (RBAC-floor /
-  OPA-restrictor), ADR 0041 (substrate abstraction + connection secret), ADR 0030 (versioning),
+  OPA-restrictor), ADR 0044 (substrate abstraction + connection secret), ADR 0030 (versioning),
   ADR 0034 (audit).
 - interface-contract §1.2 (`Memory`), §1.6 (`MemoryStore`), §2 (taxonomy), §3.1 (`memory.*`), §4
   (connection secret). Glossary: Letta, `MemoryStore`, connection secret.

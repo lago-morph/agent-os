@@ -40,8 +40,8 @@ derived from `architecture-overview.md` §15 (glossary), §6.12 (CRD inventory),
 | Stage | **Stage** | Kargo promotion target (ADR 0040). v1.0 starts with a **single Stage**; staging/prod Stages come online later per the phased rollout. |
 | Approval gate | **`Approval`-CRD-backed human gate** | A Kargo Stage gate backed by the `Approval` CRD (B19). |
 | RBAC-as-floor / OPA-as-restrictor | **RBAC-as-floor / OPA-as-restrictor** | Platform-wide enforcement model (ADR 0018): RBAC grants the permission floor; OPA may further restrict per-decision. |
-| Substrate | **substrate** | A deployment target (`kind` or `aws`) abstracted by Crossplane Compositions (ADR 0041). Selection is label-driven via `platform.io/environment=kind|aws`. |
-| Connection secret | **connection secret** | The uniform secret shape (host, port, user, password, dbname or equivalent) every substrate XRD Composition writes per the XRD contract (ADR 0041). |
+| Substrate | **substrate** | A deployment target (`kind` or `aws`) abstracted by Crossplane Compositions (ADR 0044). Selection is label-driven via `platform.io/environment=kind|aws`. |
+| Connection secret | **connection secret** | The uniform secret shape (host, port, user, password, dbname or equivalent) every substrate XRD Composition writes per the XRD contract (ADR 0044). |
 | ESO | **ESO** | External Secrets Operator — handles MCP-service secrets (§A17). |
 
 ## CRDs and XRDs (exact kinds — from §6.12)
@@ -77,22 +77,22 @@ Crossplane XRs / XRDs (reconciled by Crossplane, B4):
 - `MemoryStore` (XR) — composed memory backend.
 - `AgentEnvironment` (XR) — composed environment for a class of agents.
 - `SyntheticMCPServer` (XR) — MCP server synthesized from an OpenAPI spec.
-- `GrafanaDashboard` (XR) — namespaced dashboard.
-- `AuditLog` (XRD) — composes the audit pipeline (ADR 0034).
+- `GrafanaDashboard` (XR) — namespaced dashboard (ADR 0021 / 0044).
+- `AuditLog` (XR) — composes the audit pipeline (ADR 0034 / 0044). Composes `Postgres` + `ObjectStore`.
 - `TenantOnboarding` (XRD) — provisions a tenant (ADR 0028 / 0037).
-- `XAgentDatabase` (XRD) — per-agent/tenant/user Postgres or MongoDB databases (ADR 0020 / 0041).
-- `XPostgres` (XRD) — substrate-abstracted Postgres (ADR 0041).
-- `XSearchIndex` (XRD) — substrate-abstracted search/index backend (ADR 0041).
-- `XObjectStore` (XRD) — substrate-abstracted object storage (ADR 0041).
-- `XMongoDocStore` (XRD) — substrate-abstracted Mongo-compatible document store (ADR 0041).
+- `AgentDatabase` (XR) — per-agent/tenant/user Postgres or MongoDB databases (ADR 0020 / 0044).
+- `Postgres` (XR) — substrate-abstracted Postgres (ADR 0044).
+- `SearchIndex` (XR) — substrate-abstracted search/index backend (ADR 0044).
+- `ObjectStore` (XR) — substrate-abstracted object storage (ADR 0044).
+- `MongoDocStore` (XR) — substrate-abstracted Mongo-compatible document store (ADR 0044).
 
 > All v1.0 platform CRDs are **namespaced**. There are no cluster-scoped platform CRDs in v1.0.
 
-> XR ↔ claim naming (ADR 0041): `X`-prefixed names are the cluster-scoped composite (XR); the
-> user-facing namespaced **claim drops the prefix** — XR `XPostgres` ↔ claim `Postgres`, XR
-> `XAuditLog` ↔ claim `AuditLog`, XR `XAgentDatabase` ↔ claim `AgentDatabase`, XR
-> `XGrafanaDashboard` ↔ claim `GrafanaDashboard`. Both names refer to the same XRD. When in
-> doubt use the form the source uses in context; do not coin new variants.
+> Crossplane v2 naming (ADR 0044): All substrate XRs are namespace-scoped directly — users
+> create them in their namespace. The `X`-prefix convention (ADR 0041) is retired with claims.
+> Primitive XRs: `Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore`. Higher-level XRs:
+> `AgentDatabase` (composes `Postgres` or `MongoDocStore`), `AuditLog` (composes `Postgres` +
+> `ObjectStore`), `GrafanaDashboard`. All reference ADR 0044.
 
 ## Products and vendor components (exact casing)
 
@@ -108,7 +108,7 @@ Crossplane XRs / XRDs (reconciled by Crossplane, B4):
 | **Kargo** | Promotion fabric across environments (A23; ADR 0040). |
 | **Headlamp** | Kubernetes UI + plugin framework (A9). |
 | **HolmesGPT** | Self-management agent (A14; ADR 0012). |
-| **Crossplane** | Composition / substrate abstraction (Crossplane v2; B4; ADR 0041). |
+| **Crossplane** | Composition / substrate abstraction (Crossplane v2; B4; ADR 0044). |
 | **OPA / Gatekeeper** | Policy engine (A7; ADR 0002). "OPA" for the engine, "Gatekeeper" for admission. |
 | **Envoy** | Egress proxy (A6; ADR 0003). "Envoy egress proxy". |
 | **Keycloak** | Identity provider / JWT issuer (ADR 0028, 0029). |
@@ -123,9 +123,9 @@ Crossplane XRs / XRDs (reconciled by Crossplane, B4):
 | **ArgoCD** | GitOps sync (referenced throughout; within-environment deploy). |
 | **Argo Workflow** | A single workflow run (used in `Approval` reconciliation). |
 | **Material for MkDocs** | Documentation portal (C1; ADR 0008). |
-| **CloudNativePG** | In-cluster Postgres on kind (per `XPostgres`, ADR 0041). |
-| **MinIO** | MinIO-compatible object store on kind (per `XObjectStore`). |
-| **Bitnami MongoDB** | In-cluster MongoDB on kind (per `XMongoDocStore`). |
+| **CloudNativePG** | In-cluster Postgres on kind (per `Postgres`, ADR 0044). |
+| **MinIO** | MinIO-compatible object store on kind (per `ObjectStore`). |
+| **Bitnami MongoDB** | In-cluster MongoDB on kind (per `MongoDocStore`). |
 | **Context7** | An initial MCP service (A17; ADR 0020). |
 | **Firecrawl** | Explicitly **NOT in v1.0** (A17 / ADR 0020) — replaced by generic web-search + web-scrape services. |
 | **LangGraph** | Supported v1.0 agent SDK (B7; ADR 0019). `Agent.sdk` value `langgraph`. |

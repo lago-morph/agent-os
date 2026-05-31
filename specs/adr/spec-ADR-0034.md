@@ -23,6 +23,7 @@ the authoritative store, and keeps OpenSearch a rebuildable index that can fail 
 
 ### 2.1 In scope
 - The single-adapter emission contract: every component emits audit **only** through the adapter library to the audit endpoint.
+- The audit-adapter interface and `audit_events` schema are frozen (D-05); a freeze-gate MUST pass before any component emits audit events.
 - The system-of-record topology: in-flight rows in Postgres `audit_events`; AWS batch CronJob → immutable verified S3 object → only-then Postgres delete; kind = Postgres-only, batch disabled.
 - OpenSearch as advisory async fanout: rebuildable, never authoritative, non-blocking to ingestion.
 - The `AuditLog` XRD as the provisioner of the whole pipeline (endpoint Deployment, Postgres, S3+lifecycle (AWS), indexer, batch CronJob (AWS)).
@@ -32,25 +33,25 @@ the authoritative store, and keeps OpenSearch a rebuildable index that can fail 
 ### 2.2 Out of scope (and where it lives instead)
 - Audit **retention durations, redaction rules, lifecycle specifics** — deferred to Workstream F (component F1) per architecture-backlog §1.13.
 - Per-event-type audit **schemas** under `platform.audit.*` — owned by component B12 (schema registry).
-- The substrate XRDs (`XPostgres`, `XObjectStore`) the `AuditLog` XRD composes — owned by ADR 0041 / B4.
+- The substrate XRDs (`Postgres`, `ObjectStore`) the `AuditLog` XRD composes — owned by ADR 0044 / B4.
 - The dynamic-toggle mechanism itself — owned by ADR 0035.
 - The audit-endpoint component build and adapter-library build — owned by component A18.
 
 ## 3. Context & Dependencies
 
-Upstream consumed: B4 (Crossplane Compositions) supplies `XPostgres` + `XObjectStore` that the
+Upstream consumed: B4 (Crossplane Compositions) supplies `Postgres` + `ObjectStore` that the
 `AuditLog` XRD composes; A11 (OpenSearch) is the advisory fanout target; A7 (OPA/Gatekeeper) admits
-the claim only when a Composition matches the cluster's substrate label (ADR 0041). Downstream
+the XR only when a Composition matches the cluster's substrate label (ADR 0044). Downstream
 consumers: A18 (builds the adapter library + audit endpoint), B4 (owns the `AuditLog` Composition),
-A23 (Kargo promotes the `AuditLog` claim uniformly across substrates), B12 (registers `platform.audit.*`
+A23 (Kargo promotes the `AuditLog` XR uniformly across substrates), B12 (registers `platform.audit.*`
 event schemas). Every platform component is an emitter that MUST link the adapter.
 
 ADR decisions honored:
 - **ADR 0034** (this): single adapter; no direct writes; Postgres+S3 SoR; OpenSearch advisory; `AuditLog` XRD provisions the pipeline.
 - **ADR 0031**: audit events carry a `type` under `platform.audit.*`.
 - **ADR 0035**: the audit endpoint owns its own dynamic `LogLevel` toggle.
-- **ADR 0041**: `AuditLog` is a canonical substrate-abstraction instance composing `XPostgres` + `XObjectStore`; kind may produce "no archive" (graceful degradation).
-- **ADR 0040**: Kargo promotes the `AuditLog` claim uniformly across substrates.
+- **ADR 0044**: `AuditLog` is a canonical substrate-abstraction instance composing `Postgres` + `ObjectStore`; kind may produce "no archive" (graceful degradation).
+- **ADR 0040**: Kargo promotes the `AuditLog` XR uniformly across substrates.
 - **ADR 0014 / ADR 0033**: Postgres dual-mode (RDS on AWS, in-cluster on kind); kind functionally complete without cloud services.
 - **ADR 0003**: audit-endpoint egress to S3 and managed OpenSearch goes through the Envoy egress proxy.
 
@@ -58,11 +59,11 @@ ADR decisions honored:
 
 ### 4.1 CRDs / XRDs (schema fields, version per ADR 0030)
 - **`AuditLog` (XRD)**, namespaced. Source-stated fields: `postgresRef`, `s3BucketRef`, `indexerRef`,
-  `batchScheduleSpec`, `endpointReplicas`. (XR form: `XAuditLog`.) One claim provisions: Postgres
+  `batchScheduleSpec`, `endpointReplicas`. (XRD kind: `AuditLog`, created as a namespaced XR directly in the tenant namespace per Crossplane v2.) One XR provisions: Postgres
   backing store, S3 bucket + lifecycle (AWS only), OpenSearch indexer config, the ~5-minute batch
-  CronJob (AWS only), and the audit endpoint Deployment. Composes `XPostgres` (system of record on
-  kind and AWS) and `XObjectStore` (S3 archive on AWS; MinIO or no-op on kind). XRD versioning
-  follows ADR 0030 (conversion webhooks + deprecation windows on both Compositions).
+  CronJob (AWS only), and the audit endpoint Deployment. Composes `Postgres` (system of record on
+  kind and AWS) and `ObjectStore` (S3 archive on AWS; MinIO or no-op on kind). XRD versioning
+  follows ADR 0030 (conversion webhooks + deprecation windows on both Compositions, per ADR 0044).
 
 ### 4.2 APIs / SDK surfaces
 - **Audit adapter — a Python library** every component links against (architecture-backlog §6: all
@@ -89,7 +90,7 @@ ADR decisions honored:
 - **kind**: S3 not provisioned; Postgres alone is the system of record; the batch step is disabled.
 - **OpenSearch** receives events via an async indexer; the audit index is rebuildable from S3 (AWS)
   or Postgres (kind); OpenSearch is never authoritative; if down, audit ingestion still succeeds.
-- The `AuditLog` XRD's composed Postgres / S3 backends present the ADR 0041 uniform connection-secret
+- The `AuditLog` XRD's composed Postgres / S3 backends present the ADR 0044 uniform connection-secret
   shape (`host`, `port`, `user`, `password`, `dbname` or equivalent) to the endpoint.
 
 ## 5. OSS-vs-Custom Decision
@@ -108,16 +109,17 @@ OSS-vs-custom calls live in A18 / B4 SPECs.
 - REQ-ADR-0034-06: On kind, S3 MUST NOT be required: Postgres alone is the system of record and the batch step MUST be disabled (the pipeline degrades gracefully — "no archive").
 - REQ-ADR-0034-07: OpenSearch MUST be advisory fanout only: an async indexer; the audit index MUST be rebuildable from S3 (AWS) or Postgres (kind); OpenSearch MUST never be the system of record; if OpenSearch is unavailable, audit ingestion MUST still succeed.
 - REQ-ADR-0034-08: Audit events MUST carry a CloudEvent `type` under `platform.audit.*`, distinct from `platform.security.*` (ADR 0031).
-- REQ-ADR-0034-09: The `AuditLog` XRD MUST provision the whole pipeline from one claim: Postgres store, S3 bucket + lifecycle (AWS only), OpenSearch indexer, batch CronJob (AWS only), and the audit endpoint Deployment.
+- REQ-ADR-0034-09: The `AuditLog` XRD MUST provision the whole pipeline from one XR: Postgres store, S3 bucket + lifecycle (AWS only), OpenSearch indexer, batch CronJob (AWS only), and the audit endpoint Deployment.
 - REQ-ADR-0034-10: The audit endpoint MUST own its own `LogLevel` toggle (ADR 0035) so verbosity rises per-tenant / per-event-class without redeploying callers.
 - REQ-ADR-0034-11: Audit-endpoint egress to S3 and AWS-managed OpenSearch MUST go through the Envoy egress proxy (ADR 0003); the endpoint is not a special case.
+- REQ-ADR-0034-12: The audit-adapter interface and the `audit_events` schema MUST be frozen (D-05); a freeze-gate MUST pass before any component emits audit events, so no emitter ships against an unfrozen contract.
 
 ## 7. Non-Functional Requirements
 - Reproducibility invariant: OpenSearch contents MUST always be rebuildable from S3 (AWS) or Postgres (kind).
 - Failure bounding: OpenSearch down ⇒ ingestion still succeeds; S3 write/verify fails ⇒ rows retained + retried; Postgres down ⇒ endpoint fails closed for that caller (same surface as any Postgres-backed control-plane op).
 - Multi-tenancy (§6.9): verbosity is raiseable per-tenant / per-event-class via the endpoint's `LogLevel` toggle without caller redeploy.
 - Observability (§6.5): the §6.5 diagram is logical — components emit via adapter → endpoint → Postgres (authoritative) / S3 (archive, AWS) / OpenSearch (advisory).
-- Versioning (ADR 0030): `AuditLog` XRD claim-shape changes are versioning events on both Compositions; the endpoint HTTP API uses URL-path versioning; events carry `schemaVersion`.
+- Versioning (ADR 0030): `AuditLog` XRD schema changes are versioning events on both Compositions; the endpoint HTTP API uses URL-path versioning; events carry `schemaVersion`.
 
 ## 8. Cross-Cutting Deliverable Checklist
 N/A — ADR. The realizing component A18 carries the §14.1 deliverables (adapter library, endpoint
@@ -133,9 +135,10 @@ Deployment manifests, runbook, audit emission, HolmesGPT toolset, 3-layer tests)
 - AC-ADR-0034-05: Honored when, on kind, the pipeline ingests and serves audit with no S3 provisioned and the batch CronJob absent/disabled. (→ REQ-06)
 - AC-ADR-0034-06: Honored when OpenSearch is taken down mid-ingest, ingestion still succeeds, and the audit index is shown to rebuild from S3 (AWS) / Postgres (kind). (→ REQ-07)
 - AC-ADR-0034-07: Honored when every sampled audit event carries a `type` under `platform.audit.*` and no audit event is emitted under `platform.security.*`. (→ REQ-08)
-- AC-ADR-0034-08: Honored when one `AuditLog` claim is shown to provision the endpoint Deployment, Postgres store, and (on AWS) S3 bucket + lifecycle + indexer + batch CronJob. (→ REQ-09)
+- AC-ADR-0034-08: Honored when one `AuditLog` XR is shown to provision the endpoint Deployment, Postgres store, and (on AWS) S3 bucket + lifecycle + indexer + batch CronJob. (→ REQ-09)
 - AC-ADR-0034-09: Honored when a `LogLevel` change on the audit endpoint raises verbosity per-tenant / per-event-class with no caller redeploy. (→ REQ-10)
 - AC-ADR-0034-10: Honored when endpoint egress to S3 / managed OpenSearch is observed traversing the Envoy egress proxy. (→ REQ-11)
+- AC-ADR-0034-11: Honored when the audit-adapter interface and `audit_events` schema are marked frozen (D-05) and a CI freeze-gate fails any pipeline in which a component emits audit events before that gate passes. (→ REQ-12)
 
 ## 10. Risks & Open Questions
 - (high) On AWS the in-flight Postgres `audit_events` table grows unbounded while S3 is unrecoverable; REQ-05 retains data but operators must alert on table growth — alerting threshold is an A18 design detail, not specified here.
@@ -144,5 +147,5 @@ Deployment manifests, runbook, audit emission, HolmesGPT toolset, 3-layer tests)
 - Open: retention durations / redaction rules — deferred to Workstream F (F1); the S3 lifecycle on the `AuditLog` XRD is the surface they attach to.
 
 ## 11. References
-- ADR 0034 (this decision). Enforcing/realizing components: A18 (adapter library + audit endpoint), B4 (`AuditLog` Composition), A11 (OpenSearch advisory), A7 (admission), A23 (Kargo claim promotion), B12 (`platform.audit.*` schemas).
-- architecture-overview.md §6.5 (observability/audit), §6.3 (data architecture). architecture-backlog.md §1.13 (retention deferred to F), §6 (reproducibility invariant; all custom code Python). ADR 0003, 0009, 0011, 0014, 0021, 0031, 0033, 0035, 0040, 0041.
+- ADR 0034 (this decision). Enforcing/realizing components: A18 (adapter library + audit endpoint), B4 (`AuditLog` Composition), A11 (OpenSearch advisory), A7 (admission), A23 (Kargo XR schema promotion), B12 (`platform.audit.*` schemas).
+- architecture-overview.md §6.5 (observability/audit), §6.3 (data architecture). architecture-backlog.md §1.13 (retention deferred to F), §6 (reproducibility invariant; all custom code Python). ADR 0003, 0009, 0011, 0014, 0021, 0031, 0033, 0035, 0040, 0044.

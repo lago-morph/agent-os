@@ -3,7 +3,7 @@
 > kind: COMPONENT · workstream: B · tier: T1
 > upstream: [B9, B14] · downstream: [] · adrs: [0010, 0033, 0011, 0040, 0002, 0034, 0030, 0031]
 > · views: [6.6]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
 
@@ -79,7 +79,7 @@ adopters* at runtime, and its outputs feed ArgoCD/Kargo, but no build piece depe
 - **ADR 0010** — GitHub Actions only; CLI is the contract; security-first reference pipeline;
   container-maintenance pipeline in GitHub Actions; one how-to (not three).
 - **ADR 0033** — AWS (EKS) + GitHub as v1.0 targets; OIDC federation to AWS; kind for dev/test; dual-
-  mode primitives consumed via Crossplane claims (tests run against both modes).
+  mode primitives consumed via Crossplane composite resources (XRs) (tests run against both modes).
 - **ADR 0011** — CLI-based test orchestration is what makes a second CI mechanical.
 - **ADR 0040** — pre-merge checks complement Kargo's runtime promotion gates; rollback is
   promote-previous-Warehouse-commit, not `git revert` (§7.4).

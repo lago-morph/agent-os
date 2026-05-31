@@ -2,9 +2,11 @@
 
 > kind: COMPONENT · workstream: B · tier: T0
 > upstream: [A4, B8] · downstream: [B19] · adrs: [0031, 0030, 0004, 0013, 0034, 0023] · views: [6.7, 6.13]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
+
+Each `platform.*` event namespace has **exactly one authoring/owning component**; the registry rejects schema writes from non-owners (QN-03). Canonical owners include B13 (`platform.capability`), B19 (`platform.approval`), B14 (`platform.evaluation`), A5 (`platform.lifecycle`), A1 (`platform.gateway`), A7 (`platform.policy` and `platform.security`), A18 (`platform.audit`), A21 (`platform.tenant`), and A13 (`platform.observability`). JWT/OIDC claims are a separate concept from Crossplane composite resources and must not be conflated.
 
 B12 is the **CloudEvent schema registry**: the Git-versioned set of **JSON schemas** for the
 platform's CloudEvent types plus the tooling that validates, versions, and publishes them. Every
@@ -114,7 +116,7 @@ Agent/CapabilitySet identifiers per ADR 0013) but owns no CRD.
 
 ### 4.4 Data schemas / connection-secret contracts
 N/A — no datastore, no connection secret. B12's "schemas" are JSON-schema files in Git; the registry
-is reconciled like other GitOps artifacts. It owns no substrate primitive (ADR 0041).
+is reconciled like other GitOps artifacts. It owns no substrate primitive (ADR 0044).
 
 ## 5. OSS-vs-Custom Decision
 **Build-new tooling over an OSS schema standard.** Upstream: **CloudEvents** (the event format,

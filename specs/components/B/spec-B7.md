@@ -2,7 +2,7 @@
 
 > kind: COMPONENT · workstream: B · tier: T0
 > upstream: [B6, A6, A5] · downstream: [B18, B21] · adrs: [0019, 0001, 0013, 0032, 0003, 0030] · views: [6.2, 6.6, 6.13]
-> canon-glossary: see _meta/glossary.md · canon-interface: see _meta/interface-contract.md
+> canon-glossary: b0edae10a2e649ba06e2b184dc938235aab758e3 · canon-interface: 0ce201d5d5af5cffcf09b647ea4a902a47596d36
 
 ## 1. Purpose & Problem Statement
 

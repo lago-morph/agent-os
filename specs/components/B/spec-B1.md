@@ -58,7 +58,7 @@ N/A — B1 introduces no CRD/XRD. It is proxy + Keycloak-client configuration de
 - Audit-relevant access events (who reached which UI), if emitted, fall under `platform.audit.*` via the audit adapter (ADR 0034). Emission is via the audit adapter library, never direct writes.
 
 ### 4.4 Data schemas / connection-secret contracts
-- Keycloak client secrets / oauth2-proxy cookie secrets are fetched via **ESO** from the secret backend (AWS Secrets Manager on AWS; local on kind) per §6.11 trust bootstrap. No connection-secret XRD shape (ADR 0041) is owned here.
+- Keycloak client secrets / oauth2-proxy cookie secrets are fetched via **ESO** from the secret backend (AWS Secrets Manager on AWS; local on kind) per §6.11 trust bootstrap. No connection-secret XRD shape (ADR 0044) is owned here.
 - Consumed claim schema: the §6.9 table verbatim (ADR 0029).
 
 ## 5. OSS-vs-Custom Decision

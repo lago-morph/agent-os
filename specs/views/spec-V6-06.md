@@ -60,7 +60,7 @@ Consumed (owned by B13):
 Consumed (owned by Argo Workflow + B19):
 - `Approval` — `requestingAgent`, `actionType`, `actionAttributes`, `defaultLevel`, `evidenceRefs[]`, `decision`, `decidedBy`, `decidedAt` (OPA elevation per ADR 0017).
 
-Decision points apply to the full admission set (Gatekeeper): `Agent`, `AgentRun`, `Sandbox`, `SandboxTemplate`, `Memory`, `MemoryStore`, `MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, `BudgetPolicy`, `Approval`, `LogLevel`, and the Crossplane XRs (`AgentEnvironment`, `SyntheticMCPServer`, `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `XAgentDatabase`, `XPostgres`, `XSearchIndex`, `XObjectStore`, `XMongoDocStore`).
+Decision points apply to the full admission set (Gatekeeper): `Agent`, `AgentRun`, `Sandbox`, `SandboxTemplate`, `Memory`, `MemoryStore`, `MCPServer`, `A2APeer`, `RAGStore`, `EgressTarget`, `Skill`, `CapabilitySet`, `VirtualKey`, `BudgetPolicy`, `Approval`, `LogLevel`, and the Crossplane v2 XRs (`AgentEnvironment`, `SyntheticMCPServer`, `GrafanaDashboard`, `AuditLog`, `TenantOnboarding`, `AgentDatabase`, `Postgres`, `SearchIndex`, `ObjectStore`, `MongoDocStore`).
 
 All namespaced; versioning per ADR 0030; owners per the interface contract.
 
@@ -70,12 +70,12 @@ All namespaced; versioning per ADR 0030; owners per the interface contract.
 - Audit adapter library (A18) — every enumerated audit point links it; no direct store writes.
 - Headlamp plugin actions — the editing surface for OPA bundles, virtual keys, budgets (one editing surface across components).
 
-### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031)
-Emitted by the security/policy slice (per-event-type names deferred to B12 registry):
-- `platform.policy.*` — OPA decisions, policy violations, dynamic-registration accept/deny, and **all simulator dry-run decisions** (audited even though they never enforce).
-- `platform.security.*` — security events distinct from audit: sandbox-escape signal, repeated authn failures, policy-bypass attempts.
-- `platform.audit.*` — every enumerated audit point (admission, gateway, egress, ESO, ArgoCD, LibreChat, Headlamp actions, approval, Coach, HolmesGPT, kopf registry changes) via the adapter.
-- `platform.approval.*` — approval requested, OPA-elevated, decided, timed out (ADR 0017).
+### 4.3 CloudEvents emitted / consumed (taxonomy per ADR 0031; single owner per namespace, QN-03)
+Each `platform.*` namespace has exactly one owner (DECISIONS-LOG QN-03); this slice emits onto:
+- `platform.policy.*` (owner **A7**, OPA engine) — OPA decisions, policy violations, dynamic-registration accept/deny, and **all simulator dry-run decisions** (audited even though they never enforce).
+- `platform.security.*` (owner **A7**, OPA engine) — security events distinct from audit: sandbox-escape signal, repeated authn failures, policy-bypass attempts.
+- `platform.audit.*` (owner **A18**, audit endpoint) — every enumerated audit point (admission, gateway, egress, ESO, ArgoCD, LibreChat, Headlamp actions, approval, Coach, HolmesGPT, kopf registry changes) via the adapter.
+- `platform.approval.*` (owner **B19**, approval system) — approval requested, OPA-elevated, decided, timed out (ADR 0017).
 
 ### 4.4 Data schemas / connection-secret contracts
 - Budgets: `BudgetPolicy` reconciled into OPA data + LiteLLM spend tracking; OPA returns allow/deny on each request given current spend.
@@ -99,6 +99,7 @@ Each requirement is an **invariant/constraint this view imposes** on every parti
 - **REQ-V6-06-09:** The policy simulator MUST answer "what would happen at each enforcement layer?" via a structured dry-run at each layer (RBAC, Gatekeeper audit-mode, LiteLLM OPA callback, Envoy egress OPA, approval elevation, CLI promotion gates), emitting the same decision shape with `simulated: true` and NO enforcement-path side effects (ADR 0038). (§6.6, lines ~544–551)
 - **REQ-V6-06-10:** Simulator dry-run decisions MUST be audited under `platform.policy.*` so policy-edit history is observable, while never producing enforcement-path effects. (§6.6, line ~551)
 - **REQ-V6-06-11:** RBAC MUST be reported as a separately-attributed layer alongside the OPA-driven layers in the simulator, so admins can distinguish denial at the floor from restriction by policy. (§6.6, line ~548)
+- **REQ-V6-06-12:** When any platform component detects a security-relevant event (sandbox-escape signal, repeated authn failure, policy-bypass attempt), it MUST emit a CloudEvent under `platform.security.*` (single owner A7, the OPA engine) **in addition to** any local handling; the bus is the cross-cutting security-signal path, not a substitute for in-place enforcement. (DECISIONS-LOG QN-03; ADR 0031)
 
 ## 7. Non-Functional Requirements
 - **Security/multi-tenancy (§6.9):** defense-in-depth is the security model; tenant ↔ tenant is a named trust boundary in the B22 threat model; capability scope is enforced at admission/gateway/egress/kernel.
@@ -122,6 +123,7 @@ The view holds when:
 - **AC-V6-06-09:** The simulator returns a per-layer decision composite for a sample request with `simulated: true` and causes no state change or live denial. (→ REQ-09)
 - **AC-V6-06-10:** Each simulator dry-run produces a `platform.policy.*` audit record with no enforcement-path effect. (→ REQ-10)
 - **AC-V6-06-11:** The simulator response attributes RBAC as a distinct layer from the OPA-driven layers. (→ REQ-11)
+- **AC-V6-06-12:** A simulated sandbox-escape / repeated-authn-failure / policy-bypass detection produces a `platform.security.*` CloudEvent (owner A7) in addition to its local handling; the namespace used is from the ten-namespace table (ADR 0031). (→ REQ-12)
 
 ## 10. Risks & Open Questions
 - **OQ-1 (med):** Some LiteLLM budget features (alert routing, automated suspension) may be enterprise-only; if so, extended via callbacks (B2). OPA-as-policy / LiteLLM-as-spend-tracker invariant is unchanged. (§6.6, line ~509)

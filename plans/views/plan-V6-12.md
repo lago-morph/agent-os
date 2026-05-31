@@ -9,7 +9,7 @@ Realization map. This view is not built directly; it is realized collectively by
 reconciler owner** — A5 (ARK CRDs), A6 (sandbox CRDs), B13 (capability/key/budget CRDs), B19
 (`Approval`), B4 (all XRs/XRDs), and per-component `LogLevel`. The view's job is to keep the union of
 all component-defined CRDs equal to the master inventory and to hold the namespaced-everything,
-per-component-ownership, and X-prefix/claim invariants. The realization is continuous: each owner's
+per-component-ownership, and Crossplane v2 namespace-scoped-XR invariants. The realization is continuous: each owner's
 spec is checked against this inventory, and the inventory is checked against interface-contract.md §1
 (done in SPEC §10 — no membership divergence found). Verification is a conformance diff, not a build.
 
@@ -17,13 +17,13 @@ spec is checked against this inventory, and the inventory is checked against int
 - **TASK-01:** Bind the §4.1 master inventory to reconciler owners (A5/A6/B13/B19/B4 + per-component
   LogLevel) — produces: CRD→owner trace — depends-on: [].
 - **TASK-02:** Run the interface-contract.md §1 cross-check; record divergences — produces: §10
-  divergence log (completed: no missing/extra CRDs; 5 naming nuances + 3 `[PROPOSED]` claim
-  spellings) — depends-on: [TASK-01].
+  divergence log (completed: no missing/extra CRDs; naming nuances aligned to Crossplane v2 XR
+  conventions) — depends-on: [TASK-01].
 - **TASK-03:** Define the conformance-diff verification path (union-of-specs == inventory;
-  namespaced-only; owner-traceable; XR↔claim resolves to one XRD) — produces: §5 AC→layer map —
+  namespaced-only; owner-traceable; each substrate XR is one namespace-scoped Crossplane v2 composite) — produces: §5 AC→layer map —
   depends-on: [TASK-01].
-- **TASK-04:** Route open questions (`LogLevel` versioning-column owner; derived claim spellings) to
-  V6-13 / ADR 0041 owners; cross-link realizing views — produces: routing + reference set —
+- **TASK-04:** Route open questions (`LogLevel` versioning-column owner; substrate XR naming under Crossplane v2) to
+  V6-13 / ADR 0044 owners; cross-link realizing views — produces: routing + reference set —
   depends-on: [TASK-02].
 
 ## 3. Dependency Map
@@ -43,11 +43,11 @@ TASK-02 and TASK-03 run concurrently after TASK-01; TASK-04 follows TASK-02.
 Maps SPEC §9 ACs to layers; realized by the reconciler owners, verified as a conformance diff:
 - AC-V6-12-01 → **PyTest**: union of CRDs across all component specs == §4.1 inventory; no orphan, no
   unlisted CRD.
-- AC-V6-12-02 → **Chainsaw**: every installed platform CRD is namespaced; a cluster-scoped platform
-  CRD (other than Crossplane composite XRs) fails.
+- AC-V6-12-02 → **Chainsaw**: every installed platform CRD is namespaced, including the Crossplane v2
+  XRs; a cluster-scoped platform CRD fails.
 - AC-V6-12-03 → **PyTest**: each CRD's `CustomResourceDefinition`/conversion-webhook ownership traces
   to a §3 reconciler.
-- AC-V6-12-04 → **Chainsaw**: for each substrate XRD, the `X`-prefixed XR and unprefixed claim resolve
+- AC-V6-12-04 → **Chainsaw**: each substrate XR is a single namespace-scoped Crossplane v2 composite (no claim, no `X`-prefixed form) that resolves
   to one XRD; no variant name appears in any spec.
 - AC-V6-12-05 → **PyTest**: diff of inventory vs interface-contract.md §1 yields only the §10 log
   items (target: empty after reconciliation).
