@@ -16,12 +16,12 @@ A14,COMPONENT,HolmesGPT (early phase),A,T1,W0,,A16;B10,L
 A15,COMPONENT,Reloader + oauth2-proxy,A,T2,W0,,,S
 A16,COMPONENT,Interactive Access Agent,A,T1,W2,A1;A14,,M
 A17,COMPONENT,Initial MCP services integration,A,T0,W2,A1;A7;B13,,XL
-A18,COMPONENT,Audit endpoint + audit adapter library,A,T0,W1,A11;A7,,L
+A18,COMPONENT,Audit endpoint + audit adapter library,A,T0,W1,A11;A7;B4,,L
 A19,COMPONENT,Mattermost adapter,A,T1,W1,A4;A1,,L
 A20,COMPONENT,Policy simulator service,A,T1,W1,A7;A1;A6,A22,L
-A21,COMPONENT,Tenant onboarding reconciler,A,T1,W3,A9;A22,,M
+A21,COMPONENT,Tenant onboarding reconciler,A,T1,W3,A9;A22;B4,,M
 A22,COMPONENT,Headlamp graphical-editor framework for platform CRDs,A,T0,W2,A9;A20,A21,L
-A23,COMPONENT,Kargo promotion fabric,A,T1,W4,A7;B19,B5,L
+A23,COMPONENT,Kargo promotion fabric,A,T1,W4,A7;B19;B4,B5,L
 B1,COMPONENT,SSO/auth proxy layer,B,T1,W1,A1;A2;A8;A9,,M
 B2,COMPONENT,LiteLLM custom callbacks,B,T1,W1,A1;A7,,L
 B3,COMPONENT,OPA policy library (framework),B,T0,W1,A7,B16,M
@@ -40,7 +40,7 @@ B15,COMPONENT,CI/CD reference pipeline (GitHub Actions),B,T1,W4,B9;B14,,M
 B16,COMPONENT,Initial OPA policy library content,B,T0,W2,B3;A1;A6;A5;B13,,L
 B17,COMPONENT,Agent profile library,B,T1,W2,B13;A5;A1,B18,M
 B18,COMPONENT,Recommended agent compositions,B,T2,W4,B17;A5;A1;B7,,M
-B19,COMPONENT,Generalized approval system,B,T0,W3,A3;A7;A9;B5;B12,A23,L
+B19,COMPONENT,Generalized approval system,B,T0,W3,A3;A7;A9;B5;B12;B4,A23,L
 B20,COMPONENT,Persistent volume access for Platform Agents,B,T1,W2,A6;A7;A5,,M
 B21,COMPONENT,Development environment for agents,B,T2,W4,B7;B6;B9,,M
 B22,COMPONENT,Security threat model design specification,B,T0,W0,,,L
