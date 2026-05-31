@@ -1,9 +1,83 @@
 # HANDOFF — Spec + Plan Generation Run (Agentic Execution Platform)
 
-> Branch: `claude/spec-plan-review-parallel-zR9Qr` · Date: 2026-05-30
-> Status: **Authoring complete (119/119 pieces, spec + plan each).** Verification,
-> consistency normalization, targeted adversarial review, the per-piece PR graph,
-> and the Operational/NFR layer remain. Read this top-to-bottom before continuing.
+> Original run branch: `claude/spec-plan-review-parallel-zR9Qr` · Date: 2026-05-30
+> **Status (updated 2026-05-31): authoring complete; review + decisions session done.
+> Every open question is resolved EXCEPT the Crossplane v1→v2 conformance pass.
+> Decisions are recorded in `_meta/reviews/DECISIONS-LOG.md` but NOT yet applied to the
+> spec/plan files. § "SESSION 2 HANDOFF" below is the current entry point; §§1–7 are kept
+> as background on the original authoring run.**
+
+---
+
+## SESSION 2 HANDOFF — Review & Decisions (2026-05-31): start here
+
+A full review + decision pass ran over the 119-piece corpus. Read these, in order:
+
+1. **`_meta/reviews/DECISIONS-LOG.md`** — the authoritative record: every ruling (Decided),
+   the **Future-version** backlog, the **Out-of-scope** list, the resolved **event-namespace
+   ownership** table, and the **OPS-layer consequence**. *This is the single source of truth
+   for what was decided.*
+2. **`_meta/reviews/OPEN-DECISIONS.md`** — plain-language rationale; 5 of 6 now marked decided.
+3. T0 reviews: `review-R1..R5*.md` + `DECISIONS-NEEDED.md` / `-PLAIN.md`; consistency:
+   `consistency-existence.md`, `csv-reciprocity.md`.
+
+**Repo / PR state.** Merged to `main`: PR #12 (OPS layer), #13 (reviews + registers),
+#14 (consistency + 4 csv fixes). **Open, NOT merged: PR #15** on branch
+`claude/scrub-crossplane-v1-terms` — carries the decisions log, the v1→v2 finding, the
+v1-term scrub of the registers, the D-09 csv fix, and the resolved-QN-03 record. Merge or
+rebase PR #15 first in the next session.
+
+### The ONE remaining open decision → the next session's main job: Crossplane v1 → v2
+
+The specs were authored on the **Crossplane v1** resource model (~270 references to "claim",
+the `X`-prefixed-composite/claim split, "claim admission"), codified in **ADR-0041**. The
+platform is **Crossplane v2** (claims removed; composite resources are namespaced directly).
+Agreed plan (one PR):
+- **ADR mechanics:** create a new ADR (next free number, ~0044) — *"Crossplane v2 resource
+  model"*; set **ADR-0041 → `Superseded`**; **move ADR-0041 (and its spec/plan) into an
+  `adr/superseded/` subdirectory** so agents don't read the stale one; new ADR carries a guard note.
+- **Sweep:** parallel **opus** subagents, one per slice (Workstream A, B, C–F, views, ADRs),
+  **re-expressing** v1 terminology *and logic* (admission, naming, versioning) in v2 terms —
+  re-expression, not blind find-and-replace. Fold in D-07 (add `SearchIndex`/`MongoDocStore`/
+  `ObjectStore` to the glossary as v2 composite types).
+- **Verify:** grep for residual Crossplane-context "claim"/`X`-prefix (target zero) + a re-read pass.
+
+### Honest answer to "is Crossplane the only TODO before implementing?"
+
+**It's the last open *question*, but not the last *task*.** The decisions live in the log,
+not yet in the spec files. Before implementing the corpus, a **"apply the decisions to the
+specs"** phase is needed (naturally bundled with the Crossplane pass, since it touches most
+of the same files):
+
+1. **Crossplane v1→v2 pass** (above) — largest.
+2. **OPS-layer trim** — retire/trim OPS1–OPS6 to the surviving in-scope slivers (see the log's
+   "Consequence for the OPS layer"): OPS2/OPS5 essentially gone; OPS1/OPS4 → quota+sandbox
+   sliver; OPS3 → "consume ESO + reloader + LiteLLM entry"; OPS6 → RBAC granularity.
+3. **Thread the remaining rulings into the actual specs** (currently only in the log): D-02
+   (B19 authors `platform.approval.*` + add the task), D-03 (B3 owns the OPA decision-doc;
+   A1/A6/A7 are consumers), D-05 (audit-adapter + `audit_events` freeze-gate), QN-03 (the ten
+   event-namespace owners **+ the cross-cutting "on a security event, also emit to the bus"
+   requirement in every component**), the **observability correction** (remove the direct
+   `AlertManager→HolmesGPT` trigger from glossary/§6.7 → bus-mediated), **#5/#9 + quota schema**
+   (extensible typed `quotas` list on `TenantOnboarding`; admission requires `cpu`+`memory`
+   entries *present*, value may be explicit `unlimited:true`; composition emits
+   `ResourceQuota`/`LimitRange`), #23 (distinct RBAC perms), D-08 (Envoy stays; sandbox
+   `NetworkPolicy` L3/L4 baseline; egress **floor**, not a ceiling; OAuth = a LiteLLM-GUI
+   secret), D-01 (`system`/`system-mediated` meanings; retire `user-cred`; system agents use a
+   service-account identity), secrets (ESO + reloader startup-gate + LiteLLM PushSecret flow),
+   D-04 (memory = design-time abstraction owned by the memory adapter B11).
+4. **My-scope cleanup:** QN-02 (normalize `canon-*` front-matter hashes), QN-04 (rewrite the
+   untestable ACs), QN-05 (reword/drop the "platform release"-unit ACs).
+
+### Guardrails the user set (honor these in every edit)
+- **Plain language** in any human-facing doc; never lead with bare piece codes.
+- **Crossplane v2 only** — the word "claim" and the v1 model must not appear.
+- **Egress baseline is a floor (extensible), never a closed/mandatory ceiling** — watch
+  mandatory-vs-optional wording; one word flips intent.
+- **One owner per event namespace**; others take an explicit dependency (no co-ownership).
+- **Quotas: mandatory *presence* of cpu+memory** (value may be explicit `unlimited`), not
+  mandatory limits.
+- **Do not scope-creep** into baseline/platform/cluster concerns (see the Out-of-scope list).
 
 ---
 
