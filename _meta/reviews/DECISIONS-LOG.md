@@ -38,6 +38,26 @@ Buckets: **Decided** (act on these) · **Future version** (post-MVP — importan
 ### Template layering (confirmed existing)
 - Agent "templates" layer via the existing **`CapabilitySet` overlay model** (ADR-0013 / ADR-0032: add-if-not-there / replace-if-there), with per-Agent overrides. B17 is the curated profile library. Egress allowlists (`egressTargets[]`) and other capabilities ride this model — no new template/override mechanism needed.
 
+### Event-namespace ownership (QN-03 — resolved)
+**Principle: exactly one component owns each of the ten `platform.*` CloudEvent namespaces** — it authors and owns the schemas and registers them in the registry (B12). Other components that emit or consume those events take an **explicit dependency** on the owner; never co-ownership.
+
+| Event family (namespace) | Single owner | Who depends |
+|---|---|---|
+| Agent lifecycle (`platform.lifecycle`) | the agent operator / ARK (A5) | the sandbox (A6), dashboards |
+| Gateway (`platform.gateway`) | the LiteLLM gateway (A1) | dashboards, cost reporting |
+| Policy (`platform.policy`) | the policy engine / OPA (A7) | dashboards, audit |
+| Audit (`platform.audit`) | the audit endpoint (A18) | every audit-emitting component (ties to D-05) |
+| Tenant (`platform.tenant`) | the tenant-onboarding reconciler (A21) | dashboards |
+| Capability (`platform.capability`) | the kopf operator (B13) — existing | dashboard, SDK, profile library |
+| Approval (`platform.approval`) | the approval system (B19) — D-02 | promotion pipeline, dashboard, self-healing agent |
+| Security (`platform.security`) | the policy engine / OPA (A7) | dashboards, audit, external SIEM (out of scope) |
+| Observability (`platform.observability`) | the metrics & tracing stack — Tempo + Mimir (A13) | external consumers (initially cloud-native logging) |
+| Evaluation (`platform.evaluation`) | the test & evaluation framework (B14) | dashboards, promotion pipeline |
+
+**Cross-cutting security requirement (applies to every component):** when a component detects a security-relevant event, it performs its existing local handling **and additionally emits the event to the bus** under `platform.security` (schema owned by A7). Security alerts are treated like policy violations — "we caught something out of the norm worth capturing." The bus emission is an *export/notification* surface (for dashboards, audit, external SIEM), not the primary response path. This needs to land as a requirement in each component spec.
+
+**Observability note:** alarming happens inside the observability stack (AlertManager → HolmesGPT, §6.7). `platform.observability` events are an **export surface for outside consumers** (cloud-native logging initially), **not** a load-bearing internal dependency. A13 owns the schema.
+
 ---
 
 ## FUTURE VERSION (post-MVP — important, not v1)
@@ -66,7 +86,7 @@ Recorded so they are not re-raised.
 ## STILL OPEN (awaiting ruling)
 - **#24 / #25 / #26** — global OPA bundle ownership; policy-bundle signing + load-time verification; staged policy rollout (audit→enforce, whether Kargo gates it). *(You said "don't know on everything related to policies here.")*
 - **D-04** — concrete `MemoryStore` connection-secret field list (still open). **D-09 resolved:** the memory adapter (B11) depends on the infrastructure layer (B4), which provisions the memory store and emits its connection secret — dependency runs **B4 → B11**; csv fixed accordingly.
-- **QN-03 — event-namespace ownership** — assign an owning/authoring component to each of the ten `platform.*` CloudEvent namespaces (walkthrough in progress).
+- **QN-03 — RESOLVED** (event-namespace ownership — see the Decided section).
 - **D-08 wiring — not a standing decision.** Envoy's deployment topology (sidecar vs shared gateway) and the agent↔Envoy linkage are ordinary build-time implementation details, decided during implementation. The spec only states: Envoy enforces the per-agent L7 egress allowlist resolved from the agent's `CapabilitySet`.
 - **D-11** — Crossplane **v1→v2 conformance pass** go-ahead (and revising/superseding ADR-0041). The specs are written on the v1 model.
 - **PROPOSED-ADR-A** — the tenant quota field schema (needed to land #5/#9).
